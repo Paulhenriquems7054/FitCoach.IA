@@ -106,22 +106,6 @@ export interface ModerationResult {
     reason: string;
 }
 
-export interface ForumReply {
-    id: string;
-    author: string;
-    content: string;
-    timestamp: string;
-}
-  
-export interface ForumPost {
-    id: string;
-    author: string;
-    title: string;
-    content: string;
-    timestamp: string;
-    replies: ForumReply[];
-}
-
 export interface WorkoutDay {
     dia_semana: string;
     foco_treino: string;

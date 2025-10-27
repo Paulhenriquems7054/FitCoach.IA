@@ -11,7 +11,6 @@ import ChallengesPage from './pages/ChallengesPage';
 import LibraryPage from './pages/LibraryPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
-import CommunityPage from './pages/CommunityPage';
 import WellnessPlanPage from './pages/WellnessPlanPage';
 import AnalysisPage from './pages/AnalysisPage';
 import SmartMealPage from './pages/SmartMealPage';
@@ -30,7 +29,6 @@ const App: React.FC = () => {
             case '/reports': return <ReportsPage />;
             case '/desafios': return <ChallengesPage />;
             case '/biblioteca': return <LibraryPage />;
-            case '/comunidade': return <CommunityPage />;
             case '/perfil': return <ProfilePage />;
             case '/configuracoes': return <SettingsPage />;
             case '/wellness': return <WellnessPlanPage />;

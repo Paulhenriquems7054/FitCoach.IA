@@ -13,7 +13,6 @@ import { TrophyIcon } from '../icons/TrophyIcon';
 import { BookOpenIcon } from '../icons/BookOpenIcon';
 import { UserCircleIcon } from '../icons/UserCircleIcon';
 import { CogIcon } from '../icons/CogIcon';
-import { UsersIcon } from '../icons/UsersIcon';
 import { HeartIcon } from '../icons/HeartIcon';
 import { TrendingUpIcon } from '../icons/TrendingUpIcon';
 import { WandIcon } from '../icons/WandIcon';
@@ -46,7 +45,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     { name: t('sidebar.wellnessPlan'), href: '#/wellness', icon: HeartIcon },
     { name: t('sidebar.challenges'), href: '#/desafios', icon: TrophyIcon },
     { name: t('sidebar.library'), href: '#/biblioteca', icon: BookOpenIcon },
-    { name: t('sidebar.community'), href: '#/comunidade', icon: UsersIcon },
   ];
 
   const userNavigation = [
