@@ -9,7 +9,6 @@
         "planGenerator": "Gerador de Plano",
         "smartMeal": "Refeição Inteligente",
         "plateAnalyzer": "Analisador de Prato",
-        "imageEditor": "Editor de Imagem",
         "aiChat": "Chat com IA",
         "progressAnalysis": "Análise de Progresso",
         "aiReports": "Relatórios IA",
@@ -82,19 +81,6 @@
             "title": "Limite Atingido",
             "description": "Você atingiu o limite de relatórios para o plano gratuito. Faça upgrade para acesso ilimitado.",
             "button": "Virar Premium"
-        }
-    },
-    "image_editor": {
-        "title": "Editor de Imagem com IA",
-        "subtitle": "Edite suas fotos usando comandos de texto simples.",
-        "prompt_placeholder": "Ex: Adicione um filtro retrô, remova o fundo...",
-        "button": "Editar com IA",
-        "remove_image": "Remover Imagem",
-        "original_title": "Original",
-        "edited_title": "Editada",
-        "error": {
-            "title": "Erro na Edição",
-            "generic": "Não foi possível editar a imagem. Tente um prompt diferente ou outra imagem."
         }
     },
     "settings": {

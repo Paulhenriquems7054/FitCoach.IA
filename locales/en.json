@@ -9,7 +9,6 @@
         "planGenerator": "Plan Generator",
         "smartMeal": "Smart Meal",
         "plateAnalyzer": "Plate Analyzer",
-        "imageEditor": "Image Editor",
         "aiChat": "AI Chat",
         "progressAnalysis": "Progress Analysis",
         "aiReports": "AI Reports",
@@ -82,19 +81,6 @@
             "title": "Limit Reached",
             "description": "You've reached the report limit for the free plan. Upgrade for unlimited access.",
             "button": "Become Premium"
-        }
-    },
-    "image_editor": {
-        "title": "AI Image Editor",
-        "subtitle": "Edit your photos using simple text commands.",
-        "prompt_placeholder": "E.g., Add a retro filter, remove the background...",
-        "button": "Edit with AI",
-        "remove_image": "Remove Image",
-        "original_title": "Original",
-        "edited_title": "Edited",
-        "error": {
-            "title": "Editing Error",
-            "generic": "Could not edit the image. Try a different prompt or another image."
         }
     },
     "settings": {
