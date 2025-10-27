@@ -20,7 +20,6 @@ import { WandIcon } from '../icons/WandIcon';
 import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
 import { BriefcaseIcon } from '../icons/BriefcaseIcon';
 import { StarIcon } from '../icons/StarIcon';
-import { PhotoIcon } from '../icons/PhotoIcon';
 
 interface SidebarProps {
   open: boolean;
@@ -41,7 +40,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     { name: t('sidebar.planGenerator'), href: '#/generator', icon: SparklesIcon },
     { name: t('sidebar.smartMeal'), href: '#/smart-meal', icon: WandIcon },
     { name: t('sidebar.plateAnalyzer'), href: '#/analyzer', icon: CameraIcon },
-    { name: t('sidebar.imageEditor'), href: '#/image-editor', icon: PhotoIcon },
     { name: t('sidebar.aiChat'), href: '#/chat', icon: ChatBubbleIcon },
     { name: t('sidebar.progressAnalysis'), href: '#/analysis', icon: TrendingUpIcon },
     { name: t('sidebar.aiReports'), href: '#/reports', icon: ChartBarIcon },

@@ -18,7 +18,6 @@ import SmartMealPage from './pages/SmartMealPage';
 import PrivacyPage from './pages/PrivacyPage';
 import ProfessionalDashboardPage from './pages/ProfessionalDashboardPage';
 import PremiumPage from './pages/PremiumPage';
-import ImageEditorPage from './pages/ImageEditorPage';
 
 const App: React.FC = () => {
     const { path } = useRouter();
@@ -40,7 +39,6 @@ const App: React.FC = () => {
             case '/privacy': return <PrivacyPage />;
             case '/professional': return <ProfessionalDashboardPage />;
             case '/premium': return <PremiumPage />;
-            case '/image-editor': return <ImageEditorPage />;
             case '/':
             default:
                 return <HomePage />;
