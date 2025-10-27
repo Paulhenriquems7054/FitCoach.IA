@@ -1,0 +1,155 @@
+
+{
+    "anonymous_user": "Usuário Anônimo",
+    "offline": {
+        "banner": "Você está offline. Algumas funcionalidades podem estar limitadas."
+    },
+    "sidebar": {
+        "home": "Início",
+        "planGenerator": "Gerador de Plano",
+        "smartMeal": "Refeição Inteligente",
+        "plateAnalyzer": "Analisador de Prato",
+        "imageEditor": "Editor de Imagem",
+        "aiChat": "Chat com IA",
+        "progressAnalysis": "Análise de Progresso",
+        "aiReports": "Relatórios IA",
+        "wellnessPlan": "Plano de Bem-Estar",
+        "challenges": "Desafios",
+        "library": "Biblioteca",
+        "community": "Comunidade",
+        "myProfile": "Meu Perfil",
+        "privacy": "Segurança e Privacidade",
+        "settings": "Configurações",
+        "professionalDashboard": "Painel Profissional",
+        "bePremium": "Seja Premium"
+    },
+    "home": {
+        "greeting": "Olá, {{name}}!",
+        "welcome_back": "Bem-vindo(a) de volta ao seu centro de bem-estar.",
+        "coach_tip": {
+            "title": "Dica do Coach IA"
+        },
+        "smart_navigation": {
+            "title": "Navegação Inteligente",
+            "generator_title": "Gerar Plano Alimentar",
+            "generator_desc": "Crie um novo plano diário com IA.",
+            "library_title": "Biblioteca Nutricional",
+            "library_desc": "Explore receitas personalizadas.",
+            "challenges_title": "Desafios e Conquistas",
+            "challenges_desc": "Complete tarefas e ganhe pontos."
+        },
+        "checkin": {
+            "title": "Check-in Semanal",
+            "description": "Já faz uma semana! Que tal registrar seu peso para acompanhar o progresso?",
+            "button_log": "Registrar Peso",
+            "button_later": "Lembre-me Amanhã"
+        }
+    },
+    "meal_plan": {
+        "title": "Seu Plano Alimentar",
+        "export_pdf": "Exportar PDF",
+        "why_this_meal": "Por que esta refeição?",
+        "observations_title": "Observações da Nutri.IA",
+        "explanation": {
+            "title": "Análise da IA para",
+            "error": "Não foi possível obter a explicação da IA no momento."
+        }
+    },
+    "chat": {
+        "title": "Chat com Nutri.IA",
+        "subtitle": "Tire suas dúvidas sobre nutrição",
+        "initial_greeting": "Olá, {{name}}! Eu sou o Nutri.IA, seu assistente nutricional. Sabendo que seu objetivo é {{objective}}, como posso te ajudar hoje?",
+        "placeholder": "Digite sua mensagem...",
+        "send": "Enviar",
+        "error": "Desculpe, ocorreu um erro ao me comunicar. Por favor, tente novamente.",
+        "voice_not_supported": "Reconhecimento de voz não é suportado neste navegador.",
+        "tts_not_supported": "Leitura de texto não é suportada neste navegador."
+    },
+    "reports": {
+        "title": "Relatórios IA",
+        "subtitle": "Receba análises semanais do seu progresso pela IA.",
+        "initial": {
+            "title": "Pronto para sua análise semanal?",
+            "description": "A Nutri.IA analisará seu progresso, destacando vitórias e sugerindo os próximos passos para atingir seu objetivo.",
+            "button": "Gerar meu Relatório"
+        },
+        "error": {
+            "generic": "Ocorreu um erro ao gerar seu relatório. Por favor, tente novamente.",
+            "title": "Erro ao Gerar",
+            "retry": "Tentar Novamente"
+        },
+        "limit": {
+            "title": "Limite Atingido",
+            "description": "Você atingiu o limite de relatórios para o plano gratuito. Faça upgrade para acesso ilimitado.",
+            "button": "Virar Premium"
+        }
+    },
+    "image_editor": {
+        "title": "Editor de Imagem com IA",
+        "subtitle": "Edite suas fotos usando comandos de texto simples.",
+        "prompt_placeholder": "Ex: Adicione um filtro retrô, remova o fundo...",
+        "button": "Editar com IA",
+        "remove_image": "Remover Imagem",
+        "original_title": "Original",
+        "edited_title": "Editada",
+        "error": {
+            "title": "Erro na Edição",
+            "generic": "Não foi possível editar a imagem. Tente um prompt diferente ou outra imagem."
+        }
+    },
+    "settings": {
+        "title": "Configurações",
+        "subtitle": "Personalize sua experiência no aplicativo.",
+        "appearance": {
+            "title": "Aparência",
+            "description": "Escolha como o aplicativo deve parecer.",
+            "legend": "Tema da interface",
+            "light": "Claro",
+            "dark": "Escuro",
+            "system": "Sistema"
+        },
+        "language": {
+            "title": "Idioma",
+            "description": "Selecione o idioma da interface."
+        },
+        "notifications": {
+            "title": "Notificações",
+            "description": "Receba lembretes e dicas proativas da IA.",
+            "button": "Ativar Notificações",
+            "grantedTitle": "Notificações Ativadas!",
+            "grantedBody": "Você agora receberá dicas e lembretes do Nutri.IA."
+        },
+        "profile_type": {
+            "title": "Tipo de Perfil",
+            "description": "Alterne entre a visualização de usuário e profissional.",
+            "current": "Perfil atual",
+            "user": "Usuário",
+            "professional": "Profissional",
+            "button": "Trocar de Perfil"
+        }
+    },
+    "privacy": {
+        "title": "Segurança e Privacidade",
+        "subtitle": "Gerencie como seus dados são usados e protegidos.",
+        "anonymization": {
+            "title": "Anonimização de Dados",
+            "description": "Oculte seu nome em áreas públicas como a comunidade para proteger sua identidade."
+        },
+        "biometrics": {
+            "title": "Autenticação Biométrica",
+            "description": "Use sua impressão digital ou reconhecimento facial para um login mais rápido e seguro."
+        },
+        "permissions": {
+            "title": "Gerenciar Permissões de Dados",
+            "description": "Controle quais dados a IA pode acessar para personalizar sua experiência.",
+            "button": "Gerenciar Permissões"
+        },
+        "audit": {
+            "title": "Logs de Atividade",
+            "description": "Veja um registro de atividades importantes em sua conta.",
+            "event": "Evento",
+            "ip": "Endereço IP",
+            "timestamp": "Data e Hora"
+        }
+    }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Nutri.IA: Agente Nutricional Inteligente",
+  "description": "Um assistente nutricional com inteligência artificial integrada, capaz de gerar planos alimentares personalizados, acompanhar progresso e interagir por chat.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

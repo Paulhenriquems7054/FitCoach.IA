@@ -1,0 +1,344 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "path": "Nutri.IA",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -768,
+        -112
+      ],
+      "id": "d6fde996-9a68-4122-b110-3f93bdfc5308",
+      "name": "Webhook",
+      "webhookId": "83940836-fd6a-4039-98d7-ef2591c908ba"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "5ac83b82-e39b-4b4c-a7fa-ede6a7ba71a2"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {},
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "e12787f0-225a-454d-9038-f3ffc9b13743",
+      "name": "Switch - Tipo de Mensagem",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -464,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrair e preparar mensagem de texto\nconst message = $input.item.json.body.message || $input.item.json.body.text;\nconst userId = $input.item.json.body.userId || $input.item.json.body.user.nome;\nconst timestamp = $input.item.json.body.timestamp || new Date().toISOString();\n\nreturn {\n  messageType: 'text',\n  content: message,\n  userId: userId,\n  timestamp: timestamp,\n  processed: true\n};"
+      },
+      "id": "9b5b9d76-58c1-43db-b8bb-e58b49989c18",
+      "name": "Processar Texto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar imagem - converter para base64 e extrair texto\nconst imageData = $input.item.json.body.image || $input.item.json.body.imageData;\nconst userId = $input.item.json.body.userId || $input.item.json.body.user.nome;\n\n// Se for base64, extrair os dados\nlet base64Image = imageData;\nif (typeof imageData === 'string' && imageData.startsWith('data:')) {\n  base64Image = imageData.split(',')[1];\n}\n\nreturn {\n  messageType: 'image',\n  imageData: base64Image,\n  userId: userId,\n  timestamp: new Date().toISOString(),\n  prompt: 'Analise esta imagem de refeição e forneça informações nutricionais.'\n};"
+      },
+      "id": "e6eb8989-3b56-4f08-b564-87807d1355f5",
+      "name": "Processar Imagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar áudio - converter para texto\nconst audioData = $input.item.json.body.audio || $input.item.json.body.audioData;\nconst userId = $input.item.json.body.userId || $input.item.json.body.user.nome;\n\n// Extrair áudio se for base64\nlet audioBase64 = audioData;\nif (typeof audioData === 'string' && audioData.startsWith('data:')) {\n  audioBase64 = audioData.split(',')[1];\n}\n\nreturn {\n  messageType: 'audio',\n  audioData: audioBase64,\n  audioFormat: 'wav',\n  userId: userId,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "81a86ab5-1546-495c-b72d-05c3c81ed7d6",
+      "name": "Processar Áudio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Consolidar resposta final\nconst inputType = $('Processar Texto').item.json.messageType || \n                   $('Processar Imagem').item.json.messageType ||\n                   $('Processar Áudio').item.json.messageType;\n\nlet response, processedContent;\n\nif (inputType === 'text') {\n  response = $('Gemini AI - Resposta').item.json.response;\n  processedContent = response.candidates[0].content.parts[0].text;\n} else if (inputType === 'image') {\n  response = $('Gemini Vision - Análise de Imagem').item.json.response;\n  processedContent = response.candidates[0].content.parts[0].text;\n} else if (inputType === 'audio') {\n  const transcription = $('OpenAI Whisper - Transcrição').item.json.text;\n  processedContent = transcription;\n}\n\nreturn {\n  messageType: inputType,\n  originalMessage: $('Processar Texto').item.json.content || 'Áudio/Imagem',\n  processedContent: processedContent,\n  userId: $('Processar Texto').item.json.userId || $('Processar Imagem').item.json.userId || $('Processar Áudio').item.json.userId,\n  timestamp: new Date().toISOString(),\n  success: true\n};"
+      },
+      "id": "0207fd98-4468-41bd-baa2-7e88d19fc8e1",
+      "name": "Consolidar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "3bae11cc-755a-4aae-b29e-b967d1c2c36a",
+      "name": "Responder ao App",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -192
+      ],
+      "id": "a2180165-e904-449b-b591-b4333499cfe5",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        320,
+        16
+      ],
+      "id": "d3e0f064-a279-42f8-b1a8-e89213669eb9",
+      "name": "Google Gemini Chat Model"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -64
+      ],
+      "id": "22470f6d-c01a-483e-a32b-8902dd3aafd1",
+      "name": "Analyze an image"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        144,
+        304
+      ],
+      "id": "057ebc66-a2e5-41cf-a077-378e7b0a5734",
+      "name": "Transcribe a recording"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        432,
+        112
+      ],
+      "id": "400d7d02-4690-4f26-8fca-2b9bcb6bd886",
+      "name": "Simple Memory"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch - Tipo de Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Tipo de Mensagem": {
+      "main": [
+        [
+          {
+            "node": "Processar Texto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processar Imagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processar Áudio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Texto": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Imagem": {
+      "main": [
+        [
+          {
+            "node": "Analyze an image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Áudio": {
+      "main": [
+        [
+          {
+            "node": "Transcribe a recording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidar Resposta": {
+      "main": [
+        [
+          {
+            "node": "Responder ao App",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Responder ao App",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze an image": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe a recording": {
+      "main": [
+        [
+          {
+            "node": "Consolidar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "6e37404733e10a9419a64d1664d54b0762761a8df1e8c2dc36ce540fc6b1a310"
+  }
+} 

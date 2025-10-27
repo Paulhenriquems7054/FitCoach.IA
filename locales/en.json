@@ -1,0 +1,155 @@
+
+{
+    "anonymous_user": "Anonymous User",
+    "offline": {
+        "banner": "You are offline. Some features may be limited."
+    },
+    "sidebar": {
+        "home": "Home",
+        "planGenerator": "Plan Generator",
+        "smartMeal": "Smart Meal",
+        "plateAnalyzer": "Plate Analyzer",
+        "imageEditor": "Image Editor",
+        "aiChat": "AI Chat",
+        "progressAnalysis": "Progress Analysis",
+        "aiReports": "AI Reports",
+        "wellnessPlan": "Wellness Plan",
+        "challenges": "Challenges",
+        "library": "Library",
+        "community": "Community",
+        "myProfile": "My Profile",
+        "privacy": "Security & Privacy",
+        "settings": "Settings",
+        "professionalDashboard": "Professional Dashboard",
+        "bePremium": "Go Premium"
+    },
+    "home": {
+        "greeting": "Hello, {{name}}!",
+        "welcome_back": "Welcome back to your wellness center.",
+        "coach_tip": {
+            "title": "AI Coach Tip"
+        },
+        "smart_navigation": {
+            "title": "Smart Navigation",
+            "generator_title": "Generate Meal Plan",
+            "generator_desc": "Create a new daily plan with AI.",
+            "library_title": "Nutritional Library",
+            "library_desc": "Explore personalized recipes.",
+            "challenges_title": "Challenges & Achievements",
+            "challenges_desc": "Complete tasks and earn points."
+        },
+        "checkin": {
+            "title": "Weekly Check-in",
+            "description": "It's been a week! How about logging your weight to track your progress?",
+            "button_log": "Log Weight",
+            "button_later": "Remind Me Tomorrow"
+        }
+    },
+    "meal_plan": {
+        "title": "Your Meal Plan",
+        "export_pdf": "Export PDF",
+        "why_this_meal": "Why this meal?",
+        "observations_title": "Observations from Nutri.IA",
+        "explanation": {
+            "title": "AI Analysis for",
+            "error": "Could not get the AI explanation at this time."
+        }
+    },
+    "chat": {
+        "title": "Chat with Nutri.IA",
+        "subtitle": "Ask your questions about nutrition",
+        "initial_greeting": "Hello, {{name}}! I'm Nutri.IA, your nutritional assistant. Knowing your goal is {{objective}}, how can I help you today?",
+        "placeholder": "Type your message...",
+        "send": "Send",
+        "error": "Sorry, an error occurred while communicating. Please try again.",
+        "voice_not_supported": "Voice recognition is not supported in this browser.",
+        "tts_not_supported": "Text-to-speech is not supported in this browser."
+    },
+    "reports": {
+        "title": "AI Reports",
+        "subtitle": "Get weekly analysis of your progress from the AI.",
+        "initial": {
+            "title": "Ready for your weekly analysis?",
+            "description": "Nutri.IA will analyze your progress, highlight wins, and suggest the next steps to reach your goal.",
+            "button": "Generate my Report"
+        },
+        "error": {
+            "generic": "An error occurred while generating your report. Please try again.",
+            "title": "Generation Error",
+            "retry": "Try Again"
+        },
+        "limit": {
+            "title": "Limit Reached",
+            "description": "You've reached the report limit for the free plan. Upgrade for unlimited access.",
+            "button": "Become Premium"
+        }
+    },
+    "image_editor": {
+        "title": "AI Image Editor",
+        "subtitle": "Edit your photos using simple text commands.",
+        "prompt_placeholder": "E.g., Add a retro filter, remove the background...",
+        "button": "Edit with AI",
+        "remove_image": "Remove Image",
+        "original_title": "Original",
+        "edited_title": "Edited",
+        "error": {
+            "title": "Editing Error",
+            "generic": "Could not edit the image. Try a different prompt or another image."
+        }
+    },
+    "settings": {
+        "title": "Settings",
+        "subtitle": "Customize your app experience.",
+        "appearance": {
+            "title": "Appearance",
+            "description": "Choose how the application should look.",
+            "legend": "Interface theme",
+            "light": "Light",
+            "dark": "Dark",
+            "system": "System"
+        },
+        "language": {
+            "title": "Language",
+            "description": "Select the interface language."
+        },
+        "notifications": {
+            "title": "Notifications",
+            "description": "Receive proactive reminders and tips from the AI.",
+            "button": "Enable Notifications",
+            "grantedTitle": "Notifications Enabled!",
+            "grantedBody": "You will now receive tips and reminders from Nutri.IA."
+        },
+        "profile_type": {
+            "title": "Profile Type",
+            "description": "Switch between user and professional view.",
+            "current": "Current profile",
+            "user": "User",
+            "professional": "Professional",
+            "button": "Switch Profile"
+        }
+    },
+    "privacy": {
+        "title": "Security & Privacy",
+        "subtitle": "Manage how your data is used and protected.",
+        "anonymization": {
+            "title": "Data Anonymization",
+            "description": "Hide your name in public areas like the community to protect your identity."
+        },
+        "biometrics": {
+            "title": "Biometric Authentication",
+            "description": "Use your fingerprint or face recognition for a faster, more secure login."
+        },
+        "permissions": {
+            "title": "Manage Data Permissions",
+            "description": "Control which data the AI can access to personalize your experience.",
+            "button": "Manage Permissions"
+        },
+        "audit": {
+            "title": "Activity Logs",
+            "description": "See a record of important activities in your account.",
+            "event": "Event",
+            "ip": "IP Address",
+            "timestamp": "Date & Time"
+        }
+    }
+}
