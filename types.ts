@@ -154,19 +154,6 @@ export interface FoodSubstitution {
     justificativa: string;
 }
 
-export interface FoodProductInfo {
-    nome_produto: string;
-    marca: string;
-    calorias_por_100g: number;
-    macros_por_100g: {
-        proteinas_g: number;
-        carboidratos_g: number;
-        gorduras_g: number;
-    };
-    health_score_ia: number; // 0 a 10
-    avaliacao_ia: string;
-}
-
 export interface Patient {
     id: string;
     name: string;

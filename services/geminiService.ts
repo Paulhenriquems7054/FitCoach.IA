@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Chat, Modality } from "@google/genai";
-import type { User, GeminiMealPlanResponse, MealAnalysisResponse, Recipe, ModerationResult, WellnessPlan, ProgressAnalysis, FoodSubstitution, FoodProductInfo } from "../types";
+import type { User, GeminiMealPlanResponse, MealAnalysisResponse, Recipe, ModerationResult, WellnessPlan, ProgressAnalysis, FoodSubstitution } from "../types";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
 
@@ -551,46 +551,6 @@ export const getFoodSubstitutions = async (food: string, user: User): Promise<Fo
         config: { responseMimeType: "application/json", responseSchema: foodSubstitutionsSchema }
     });
     return (JSON.parse(response.text) as { substituicoes: FoodSubstitution[] }).substituicoes;
-};
-
-// --- BARCODE SCANNER ---
-const foodProductInfoSchema = {
-    type: Type.OBJECT,
-    properties: {
-        nome_produto: { type: Type.STRING },
-        marca: { type: Type.STRING },
-        calorias_por_100g: { type: Type.INTEGER },
-        macros_por_100g: {
-            type: Type.OBJECT,
-            properties: {
-                proteinas_g: { type: Type.NUMBER },
-                carboidratos_g: { type: Type.NUMBER },
-                gorduras_g: { type: Type.NUMBER }
-            },
-            required: ["proteinas_g", "carboidratos_g", "gorduras_g"]
-        },
-        health_score_ia: { type: Type.NUMBER, description: "Nota de 0 a 10" },
-        avaliacao_ia: { type: Type.STRING }
-    },
-    required: ["nome_produto", "marca", "calorias_por_100g", "macros_por_100g", "health_score_ia", "avaliacao_ia"]
-};
-
-export const getFoodInfoFromBarcode = async (barcode: string): Promise<FoodProductInfo> => {
-    if (!API_KEY) throw new Error("API key is not configured.");
-    // This is a simulation. In a real app, you might use a barcode-to-product API first.
-    const prompt = `
-        Simule as informações nutricionais para um produto com o código de barras "${barcode}".
-        Invente um produto de supermercado comum (ex: Iogurte Grego, Barra de Cereal, etc.).
-        Forneça as informações nutricionais (calorias e macros por 100g).
-        Crie uma "nota de saúde" de 0 a 10 e uma breve avaliação sobre o produto.
-        Retorne estritamente no formato JSON.
-    `;
-    const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: { responseMimeType: "application/json", responseSchema: foodProductInfoSchema }
-    });
-    return JSON.parse(response.text) as FoodProductInfo;
 };
 
 // --- IMAGE EDITING ---
