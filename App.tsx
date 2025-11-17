@@ -1,24 +1,42 @@
 
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Layout } from './components/layout/Layout';
 import { useRouter } from './hooks/useRouter';
-import HomePage from './pages/HomePage';
-import ReportsPage from './pages/ReportsPage';
-import AnalyzerPage from './pages/AnalyzerPage';
-import GeneratorPage from './pages/GeneratorPage';
-import ChallengesPage from './pages/ChallengesPage';
-import LibraryPage from './pages/LibraryPage';
-import ProfilePage from './pages/ProfilePage';
-import SettingsPage from './pages/SettingsPage';
-import WellnessPlanPage from './pages/WellnessPlanPage';
-import AnalysisPage from './pages/AnalysisPage';
-import SmartMealPage from './pages/SmartMealPage';
-import PrivacyPage from './pages/PrivacyPage';
-import ProfessionalDashboardPage from './pages/ProfessionalDashboardPage';
-import PremiumPage from './pages/PremiumPage';
-import PresentationPage from './pages/PresentationPage';
-import LoginPage from './pages/LoginPage';
-import WelcomeSurveyPage from './pages/WelcomeSurveyPage';
+import { Skeleton } from './components/ui/Skeleton';
+import { Card } from './components/ui/Card';
+
+// Lazy load das páginas para reduzir o bundle inicial
+const HomePage = lazy(() => import('./pages/HomePage'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const AnalyzerPage = lazy(() => import('./pages/AnalyzerPage'));
+const GeneratorPage = lazy(() => import('./pages/GeneratorPage'));
+const ChallengesPage = lazy(() => import('./pages/ChallengesPage'));
+const LibraryPage = lazy(() => import('./pages/LibraryPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const WellnessPlanPage = lazy(() => import('./pages/WellnessPlanPage'));
+const AnalysisPage = lazy(() => import('./pages/AnalysisPage'));
+const SmartMealPage = lazy(() => import('./pages/SmartMealPage'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const ProfessionalDashboardPage = lazy(() => import('./pages/ProfessionalDashboardPage'));
+const PremiumPage = lazy(() => import('./pages/PremiumPage'));
+const PresentationPage = lazy(() => import('./pages/PresentationPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const WelcomeSurveyPage = lazy(() => import('./pages/WelcomeSurveyPage'));
+
+// Componente de loading
+const PageLoader = () => (
+    <div className="container mx-auto px-4 py-8">
+        <Card>
+            <div className="p-6 space-y-4">
+                <Skeleton className="h-8 w-1/3" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-4/6" />
+            </div>
+        </Card>
+    </div>
+);
 
 const App: React.FC = () => {
     const { path } = useRouter();
@@ -45,20 +63,34 @@ const App: React.FC = () => {
     };
 
     if (path === '/presentation') {
-        return <PresentationPage />;
+        return (
+            <Suspense fallback={<PageLoader />}>
+                <PresentationPage />
+            </Suspense>
+        );
     }
 
     if (path === '/welcome-survey') {
-        return <WelcomeSurveyPage />;
+        return (
+            <Suspense fallback={<PageLoader />}>
+                <WelcomeSurveyPage />
+            </Suspense>
+        );
     }
 
     if (path === '/login') {
-        return <LoginPage />;
+        return (
+            <Suspense fallback={<PageLoader />}>
+                <LoginPage />
+            </Suspense>
+        );
     }
 
     return (
         <Layout>
-            {renderPage()}
+            <Suspense fallback={<PageLoader />}>
+                {renderPage()}
+            </Suspense>
         </Layout>
     );
 };

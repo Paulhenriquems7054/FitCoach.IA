@@ -10,9 +10,6 @@ import { XIcon } from './icons/XIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { useI18n } from '../context/I18nContext';
 
-declare const jspdf: any;
-declare const html2canvas: any;
-
 interface MealPlanDisplayProps {
   plan: MealPlan;
   observations: string;
@@ -26,26 +23,35 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = ({ plan, observations })
   const [modalContent, setModalContent] = useState({ title: '', explanation: '' });
   const [isExplanationLoading, setIsExplanationLoading] = useState(false);
 
-  const handleExportPDF = () => {
-    if (planRef.current) {
-      const { jsPDF } = jspdf;
-      html2canvas(planRef.current, { scale: 2 }).then((canvas: HTMLCanvasElement) => {
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-        let heightLeft = imgHeight;
-        let position = 0;
+  const handleExportPDF = async () => {
+    if (!planRef.current) return;
+    
+    try {
+      // Importação dinâmica das bibliotecas PDF
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf')
+      ]);
+
+      const canvas = await html2canvas(planRef.current, { scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pdf.internal.pageSize.getHeight();
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
         pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
         heightLeft -= pdf.internal.pageSize.getHeight();
-        while (heightLeft >= 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-          heightLeft -= pdf.internal.pageSize.getHeight();
-        }
-        pdf.save('plano-alimentar-nutri-ia.pdf');
-      });
+      }
+      pdf.save('plano-alimentar-nutri-ia.pdf');
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      alert('Erro ao exportar PDF. Tente novamente.');
     }
   };
   

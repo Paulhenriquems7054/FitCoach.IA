@@ -1,6 +1,10 @@
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
@@ -35,6 +39,25 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      build: {
+        chunkSizeWarningLimit: 1000,
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              // Separar bibliotecas grandes em chunks próprios
+              'react-vendor': ['react', 'react-dom'],
+              'google-genai': ['@google/genai'],
+              'pdf-vendor': ['html2pdf.js', 'jspdf', 'html2canvas'],
+              'chart-vendor': ['recharts'],
+              'ui-vendor': ['@heroicons/react', 'clsx'],
+            },
+            // Otimizar nomes de chunks
+            chunkFileNames: 'assets/[name]-[hash].js',
+            entryFileNames: 'assets/[name]-[hash].js',
+            assetFileNames: 'assets/[name]-[hash].[ext]',
+          },
+        },
+      },
     };
 });
