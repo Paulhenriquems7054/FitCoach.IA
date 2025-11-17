@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { saveAppSetting, getAppSetting } from '../services/databaseService';
 import pt from '../locales/pt.json';
 import en from '../locales/en.json';
 import es from '../locales/es.json';
@@ -20,25 +21,59 @@ type I18nProviderProps = {
 }
 
 export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>(() => {
-    if (typeof window !== 'undefined') {
-        const savedLang = localStorage.getItem('language');
-        if (savedLang === 'pt' || savedLang === 'en' || savedLang === 'es') {
-            return savedLang;
+  const [language, setLanguage] = useState<Language>('pt');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Carregar idioma do banco de dados
+  useEffect(() => {
+    const loadLanguage = async () => {
+      try {
+        const savedLang = await getAppSetting<Language>('language');
+        if (savedLang && (savedLang === 'pt' || savedLang === 'en' || savedLang === 'es')) {
+          setLanguage(savedLang);
+        } else {
+          // Fallback para idioma do navegador
+          if (typeof window !== 'undefined') {
+            const browserLang = navigator.language.split('-')[0];
+            if (browserLang === 'en' || browserLang === 'es') {
+              setLanguage(browserLang);
+            }
+          }
         }
-        const browserLang = navigator.language.split('-')[0];
-        if (browserLang === 'en' || browserLang === 'es') {
-            return browserLang;
+      } catch (error) {
+        console.error('Erro ao carregar idioma:', error);
+        // Fallback para localStorage se o banco não estiver pronto
+        if (typeof window !== 'undefined') {
+          const savedLang = localStorage.getItem('language');
+          if (savedLang === 'pt' || savedLang === 'en' || savedLang === 'es') {
+            setLanguage(savedLang);
+          }
         }
-    }
-    return 'pt';
-  });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadLanguage();
+  }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-        localStorage.setItem('language', language);
-    }
-  }, [language]);
+    if (isLoading) return; // Não salvar durante o carregamento inicial
+    
+    const saveLanguage = async () => {
+      try {
+        await saveAppSetting('language', language);
+      } catch (error) {
+        console.error('Erro ao salvar idioma:', error);
+        // Fallback para localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('language', language);
+        }
+      }
+    };
+
+    saveLanguage();
+  }, [language, isLoading]);
 
   const t = (key: string, values: Record<string, any> = {}): string => {
     const keys = key.split('.');

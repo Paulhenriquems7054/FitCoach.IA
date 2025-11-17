@@ -27,7 +27,7 @@ const CircularProgress: React.FC<{ progress: number }> = ({ progress }) => {
     const strokeDashoffset = circumference - (progress / 100) * circumference;
 
     return (
-        <div className="relative">
+        <div className="relative flex items-center justify-center" style={{ width: radius * 2, height: radius * 2 }}>
             <svg
                 height={radius * 2}
                 width={radius * 2}
@@ -54,7 +54,7 @@ const CircularProgress: React.FC<{ progress: number }> = ({ progress }) => {
                     cy={radius}
                 />
             </svg>
-            <span className="absolute text-xl font-bold inset-0 flex items-center justify-center text-slate-700 dark:text-slate-200">
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-xl font-bold text-slate-700 dark:text-slate-200">
                 {progress}%
             </span>
         </div>
@@ -95,18 +95,18 @@ const Dashboard: React.FC<DashboardProps> = ({ summary }) => {
       )}
       
       <Card>
-        <div className="p-6">
+        <div className="p-6 space-y-6 text-center">
           <h3 className="text-xl font-bold text-slate-900 dark:text-white">Seu Progresso</h3>
-          <div className="mt-4 flex flex-col items-center gap-6">
-            <div className="text-center">
-                <p className="text-sm text-slate-500 dark:text-slate-400">Score de Disciplina</p>
-                <div className="mt-2">
-                    <CircularProgress progress={user.disciplineScore} />
-                </div>
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Pontuação de Disciplina</p>
+              <div className="flex items-center justify-center">
+                <CircularProgress progress={user.disciplineScore} />
+              </div>
             </div>
-            <div className="text-center">
-                 <p className="text-sm text-slate-500 dark:text-slate-400">Pontos Acumulados</p>
-                 <p className="text-4xl font-bold text-primary-600 dark:text-primary-400">{user.points}</p>
+            <div className="space-y-2">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Pontos Acumulados</p>
+              <p className="text-4xl font-bold text-primary-600 dark:text-primary-400">{user.points}</p>
             </div>
           </div>
         </div>

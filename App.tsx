@@ -3,7 +3,6 @@ import React from 'react';
 import { Layout } from './components/layout/Layout';
 import { useRouter } from './hooks/useRouter';
 import HomePage from './pages/HomePage';
-import ChatPage from './pages/ChatPage';
 import ReportsPage from './pages/ReportsPage';
 import AnalyzerPage from './pages/AnalyzerPage';
 import GeneratorPage from './pages/GeneratorPage';
@@ -17,6 +16,9 @@ import SmartMealPage from './pages/SmartMealPage';
 import PrivacyPage from './pages/PrivacyPage';
 import ProfessionalDashboardPage from './pages/ProfessionalDashboardPage';
 import PremiumPage from './pages/PremiumPage';
+import PresentationPage from './pages/PresentationPage';
+import LoginPage from './pages/LoginPage';
+import WelcomeSurveyPage from './pages/WelcomeSurveyPage';
 
 const App: React.FC = () => {
     const { path } = useRouter();
@@ -25,7 +27,6 @@ const App: React.FC = () => {
         switch (path) {
             case '/generator': return <GeneratorPage />;
             case '/analyzer': return <AnalyzerPage />;
-            case '/chat': return <ChatPage />;
             case '/reports': return <ReportsPage />;
             case '/desafios': return <ChallengesPage />;
             case '/biblioteca': return <LibraryPage />;
@@ -42,6 +43,18 @@ const App: React.FC = () => {
                 return <HomePage />;
         }
     };
+
+    if (path === '/presentation') {
+        return <PresentationPage />;
+    }
+
+    if (path === '/welcome-survey') {
+        return <WelcomeSurveyPage />;
+    }
+
+    if (path === '/login') {
+        return <LoginPage />;
+    }
 
     return (
         <Layout>

@@ -17,10 +17,13 @@ const PrivacyPage: React.FC = () => {
     const { t } = useI18n();
     const [biometrics, setBiometrics] = useState(false);
     
+    const rawTitle = t('privacy.title');
+    const pageTitle = rawTitle === 'privacy.title' ? t('sidebar.privacy') : rawTitle;
+
     return (
         <div className="max-w-4xl mx-auto space-y-8">
             <div className="text-center">
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{t('privacy.title')}</h1>
+                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{pageTitle}</h1>
                 <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">{t('privacy.subtitle')}</p>
             </div>
             

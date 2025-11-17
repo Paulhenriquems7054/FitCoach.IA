@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'nutri-ia-cache-v1';
+const CACHE_NAME = 'nutri-ia-cache-v2';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -9,67 +9,108 @@ const urlsToCache = [
   // as they are cross-origin. You need to configure caching for them separately if needed.
 ];
 
+// Force update on install
 self.addEventListener('install', event => {
+  self.skipWaiting(); // Force activation of new service worker
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache');
+        console.log('Opened cache', CACHE_NAME);
         return cache.addAll(urlsToCache);
       })
   );
 });
 
+// Network-first strategy: always try network first, fallback to cache
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Cache hit - return response
-        if (response) {
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  const requestUrl = event.request.url;
+  if (!requestUrl.startsWith('http')) {
+    return;
+  }
+
+  // For HTML files, always try network first to get latest version
+  if (event.request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          // If network succeeds, update cache and return response
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseToCache).catch(err => {
+                console.warn('[ServiceWorker] Falha ao gravar no cache:', err);
+              });
+            });
+          }
           return response;
+        })
+        .catch(error => {
+          // Network failed, try cache
+          console.warn('[ServiceWorker] Network failed, trying cache:', event.request.url);
+          return caches.match(event.request).then(cachedResponse => {
+            return cachedResponse || caches.match('/index.html');
+          });
+        })
+    );
+  } else {
+    // For other assets, try cache first, then network
+    event.respondWith(
+      caches.match(event.request).then(cachedResponse => {
+        if (cachedResponse) {
+          // Return cached version but also update in background
+          fetch(event.request).then(response => {
+            if (response && response.status === 200) {
+              const responseToCache = response.clone();
+              caches.open(CACHE_NAME).then(cache => {
+                cache.put(event.request, responseToCache);
+              });
+            }
+          }).catch(() => {});
+          return cachedResponse;
         }
 
-        // IMPORTANT: Clone the request. A request is a stream and
-        // can only be consumed once. Since we are consuming this
-        // once by cache and once by the browser for fetch, we need
-        // to clone the response.
-        const fetchRequest = event.request.clone();
-
-        return fetch(fetchRequest).then(
-          response => {
-            // Check if we received a valid response
+        return fetch(event.request)
+          .then(response => {
             if (!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
 
-            // IMPORTANT: Clone the response. A response is a stream
-            // and because we want the browser to consume the response
-            // as well as the cache consuming the response, we need
-            // to clone it so we have two streams.
             const responseToCache = response.clone();
-
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseToCache).catch(err => {
+                console.warn('[ServiceWorker] Falha ao gravar no cache:', err);
               });
+            });
 
             return response;
-          }
-        );
+          })
+          .catch(error => {
+            console.warn('[ServiceWorker] Network request failed for:', event.request.url, error);
+            return caches.match('/index.html');
+          });
       })
     );
+  }
 });
 
+// Clean up old caches on activate
 self.addEventListener('activate', event => {
-  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
+          if (cacheName !== CACHE_NAME) {
+            console.log('[ServiceWorker] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      return self.clients.claim(); // Take control of all pages immediately
     })
   );
 });

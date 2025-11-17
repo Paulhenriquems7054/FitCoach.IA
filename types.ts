@@ -7,6 +7,8 @@ export enum Goal {
 
 export interface User {
   nome: string;
+  username?: string; // Nome de usuário para login
+  password?: string; // Senha (será hasheada antes de salvar)
   idade: number;
   genero: 'Masculino' | 'Feminino';
   peso: number;
@@ -19,6 +21,11 @@ export interface User {
   weightHistory: { date: string; weight: number }[];
   role: 'user' | 'professional';
   subscription: 'free' | 'premium';
+}
+
+export interface LoginCredentials {
+  username: string;
+  password: string;
 }
 
 export interface MacroNutrients {
@@ -106,10 +113,23 @@ export interface ModerationResult {
     reason: string;
 }
 
+// Estrutura expandida para exercícios com mais detalhes
+export interface Exercise {
+    name: string;
+    reps?: string;
+    sets?: string;
+    tips?: string;
+    calories?: number;
+    rest?: string;
+}
+
 export interface WorkoutDay {
     dia_semana: string;
     foco_treino: string;
-    exercicios: string[];
+    exercicios: string[] | Exercise[]; // Suporta tanto string[] (legado) quanto Exercise[] (novo)
+    duracao_estimada?: string;
+    intensidade?: 'baixa' | 'moderada' | 'alta';
+    observacoes?: string;
 }
 
 export interface Supplement {
@@ -117,12 +137,25 @@ export interface Supplement {
     dosagem_sugerida: string;
     melhor_horario: string;
     justificativa: string;
+    beneficios?: string[];
+    contraindicacoes?: string;
+}
+
+export interface WellnessTips {
+    hidratacao?: string;
+    horario_treino?: string;
+    descanso?: string;
+    sono?: string;
+    nutricao?: string;
 }
 
 export interface WellnessPlan {
     plano_treino_semanal: WorkoutDay[];
     recomendacoes_suplementos: Supplement[];
     dicas_adicionais: string;
+    dicas_inteligentes?: WellnessTips;
+    data_geracao?: string;
+    versao?: number;
 }
 
 export interface ProgressAnalysis {

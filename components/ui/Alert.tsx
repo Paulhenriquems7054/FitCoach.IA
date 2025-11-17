@@ -4,6 +4,7 @@ interface AlertProps {
   type: 'success' | 'error' | 'info';
   title: string;
   children: React.ReactNode;
+  className?: string;
 }
 
 const alertConfig = {
@@ -42,11 +43,11 @@ const alertConfig = {
   },
 };
 
-export const Alert: React.FC<AlertProps> = ({ type, title, children }) => {
+export const Alert: React.FC<AlertProps> = ({ type, title, children, className = '' }) => {
   const config = alertConfig[type];
 
   return (
-    <div className={`rounded-md p-4 border ${config.bgColor} ${config.borderColor}`}>
+    <div className={`rounded-md p-4 border ${config.bgColor} ${config.borderColor} ${className}`}>
       <div className="flex">
         <div className="flex-shrink-0">
           {config.icon}

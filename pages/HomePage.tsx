@@ -42,17 +42,40 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     getAICoachTip(user).then(setCoachTip);
 
-    const lastCheckin = localStorage.getItem('lastWeightCheckin');
-    const oneWeek = 7 * 24 * 60 * 60 * 1000;
-    if (!lastCheckin || (new Date().getTime() - new Date(lastCheckin).getTime() > oneWeek)) {
-        setShowCheckin(true);
-    }
+    const checkLastCheckin = async () => {
+      try {
+        const lastCheckin = await getAppSetting<string>('lastWeightCheckin');
+        const oneWeek = 7 * 24 * 60 * 60 * 1000;
+        if (!lastCheckin || (new Date().getTime() - new Date(lastCheckin).getTime() > oneWeek)) {
+          setShowCheckin(true);
+        }
+      } catch (error) {
+        // Fallback para localStorage
+        if (typeof window !== 'undefined') {
+          const lastCheckin = localStorage.getItem('lastWeightCheckin');
+          const oneWeek = 7 * 24 * 60 * 60 * 1000;
+          if (!lastCheckin || (new Date().getTime() - new Date(lastCheckin).getTime() > oneWeek)) {
+            setShowCheckin(true);
+          }
+        }
+      }
+    };
+
+    checkLastCheckin();
   }, [user]);
 
-  const handleCheckinDismiss = () => {
+  const handleCheckinDismiss = async () => {
     setShowCheckin(false);
     // Snooze for a day
-    localStorage.setItem('lastWeightCheckin', new Date(new Date().getTime() + (24*60*60*1000)).toISOString());
+    const snoozeDate = new Date(new Date().getTime() + (24*60*60*1000)).toISOString();
+    try {
+      await saveAppSetting('lastWeightCheckin', snoozeDate);
+    } catch (error) {
+      // Fallback para localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('lastWeightCheckin', snoozeDate);
+      }
+    }
   }
   
   return (

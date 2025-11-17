@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import type { User } from '../types';
 import { Goal } from '../types';
+import { saveUser, getUser, getCurrentUsername, loginUser } from '../services/databaseService';
 
 interface UserContextType {
   user: User;
@@ -35,6 +36,26 @@ const initialUser: User = {
   subscription: 'free',
 };
 
+const loadStoredUser = async (): Promise<User | null> => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const user = await getUser();
+    if (!user) return null;
+
+    return {
+      ...initialUser,
+      ...user,
+      weightHistory: Array.isArray(user.weightHistory) ? user.weightHistory : initialUser.weightHistory,
+      completedChallengeIds: Array.isArray(user.completedChallengeIds)
+        ? user.completedChallengeIds
+        : initialUser.completedChallengeIds,
+    };
+  } catch (error) {
+    console.warn('Não foi possível carregar os dados do usuário do banco de dados.', error);
+    return null;
+  }
+};
+
 type UserProviderProps = {
   children: ReactNode;
 }
@@ -42,6 +63,40 @@ type UserProviderProps = {
 // FIX: Explicitly type the component as React.FC for better type inference and consistency.
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User>(initialUser);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Carregar usuário do banco de dados na inicialização
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const loadedUser = await loadStoredUser();
+        if (loadedUser) {
+          setUser(loadedUser);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar usuário:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUser();
+  }, []);
+
+  // Salvar usuário no banco de dados quando houver mudanças
+  useEffect(() => {
+    if (isLoading) return; // Não salvar durante o carregamento inicial
+    
+    const saveUserData = async () => {
+      try {
+        await saveUser(user);
+      } catch (error) {
+        console.error('Erro ao salvar dados do usuário no banco de dados:', error);
+      }
+    };
+
+    saveUserData();
+  }, [user, isLoading]);
 
   const addPoints = (amount: number) => {
     setUser(prevUser => ({

@@ -5,7 +5,7 @@
         "banner": "Você está offline. Algumas funcionalidades podem estar limitadas."
     },
     "sidebar": {
-        "home": "Início",
+        "home": "Dashboard",
         "planGenerator": "Gerador de Plano",
         "smartMeal": "Refeição Inteligente",
         "plateAnalyzer": "Analisador de Prato",
@@ -15,6 +15,7 @@
         "wellnessPlan": "Plano de Bem-Estar",
         "challenges": "Desafios",
         "library": "Biblioteca",
+        "enquete": "Enquete Inicial",
         "community": "Comunidade",
         "myProfile": "Meu Perfil",
         "privacy": "Segurança e Privacidade",

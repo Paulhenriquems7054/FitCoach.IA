@@ -8,6 +8,7 @@ import { SparklesIcon } from '../components/icons/SparklesIcon';
 import { TrendingUpIcon } from '../components/icons/TrendingUpIcon';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
+import { saveAppSetting } from '../services/databaseService';
 import { Skeleton } from '../components/ui/Skeleton';
 import type { ProgressAnalysis } from '../types';
 
@@ -60,13 +61,21 @@ const AnalysisPage: React.FC = () => {
         }
     }, [user.weightHistory]);
 
-    const handleAddWeight = (e: React.FormEvent) => {
+    const handleAddWeight = async (e: React.FormEvent) => {
         e.preventDefault();
         const weightValue = parseFloat(newWeight);
         if (weightValue > 0) {
             const today = new Date().toISOString().split('T')[0];
             updateWeightHistory(today, weightValue);
-            localStorage.setItem('lastWeightCheckin', new Date().toISOString());
+            // Salvar no banco de dados
+            try {
+                await saveAppSetting('lastWeightCheckin', new Date().toISOString());
+            } catch (error) {
+                // Fallback para localStorage
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('lastWeightCheckin', new Date().toISOString());
+                }
+            }
         }
     };
 

@@ -8,11 +8,22 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        strictPort: true,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
         hmr: {
           protocol: 'ws',
           host: 'localhost',
           port: 3000
         }
+      },
+      preview: {
+        port: 3000,
+        host: '0.0.0.0',
+        strictPort: true
       },
       plugins: [react()],
       define: {

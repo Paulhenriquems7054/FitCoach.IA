@@ -1,0 +1,40 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nutriaGradient" x1="128" y1="64" x2="400" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="45%" stop-color="#42d2ef"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="nutriaText" x1="0" y1="0" x2="512" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="55%" stop-color="#4ade80"/>
+      <stop offset="60%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="256" cy="256" r="232" stroke="url(#nutriaGradient)" stroke-width="6" stroke-dasharray="14 18" opacity="0.45"/>
+  <circle cx="256" cy="256" r="200" stroke="url(#nutriaGradient)" stroke-width="2" stroke-dasharray="6 12" opacity="0.25"/>
+
+  <g filter="url(#shadow)">
+    <path d="M255.7 128.4c-59.3 0-107.3 48-107.3 107.3 0 87.5 80.3 136.3 141.7 170.1 12.4 6.8 27.4-2.1 27.4-15.8v-34.5c0-10.5 6.6-19.9 16.5-23.5 40.6-14.9 71.3-55.4 71.3-102.1 0-59.3-48-107.3-107.3-107.3-14.2 0-27.8 2.7-40.3 7.9-8.2 3.3-17.4 3.3-25.6 0-12.4-5.2-26-7.9-40.4-7.9z" fill="url(#nutriaGradient)" opacity="0.92"/>
+    <path d="M348.2 182.5c-36.7 51.2-131.7 52.3-197.6 28.7" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="18 24" opacity="0.55"/>
+    <path d="M194 215.8c10.2 15.4 41.6 42.7 87.1 46.9 45.5 4.2 70 23.5 82.1 45.1" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="10 18" opacity="0.65"/>
+    <circle cx="190" cy="214" r="7.6" fill="#ffffff" opacity="0.85"/>
+    <circle cx="282" cy="262" r="6.2" fill="#ffffff" opacity="0.85"/>
+    <circle cx="362" cy="307" r="6.8" fill="#ffffff" opacity="0.85"/>
+    <circle cx="160" cy="212" r="5" fill="#ffffff" opacity="0.6"/>
+  </g>
+
+  <path d="M292.4 121.5c12.2-16 31.7-26.4 53.6-26.4 16.1 0 31 6.1 42.2 16.1-4.8 2.2-9.2 5.2-13.1 8.7-8.5 7.7-14.8 17.8-18.1 29.1-20.2-7.6-42.2-14-64.6-17.5z" fill="#4ade80" opacity="0.75"/>
+  <path d="M344.2 119.2c14.9 1.4 28.5 7 38.6 15.5 10.1 8.5 16.7 19.9 18.4 32.3-13.2-6.7-28.7-10.6-45.1-10.6-12.1 0-23.8 1.9-34.6 5.5 3.6-20.3 11.4-34.9 22.7-42.7z" fill="#1d4ed8" opacity="0.35"/>
+
+  <text x="100" y="408" font-family="Poppins, 'Segoe UI', sans-serif" font-size="64" font-weight="600" fill="url(#nutriaText)">Nutri.IA</text>
+
+  <defs>
+    <filter id="shadow" x="100" y="120" width="280" height="308" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#0ea5e9" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+</svg>
+

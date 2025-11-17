@@ -1,0 +1,85 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nutriaGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#166534" />
+      <stop offset="100%" stop-color="#22c55e" />
+    </linearGradient>
+  </defs>
+
+  <!-- Left side: Plate with vegetables -->
+  <g id="vegetables">
+    <!-- Plate circle -->
+    <circle cx="180" cy="200" r="85" stroke="#166534" stroke-width="10" fill="none" />
+    
+    <!-- Broccoli (top left) -->
+    <g id="broccoli">
+      <!-- Main broccoli head -->
+      <path d="M 120 140 Q 110 130 120 120 Q 130 110 140 120 Q 150 130 145 140 Q 135 150 125 145 Q 120 140 120 140" 
+            fill="#22c55e" stroke="#166534" stroke-width="2" />
+      <!-- Broccoli florets -->
+      <circle cx="125" cy="125" r="8" fill="#166534" />
+      <circle cx="135" cy="120" r="6" fill="#166534" />
+      <circle cx="140" cy="130" r="7" fill="#166534" />
+      <circle cx="130" cy="135" r="5" fill="#166534" />
+    </g>
+    
+    <!-- Carrot (center) -->
+    <g id="carrot">
+      <!-- Carrot body -->
+      <ellipse cx="180" cy="200" rx="14" ry="55" fill="#f97316" stroke="#166534" stroke-width="2" />
+      <!-- Carrot top leaves -->
+      <path d="M 170 145 Q 175 135 180 145 Q 185 135 190 145" 
+            fill="#22c55e" stroke="#166534" stroke-width="2" />
+      <path d="M 168 150 Q 180 140 192 150" 
+            fill="#22c55e" stroke="#166534" stroke-width="2" />
+      <path d="M 172 155 Q 180 145 188 155" 
+            fill="#22c55e" stroke="#166534" stroke-width="2" />
+    </g>
+    
+    <!-- Leaves (bottom) -->
+    <g id="leaves">
+      <ellipse cx="160" cy="240" rx="18" ry="10" fill="#166534" transform="rotate(-25 160 240)" />
+      <ellipse cx="200" cy="240" rx="18" ry="10" fill="#166534" transform="rotate(25 200 240)" />
+    </g>
+  </g>
+
+  <!-- Connecting line -->
+  <line x1="265" y1="200" x2="285" y2="200" stroke="#166534" stroke-width="8" stroke-linecap="round" />
+
+  <!-- Right side: Bicep with circuit -->
+  <g id="bicep-circuit">
+    <!-- Bicep outline (flexed arm) -->
+    <path d="M 285 140 
+             Q 305 130 330 150 
+             Q 350 170 340 220 
+             Q 330 250 310 265 
+             Q 290 275 270 265 
+             Q 250 250 260 220 
+             Q 270 190 285 170 
+             Q 285 150 285 140 Z" 
+          fill="none" stroke="#166534" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+    
+    <!-- Circuit board elements (on bicep) -->
+    <g id="circuit">
+      <!-- Main circuit line -->
+      <line x1="305" y1="200" x2="325" y2="200" stroke="#166534" stroke-width="5" stroke-linecap="round" />
+      <!-- Circuit nodes (white circles) -->
+      <circle cx="305" cy="200" r="8" fill="white" stroke="#166534" stroke-width="2" />
+      <circle cx="325" cy="200" r="8" fill="white" stroke="#166534" stroke-width="2" />
+      <!-- Connection point (dark green circle) -->
+      <circle cx="315" cy="200" r="5" fill="#166534" />
+    </g>
+  </g>
+
+  <!-- Text: Nutri.IA -->
+  <text x="256" y="400" 
+        font-family="'Segoe UI', Arial, sans-serif" 
+        font-size="72" 
+        font-weight="bold" 
+        fill="#166534" 
+        text-anchor="middle"
+        letter-spacing="2">
+    Nutri.IA
+  </text>
+</svg>
+

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { saveAppSetting, getAppSetting } from '../services/databaseService';
 
 type Theme = 'light' | 'dark';
 type ThemeSetting = 'light' | 'dark' | 'system';
@@ -16,17 +17,34 @@ type ThemeProviderProps = {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  const [themeSetting, setThemeSetting] = useState<ThemeSetting>(() => {
-    if (typeof window !== 'undefined') {
-        const savedThemeSetting = localStorage.getItem('theme_setting');
-        if (savedThemeSetting === 'dark' || savedThemeSetting === 'light' || savedThemeSetting === 'system') {
-            return savedThemeSetting;
-        }
-    }
-    return 'dark';
-  });
-
+  const [themeSetting, setThemeSetting] = useState<ThemeSetting>('dark');
   const [theme, setTheme] = useState<Theme>('dark');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Carregar tema do banco de dados
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const savedTheme = await getAppSetting<ThemeSetting>('theme_setting', 'dark');
+        if (savedTheme && (savedTheme === 'dark' || savedTheme === 'light' || savedTheme === 'system')) {
+          setThemeSetting(savedTheme);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar tema:', error);
+        // Fallback para localStorage se o banco não estiver pronto
+        if (typeof window !== 'undefined') {
+          const savedThemeSetting = localStorage.getItem('theme_setting');
+          if (savedThemeSetting === 'dark' || savedThemeSetting === 'light' || savedThemeSetting === 'system') {
+            setThemeSetting(savedThemeSetting);
+          }
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadTheme();
+  }, []);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -59,9 +77,23 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } else {
         root.classList.remove('dark');
     }
-    // Save setting to localStorage whenever it changes
-    localStorage.setItem('theme_setting', themeSetting);
-   }, [theme, themeSetting]);
+    
+    // Salvar no banco de dados quando não estiver carregando
+    if (!isLoading) {
+      const saveTheme = async () => {
+        try {
+          await saveAppSetting('theme_setting', themeSetting);
+        } catch (error) {
+          console.error('Erro ao salvar tema:', error);
+          // Fallback para localStorage
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('theme_setting', themeSetting);
+          }
+        }
+      };
+      saveTheme();
+    }
+   }, [theme, themeSetting, isLoading]);
 
   const handleSetThemeSetting = (setting: ThemeSetting) => {
     setThemeSetting(setting);

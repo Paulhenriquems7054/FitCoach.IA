@@ -5,6 +5,9 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Nutri.IA: Agente Nutricional Inteligente</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,9 +30,56 @@
 }
 </script>
 <link rel="stylesheet" href="/index.css">
+<script>
+  // Aplicar tema antes do React carregar para evitar flash
+  (function() {
+    try {
+      const savedTheme = localStorage.getItem('theme_setting') || 'dark';
+      const root = document.documentElement;
+      
+      if (savedTheme === 'system') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (prefersDark) {
+          root.classList.add('dark');
+        } else {
+          root.classList.remove('dark');
+        }
+      } else if (savedTheme === 'dark') {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    } catch (e) {
+      // Fallback: aplicar dark por padrão
+      document.documentElement.classList.add('dark');
+    }
+  })();
+</script>
 </head>
-  <body class="bg-gray-50 dark:bg-slate-900 font-sans dark">
+  <body class="bg-gray-50 dark:bg-slate-900 font-sans">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+    <script>
+      // Aggressive cache busting
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          for (let name of names) {
+            caches.delete(name);
+          }
+        });
+      }
+      
+      // Redirect to hash routing if not already there
+      if (window.location.pathname === '/' && !window.location.hash) {
+        window.location.replace('/#/');
+      }
+      
+      // Force reload if coming from cache
+      window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+          window.location.reload();
+        }
+      });
+    </script>
   </body>
 </html>

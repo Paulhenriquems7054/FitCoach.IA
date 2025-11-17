@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
@@ -7,11 +7,93 @@ import { SunIcon } from '../components/icons/SunIcon';
 import { MoonIcon } from '../components/icons/MoonIcon';
 import { useI18n } from '../context/I18nContext';
 import { Button } from '../components/ui/Button';
+import {
+    API_MODE_STORAGE_KEY,
+    FREE_API_KEY_STORAGE_KEY,
+    PAID_API_KEY_STORAGE_KEY,
+    PROVIDER_LINK_STORAGE_KEY,
+    DEFAULT_FREE_API_KEY,
+    DEFAULT_PROVIDER_LINK,
+} from '../constants/apiConfig';
+import { resetAssistantSession } from '../services/assistantService';
+import { saveAppSetting, getAppSetting } from '../services/databaseService';
 
 const SettingsPage: React.FC = () => {
     const { themeSetting, setThemeSetting } = useTheme();
     const { user, toggleRole } = useUser();
     const { t, language, setLanguage } = useI18n();
+    const [apiMode, setApiModeState] = useState<'paid' | 'free'>('free');
+    const [paidApiKey, setPaidApiKeyState] = useState<string>('');
+    const [freeApiKey, setFreeApiKeyState] = useState<string>(DEFAULT_FREE_API_KEY);
+    const [providerLink, setProviderLinkState] = useState<string>(DEFAULT_PROVIDER_LINK);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Carregar configurações do banco de dados
+    useEffect(() => {
+        const loadSettings = async () => {
+            try {
+                const savedApiMode = await getAppSetting<'paid' | 'free'>(API_MODE_STORAGE_KEY, 'free');
+                const savedPaidKey = await getAppSetting<string>(PAID_API_KEY_STORAGE_KEY, '');
+                const savedFreeKey = await getAppSetting<string>(FREE_API_KEY_STORAGE_KEY, DEFAULT_FREE_API_KEY);
+                const savedProviderLink = await getAppSetting<string>(PROVIDER_LINK_STORAGE_KEY, DEFAULT_PROVIDER_LINK);
+
+                if (savedApiMode === 'paid' || savedApiMode === 'free') {
+                    setApiModeState(savedApiMode);
+                }
+                setPaidApiKeyState(savedPaidKey || '');
+                setFreeApiKeyState(savedFreeKey || DEFAULT_FREE_API_KEY);
+                setProviderLinkState(savedProviderLink || DEFAULT_PROVIDER_LINK);
+            } catch (error) {
+                console.error('Erro ao carregar configurações:', error);
+                // Fallback para localStorage
+                if (typeof window !== 'undefined') {
+                    const stored = window.localStorage.getItem(API_MODE_STORAGE_KEY);
+                    if (stored === 'paid' || stored === 'free') {
+                        setApiModeState(stored);
+                    }
+                    setPaidApiKeyState(window.localStorage.getItem(PAID_API_KEY_STORAGE_KEY) ?? '');
+                    setFreeApiKeyState(window.localStorage.getItem(FREE_API_KEY_STORAGE_KEY) ?? DEFAULT_FREE_API_KEY);
+                    setProviderLinkState(window.localStorage.getItem(PROVIDER_LINK_STORAGE_KEY) ?? DEFAULT_PROVIDER_LINK);
+                }
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadSettings();
+    }, []);
+
+    const [isDirty, setIsDirty] = useState(false);
+    const [statusMessage, setStatusMessage] = useState<string | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    const setApiMode = useCallback((mode: 'paid' | 'free') => {
+        setApiModeState(mode);
+        setIsDirty(true);
+        setStatusMessage(null);
+        setErrorMessage(null);
+    }, []);
+
+    const setPaidApiKey = useCallback((value: string) => {
+        setPaidApiKeyState(value);
+        setIsDirty(true);
+        setStatusMessage(null);
+        setErrorMessage(null);
+    }, []);
+
+    const setFreeApiKey = useCallback((value: string) => {
+        setFreeApiKeyState(value);
+        setIsDirty(true);
+        setStatusMessage(null);
+        setErrorMessage(null);
+    }, []);
+
+    const setProviderLink = useCallback((value: string) => {
+        setProviderLinkState(value);
+        setIsDirty(true);
+        setStatusMessage(null);
+        setErrorMessage(null);
+    }, []);
 
     const handleNotifications = () => {
         if ('Notification' in window && Notification.permission !== 'denied') {
@@ -25,6 +107,64 @@ const SettingsPage: React.FC = () => {
         }
     };
 
+    const handleOpenProviderLink = () => {
+        if (!providerLink) return;
+        const formattedLink = providerLink.startsWith('http')
+            ? providerLink
+            : `https://${providerLink}`;
+        window.open(formattedLink, '_blank', 'noopener,noreferrer');
+    };
+
+    const handleUseDefaultFreeKey = () => {
+        setApiMode('free');
+        setFreeApiKey(DEFAULT_FREE_API_KEY);
+    };
+
+    const handleActivateFreeApi = () => {
+        setApiMode('free');
+        setFreeApiKey(DEFAULT_FREE_API_KEY);
+        setPaidApiKey('');
+    };
+
+    const handleSaveSettings = async () => {
+        try {
+            // Salvar no banco de dados
+            await saveAppSetting(API_MODE_STORAGE_KEY, apiMode);
+            await saveAppSetting(PAID_API_KEY_STORAGE_KEY, paidApiKey);
+            await saveAppSetting(FREE_API_KEY_STORAGE_KEY, freeApiKey);
+            await saveAppSetting(PROVIDER_LINK_STORAGE_KEY, providerLink);
+            
+            // Fallback para localStorage
+            if (typeof window !== 'undefined') {
+                window.localStorage.setItem(API_MODE_STORAGE_KEY, apiMode);
+                window.localStorage.setItem(PAID_API_KEY_STORAGE_KEY, paidApiKey);
+                window.localStorage.setItem(FREE_API_KEY_STORAGE_KEY, freeApiKey);
+                window.localStorage.setItem(PROVIDER_LINK_STORAGE_KEY, providerLink);
+            }
+            
+            resetAssistantSession();
+            setIsDirty(false);
+            setStatusMessage('Configurações salvas com sucesso!');
+            setErrorMessage(null);
+        } catch (error) {
+            console.error('Erro ao salvar configurações', error);
+            setErrorMessage('Não foi possível salvar as configurações. Tente novamente.');
+            setStatusMessage(null);
+        }
+    };
+
+    useEffect(() => {
+        if (!statusMessage) return;
+        const timeout = window.setTimeout(() => setStatusMessage(null), 4000);
+        return () => window.clearTimeout(timeout);
+    }, [statusMessage]);
+
+    useEffect(() => {
+        if (!errorMessage) return;
+        const timeout = window.setTimeout(() => setErrorMessage(null), 6000);
+        return () => window.clearTimeout(timeout);
+    }, [errorMessage]);
+
     return (
         <div className="max-w-2xl mx-auto space-y-8">
              <div className="text-center">
@@ -32,6 +172,19 @@ const SettingsPage: React.FC = () => {
                 <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">{t('settings.subtitle')}</p>
             </div>
             
+            {(statusMessage || errorMessage) && (
+                <Card>
+                    <div className="p-4">
+                        {statusMessage && (
+                            <p className="text-sm font-medium text-emerald-600">{statusMessage}</p>
+                        )}
+                        {errorMessage && (
+                            <p className="text-sm font-medium text-rose-600">{errorMessage}</p>
+                        )}
+                    </div>
+                </Card>
+            )}
+
             <Card>
                 <div className="p-6 divide-y divide-slate-200 dark:divide-slate-700">
                     <div className="pb-6">
@@ -79,6 +232,136 @@ const SettingsPage: React.FC = () => {
                         <Button onClick={handleNotifications} className="mt-4">{t('settings.notifications.button')}</Button>
                     </div>
 
+                    <div className="py-6">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Integração com APIs de IA</h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Configure seus acessos a modelos pagos ou gratuitos e defina facilmente o endpoint do provedor escolhido.
+                        </p>
+
+                        <div className="mt-6 space-y-6">
+                            <fieldset className="space-y-4">
+                                <legend className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                    Modo de utilização
+                                </legend>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setApiMode('free')}
+                                        className={`rounded-lg border px-4 py-4 text-left transition ${
+                                            apiMode === 'free'
+                                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/10 text-primary-700'
+                                                : 'border-slate-300 dark:border-slate-600 hover:border-primary-400 text-slate-600 dark:text-slate-300'
+                                        }`}
+                                    >
+                                        <span className="block font-semibold text-base">API Gratuita</span>
+                                        <span className="block text-sm text-slate-500 dark:text-slate-400">
+                                            Ideal para testes e integrações com limites menores.
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setApiMode('paid')}
+                                        className={`rounded-lg border px-4 py-4 text-left transition ${
+                                            apiMode === 'paid'
+                                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-700'
+                                                : 'border-slate-300 dark:border-slate-600 hover:border-emerald-400 text-slate-600 dark:text-slate-300'
+                                        }`}
+                                    >
+                                        <span className="block font-semibold text-base">API Paga</span>
+                                        <span className="block text-sm text-slate-500 dark:text-slate-400">
+                                            Utilize modelos avançados com performance corporativa.
+                                        </span>
+                                    </button>
+                                </div>
+                            </fieldset>
+
+                            <div className="space-y-2">
+                                <label className="space-y-1 block">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                        Página do modelo / endpoint do provedor
+                                    </span>
+                                    <input
+                                        type="url"
+                                        value={providerLink}
+                                        onChange={(event) => setProviderLink(event.target.value)}
+                                        placeholder={DEFAULT_PROVIDER_LINK}
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                    />
+                                </label>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Use o link oficial do provedor escolhido. Padrão de demonstração:{' '}
+                                    <span className="font-medium text-primary-600 dark:text-primary-400">{DEFAULT_PROVIDER_LINK}</span>
+                                </p>
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <label className="space-y-1 block">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                        Chave para API Paga
+                                    </span>
+                                    <input
+                                        type="text"
+                                        value={paidApiKey}
+                                        onChange={(event) => setPaidApiKey(event.target.value)}
+                                        placeholder="Insira sua chave premium aqui"
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                    />
+                                </label>
+
+                                <div className="space-y-2">
+                                    <label className="space-y-1 block">
+                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                            Chave para API Gratuita
+                                        </span>
+                                        <input
+                                            type="text"
+                                            value={freeApiKey}
+                                            onChange={(event) => setFreeApiKey(event.target.value)}
+                                            placeholder="Insira a chave gratuita ou de testes"
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                        />
+                                        <span className="block text-xs text-slate-500 dark:text-slate-400">
+                                            Padrão para demonstração:{' '}
+                                            <span className="font-medium text-primary-600 dark:text-primary-400">{DEFAULT_FREE_API_KEY}</span>
+                                        </span>
+                                    </label>
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={handleUseDefaultFreeKey}
+                                    >
+                                        Usar chave demo padrão
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3 justify-between">
+                                <span className="text-sm text-slate-500 dark:text-slate-400">
+                                    Atualmente selecionado:{' '}
+                                    <strong className="text-primary-600 dark:text-primary-400">
+                                        {apiMode === 'paid' ? 'API Paga' : 'API Gratuita'}
+                                    </strong>
+                                </span>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    disabled={!providerLink}
+                                    onClick={handleOpenProviderLink}
+                                >
+                                    Abrir página do provedor
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={handleActivateFreeApi}
+                                >
+                                    Ativar API Gratuita
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
                      <div className="pt-6">
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t('settings.profile_type.title')}</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{t('settings.profile_type.description')}</p>
@@ -86,6 +369,21 @@ const SettingsPage: React.FC = () => {
                             <p className="text-sm">{t('settings.profile_type.current')}: <span className="font-semibold text-primary-600">{user.role === 'user' ? t('settings.profile_type.user') : t('settings.profile_type.professional')}</span></p>
                             <Button onClick={toggleRole} variant="secondary" className="mt-2">{t('settings.profile_type.button')}</Button>
                          </div>
+                    </div>
+
+                    <div className="pt-6 flex flex-wrap items-center justify-end gap-3">
+                        {isDirty && (
+                            <span className="text-sm text-slate-500 dark:text-slate-400">
+                                Há alterações não salvas.
+                            </span>
+                        )}
+                        <Button
+                            type="button"
+                            disabled={!isDirty}
+                            onClick={handleSaveSettings}
+                        >
+                            Salvar Alterações
+                        </Button>
                     </div>
                 </div>
             </Card>
