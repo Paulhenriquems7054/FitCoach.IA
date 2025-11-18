@@ -222,24 +222,25 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
             {/* Cabeçalho com ações */}
             <Card>
-                <div className="p-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                <div className="p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
+                        <div className="flex-1 min-w-0">
+                            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
                                 ✏️ Editar Plano de Bem-Estar
                             </h2>
-                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                            <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                                 Adicione, edite ou remova dias de treino e exercícios
                             </p>
                         </div>
-                        <div className="flex gap-3">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
                             <Button
                                 onClick={handleSave}
                                 variant="primary"
                                 size="sm"
+                                className="w-full sm:w-auto text-xs sm:text-sm"
                             >
                                 💾 Salvar Plano
                             </Button>
@@ -247,6 +248,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                 onClick={onCancel}
                                 variant="secondary"
                                 size="sm"
+                                className="w-full sm:w-auto text-xs sm:text-sm"
                             >
                                 ❌ Cancelar
                             </Button>
@@ -264,18 +266,18 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
 
                     return (
                         <Card key={dayIndex}>
-                            <div className="p-6">
+                            <div className="p-4 sm:p-6">
                                 {/* Cabeçalho do dia */}
                                 {isEditingDay ? (
-                                    <div className="space-y-4 mb-4">
+                                    <div className="space-y-3 sm:space-y-4 mb-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                 Dia da Semana
                                             </label>
                                             <select
                                                 value={day.dia_semana}
                                                 onChange={(e) => handleUpdateDay(dayIndex, { dia_semana: e.target.value })}
-                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                             >
                                                 {DAYS_OF_WEEK.map(d => (
                                                     <option key={d} value={d}>{d}</option>
@@ -283,38 +285,38 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                 Foco do Treino
                                             </label>
                                             <input
                                                 type="text"
                                                 value={day.foco_treino}
                                                 onChange={(e) => handleUpdateDay(dayIndex, { foco_treino: e.target.value })}
-                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                 placeholder="Ex: Corpo Inteiro, Pernas, Cardio..."
                                             />
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                     Duração
                                                 </label>
                                                 <input
                                                     type="text"
                                                     value={day.duracao_estimada || ''}
                                                     onChange={(e) => handleUpdateDay(dayIndex, { duracao_estimada: e.target.value })}
-                                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                    className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                     placeholder="Ex: 45 min"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                     Intensidade
                                                 </label>
                                                 <select
                                                     value={day.intensidade || 'moderada'}
                                                     onChange={(e) => handleUpdateDay(dayIndex, { intensidade: e.target.value as 'baixa' | 'moderada' | 'alta' })}
-                                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                    className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                 >
                                                     {INTENSITY_OPTIONS.map(opt => (
                                                         <option key={opt} value={opt}>{opt.toUpperCase()}</option>
@@ -323,13 +325,13 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                 Observações
                                             </label>
                                             <textarea
                                                 value={day.observacoes || ''}
                                                 onChange={(e) => handleUpdateDay(dayIndex, { observacoes: e.target.value })}
-                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                 rows={2}
                                                 placeholder="Observações sobre o treino..."
                                             />
@@ -338,21 +340,22 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                             onClick={() => setEditingDayIndex(null)}
                                             variant="secondary"
                                             size="sm"
+                                            className="w-full sm:w-auto text-xs sm:text-sm"
                                         >
                                             ✓ Concluir Edição
                                         </Button>
                                     </div>
                                 ) : (
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="flex-1">
-                                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-4 mb-4">
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
                                                 {day.dia_semana}
                                             </h3>
-                                            <p className="text-lg font-semibold text-primary-600 dark:text-primary-400">
+                                            <p className="text-base sm:text-lg font-semibold text-primary-600 dark:text-primary-400">
                                                 {day.foco_treino}
                                             </p>
                                             {day.duracao_estimada && (
-                                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                                                     ⏱️ {day.duracao_estimada}
                                                 </p>
                                             )}
@@ -362,11 +365,12 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 w-full sm:w-auto">
                                             <Button
                                                 onClick={() => setEditingDayIndex(dayIndex)}
                                                 variant="secondary"
                                                 size="sm"
+                                                className="flex-1 sm:flex-none text-xs sm:text-sm"
                                             >
                                                 ✏️ Editar
                                             </Button>
@@ -374,7 +378,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                 onClick={() => handleDeleteDay(dayIndex)}
                                                 variant="secondary"
                                                 size="sm"
-                                                className="text-red-600 hover:text-red-700 dark:text-red-400"
+                                                className="flex-1 sm:flex-none text-xs sm:text-sm text-red-600 hover:text-red-700 dark:text-red-400"
                                             >
                                                 🗑️ Excluir
                                             </Button>
@@ -383,7 +387,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                 )}
 
                                 {/* Lista de exercícios */}
-                                <div className="space-y-3 mt-4">
+                                <div className="space-y-2 sm:space-y-3 mt-3 sm:mt-4">
                                     {exercises.map((exercise, exerciseIndex) => {
                                         const isEditingExercise = editingExerciseIndex === exerciseIndex;
                                         const gifPath = getExerciseGif(exercise.name);
@@ -391,12 +395,12 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                         return (
                                             <div
                                                 key={exerciseIndex}
-                                                className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700"
+                                                className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700"
                                             >
                                                 {isEditingExercise ? (
                                                     <div className="space-y-3">
                                                         <div>
-                                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                            <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                                 Nome do Exercício (apenas exercícios com GIF disponível)
                                                             </label>
                                                             <div className="relative">
@@ -409,11 +413,11 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                                         handleUpdateExercise(dayIndex, exerciseIndex, { name: newName });
                                                                     }}
                                                                     onFocus={() => setExerciseSearch(exercise.name)}
-                                                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                                    className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                                     placeholder="Digite para buscar exercício..."
                                                                 />
                                                                 {exerciseSearch && exerciseSearch !== exercise.name && filteredExercises.length > 0 && (
-                                                                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-48 sm:max-h-60 overflow-y-auto">
                                                                         {filteredExercises.map((ex, idx) => (
                                                                             <button
                                                                                 key={idx}
@@ -422,7 +426,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                                                     handleUpdateExercise(dayIndex, exerciseIndex, { name: ex });
                                                                                     setExerciseSearch(ex);
                                                                                 }}
-                                                                                className="w-full text-left px-4 py-2 hover:bg-primary-50 dark:hover:bg-primary-900/20 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 last:border-b-0"
+                                                                                className="w-full text-left px-3 sm:px-4 py-2 text-xs sm:text-sm hover:bg-primary-50 dark:hover:bg-primary-900/20 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 last:border-b-0"
                                                                             >
                                                                                 {ex}
                                                                             </button>
@@ -436,66 +440,66 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                                 </p>
                                                             )}
                                                         </div>
-                                                        <div className="grid grid-cols-2 gap-3">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                             <div>
-                                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                                <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                                     Repetições
                                                                 </label>
                                                                 <input
                                                                     type="text"
                                                                     value={exercise.reps || ''}
                                                                     onChange={(e) => handleUpdateExercise(dayIndex, exerciseIndex, { reps: e.target.value })}
-                                                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                                    className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                                     placeholder="Ex: 3x12"
                                                                 />
                                                             </div>
                                                             <div>
-                                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                                <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                                     Séries
                                                                 </label>
                                                                 <input
                                                                     type="text"
                                                                     value={exercise.sets || ''}
                                                                     onChange={(e) => handleUpdateExercise(dayIndex, exerciseIndex, { sets: e.target.value })}
-                                                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                                    className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                                     placeholder="Ex: 3"
                                                                 />
                                                             </div>
                                                         </div>
-                                                        <div className="grid grid-cols-2 gap-3">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                             <div>
-                                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                                <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                                     Descanso
                                                                 </label>
                                                                 <input
                                                                     type="text"
                                                                     value={exercise.rest || ''}
                                                                     onChange={(e) => handleUpdateExercise(dayIndex, exerciseIndex, { rest: e.target.value })}
-                                                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                                    className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                                     placeholder="Ex: 60s"
                                                                 />
                                                             </div>
                                                             <div>
-                                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                                <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                                     Calorias
                                                                 </label>
                                                                 <input
                                                                     type="number"
                                                                     value={exercise.calories || ''}
                                                                     onChange={(e) => handleUpdateExercise(dayIndex, exerciseIndex, { calories: parseInt(e.target.value) || undefined })}
-                                                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                                    className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                                     placeholder="Ex: 150"
                                                                 />
                                                             </div>
                                                         </div>
                                                         <div>
-                                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                            <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                                 Dicas
                                                             </label>
                                                             <textarea
                                                                 value={exercise.tips || ''}
                                                                 onChange={(e) => handleUpdateExercise(dayIndex, exerciseIndex, { tips: e.target.value })}
-                                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                                className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                                 rows={2}
                                                                 placeholder="Dicas para executar o exercício..."
                                                             />
@@ -507,24 +511,25 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                             }}
                                                             variant="secondary"
                                                             size="sm"
+                                                            className="w-full sm:w-auto text-xs sm:text-sm"
                                                         >
                                                             ✓ Concluir
                                                         </Button>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex items-start justify-between">
-                                                        <div className="flex-1">
-                                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                                <h4 className="font-semibold text-slate-900 dark:text-white">
+                                                    <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-4">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
+                                                                <h4 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white break-words">
                                                                     {exercise.name}
                                                                 </h4>
                                                                 {gifPath && (
-                                                                    <span className="text-xs px-2 py-1 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
+                                                                    <span className="text-xs px-2 py-1 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 flex-shrink-0">
                                                                         🎬 GIF disponível
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <div className="flex flex-wrap gap-3 text-sm text-slate-600 dark:text-slate-300">
+                                                            <div className="flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
                                                                 {exercise.reps && (
                                                                     <span>Reps: {exercise.reps}</span>
                                                                 )}
@@ -539,16 +544,17 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                                 )}
                                                             </div>
                                                             {exercise.tips && (
-                                                                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 italic">
+                                                                <p className="mt-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400 italic break-words">
                                                                     💡 {exercise.tips}
                                                                 </p>
                                                             )}
                                                         </div>
-                                                        <div className="flex gap-2 ml-4">
+                                                        <div className="flex gap-2 w-full sm:w-auto sm:ml-4">
                                                             <Button
                                                                 onClick={() => setEditingExerciseIndex(exerciseIndex)}
                                                                 variant="secondary"
                                                                 size="sm"
+                                                                className="flex-1 sm:flex-none text-xs sm:text-sm"
                                                             >
                                                                 ✏️
                                                             </Button>
@@ -556,7 +562,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                                 onClick={() => handleDeleteExercise(dayIndex, exerciseIndex)}
                                                                 variant="secondary"
                                                                 size="sm"
-                                                                className="text-red-600 hover:text-red-700 dark:text-red-400"
+                                                                className="text-xs sm:text-sm text-red-600 hover:text-red-700 dark:text-red-400"
                                                             >
                                                                 🗑️
                                                             </Button>
@@ -570,13 +576,13 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
 
                                 {/* Formulário para adicionar exercício */}
                                 {isAddingExercise ? (
-                                    <div className="mt-4 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-200 dark:border-primary-800">
-                                        <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                                    <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-200 dark:border-primary-800">
+                                        <h4 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white mb-3">
                                             ➕ Adicionar Exercício
                                         </h4>
                                         <div className="space-y-3">
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                     Nome do Exercício * (apenas exercícios com GIF disponível)
                                                 </label>
                                                 <div className="relative">
@@ -593,11 +599,11 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                             }
                                                         }}
                                                         onFocus={() => setExerciseSearch(exerciseForm.name || '')}
-                                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                        className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                         placeholder="Digite para buscar exercício..."
                                                     />
                                                     {exerciseSearch && filteredExercises.length > 0 && (
-                                                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-48 sm:max-h-60 overflow-y-auto">
                                                             {filteredExercises.map((exercise, idx) => (
                                                                 <button
                                                                     key={idx}
@@ -606,7 +612,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                                         setExerciseForm({ ...exerciseForm, name: exercise });
                                                                         setExerciseSearch(exercise);
                                                                     }}
-                                                                    className="w-full text-left px-4 py-2 hover:bg-primary-50 dark:hover:bg-primary-900/20 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 last:border-b-0"
+                                                                    className="w-full text-left px-3 sm:px-4 py-2 text-xs sm:text-sm hover:bg-primary-50 dark:hover:bg-primary-900/20 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 last:border-b-0"
                                                                 >
                                                                     {exercise}
                                                                 </button>
@@ -615,7 +621,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                     )}
                                                 </div>
                                                 {exerciseForm.name && (
-                                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 break-words">
                                                         Selecionado: <strong>{exerciseForm.name}</strong>
                                                     </p>
                                                 )}
@@ -625,75 +631,76 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                     </p>
                                                 )}
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                         Repetições
                                                     </label>
                                                     <input
                                                         type="text"
                                                         value={exerciseForm.reps}
                                                         onChange={(e) => setExerciseForm({ ...exerciseForm, reps: e.target.value })}
-                                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                        className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                         placeholder="Ex: 3x12"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                         Séries
                                                     </label>
                                                     <input
                                                         type="text"
                                                         value={exerciseForm.sets}
                                                         onChange={(e) => setExerciseForm({ ...exerciseForm, sets: e.target.value })}
-                                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                        className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                         placeholder="Ex: 3"
                                                     />
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                         Descanso
                                                     </label>
                                                     <input
                                                         type="text"
                                                         value={exerciseForm.rest}
                                                         onChange={(e) => setExerciseForm({ ...exerciseForm, rest: e.target.value })}
-                                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                        className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                         placeholder="Ex: 60s"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                         Calorias
                                                     </label>
                                                     <input
                                                         type="number"
                                                         value={exerciseForm.calories}
                                                         onChange={(e) => setExerciseForm({ ...exerciseForm, calories: e.target.value })}
-                                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                        className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                         placeholder="Ex: 150"
                                                     />
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                     Dicas
                                                 </label>
                                                 <textarea
                                                     value={exerciseForm.tips}
                                                     onChange={(e) => setExerciseForm({ ...exerciseForm, tips: e.target.value })}
-                                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                    className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                     rows={2}
                                                     placeholder="Dicas para executar o exercício..."
                                                 />
                                             </div>
-                                            <div className="flex gap-2">
+                                            <div className="flex flex-col sm:flex-row gap-2">
                                                 <Button
                                                     onClick={() => handleAddExercise(dayIndex)}
                                                     variant="primary"
                                                     size="sm"
+                                                    className="w-full sm:w-auto text-xs sm:text-sm"
                                                 >
                                                     ✓ Adicionar
                                                 </Button>
@@ -712,6 +719,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                     }}
                                                     variant="secondary"
                                                     size="sm"
+                                                    className="w-full sm:w-auto text-xs sm:text-sm"
                                                 >
                                                     ❌ Cancelar
                                                 </Button>
@@ -723,7 +731,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                         onClick={() => setShowAddExerciseForm(dayIndex)}
                                         variant="secondary"
                                         size="sm"
-                                        className="mt-4"
+                                        className="mt-3 sm:mt-4 w-full sm:w-auto text-xs sm:text-sm"
                                     >
                                         ➕ Adicionar Exercício
                                     </Button>
@@ -740,24 +748,25 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                     onClick={() => setShowAddDayForm(true)}
                     variant="primary"
                     size="lg"
-                    className="w-full"
+                    className="w-full text-sm sm:text-base"
                 >
                     ➕ Adicionar Novo Dia de Treino
                 </Button>
             ) : (
                 <Card>
-                    <div className="p-6">
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
+                    <div className="p-4 sm:p-6">
+                        <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-3 sm:mb-4">
                             ➕ Adicionar Novo Dia
                         </h3>
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-3 sm:mb-4">
                             Um novo dia de treino será adicionado ao plano.
                         </p>
-                        <div className="flex gap-3">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                             <Button
                                 onClick={handleAddDay}
                                 variant="primary"
                                 size="sm"
+                                className="w-full sm:w-auto text-xs sm:text-sm"
                             >
                                 ✓ Adicionar
                             </Button>
@@ -765,6 +774,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                 onClick={() => setShowAddDayForm(false)}
                                 variant="secondary"
                                 size="sm"
+                                className="w-full sm:w-auto text-xs sm:text-sm"
                             >
                                 ❌ Cancelar
                             </Button>
