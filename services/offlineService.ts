@@ -1,5 +1,6 @@
 
-import type { User, GeminiMealPlanResponse, MealAnalysisResponse, Recipe, MealPlan, DailySummary, Goal } from "../types";
+import type { User, GeminiMealPlanResponse, MealAnalysisResponse, Recipe, MealPlan, DailySummary } from "../types";
+import { Goal } from "../types";
 export { generateWellnessPlanOffline } from "./wellnessOfflineService";
 
 // Cache keys
@@ -462,9 +463,11 @@ const getMealTemplate = (objetivo: Goal, mealType: string): Array<{ alimento: st
 // Calcular valores nutricionais de uma refeição
 const calculateMealNutrition = (mealItems: Array<{ alimento: string; quantidade: number }>): {
   calorias: number;
-  proteinas_g: number;
-  carboidratos_g: number;
-  gorduras_g: number;
+  macros: {
+    proteinas_g: number;
+    carboidratos_g: number;
+    gorduras_g: number;
+  };
 } => {
   let totalCalories = 0;
   let totalProtein = 0;
@@ -498,9 +501,11 @@ const calculateMealNutrition = (mealItems: Array<{ alimento: string; quantidade:
 
   return {
     calorias: Math.round(totalCalories),
-    proteinas_g: Math.round(totalProtein),
-    carboidratos_g: Math.round(totalCarbs),
-    gorduras_g: Math.round(totalFat),
+    macros: {
+      proteinas_g: Math.round(totalProtein),
+      carboidratos_g: Math.round(totalCarbs),
+      gorduras_g: Math.round(totalFat),
+    },
   };
 };
 

@@ -204,14 +204,53 @@ export async function saveUser(user: User): Promise<void> {
         const transaction = db.transaction(['users'], 'readwrite');
         const store = transaction.objectStore('users');
         
-        // Buscar usuário existente
-        const getRequest = store.getAll();
-        getRequest.onsuccess = () => {
-            const users = getRequest.result;
-            
-            if (users.length > 0) {
+        // Buscar usuário existente - tentar por username primeiro, depois por ID, depois primeiro usuário
+        const findUser = async (): Promise<DBUser | null> => {
+            return new Promise((resolveFind, rejectFind) => {
+                // Se o usuário tem username, tentar buscar por username
+                if (user.username) {
+                    if (store.indexNames.contains('username')) {
+                        const index = store.index('username');
+                        const request = index.get(user.username);
+                        request.onsuccess = () => {
+                            if (request.result) {
+                                resolveFind(request.result);
+                                return;
+                            }
+                            // Se não encontrou por username, continuar para buscar geral
+                            const getAllRequest = store.getAll();
+                            getAllRequest.onsuccess = () => {
+                                const users = getAllRequest.result;
+                                resolveFind(users.length > 0 ? users[0] : null);
+                            };
+                            getAllRequest.onerror = () => rejectFind(getAllRequest.error);
+                        };
+                        request.onerror = () => {
+                            // Se índice falhar, buscar geral
+                            const getAllRequest = store.getAll();
+                            getAllRequest.onsuccess = () => {
+                                const users = getAllRequest.result;
+                                resolveFind(users.length > 0 ? users[0] : null);
+                            };
+                            getAllRequest.onerror = () => rejectFind(getAllRequest.error);
+                        };
+                        return;
+                    }
+                }
+                
+                // Buscar todos os usuários
+                const getAllRequest = store.getAll();
+                getAllRequest.onsuccess = () => {
+                    const users = getAllRequest.result;
+                    resolveFind(users.length > 0 ? users[0] : null);
+                };
+                getAllRequest.onerror = () => rejectFind(getAllRequest.error);
+            });
+        };
+        
+        findUser().then((existingUser) => {
+            if (existingUser) {
                 // Atualizar usuário existente - preservar senha se não fornecida
-                const existingUser = users[0];
                 const dbUser: DBUser = {
                     ...existingUser, // Preservar dados existentes (incluindo senha)
                     ...user, // Sobrescrever com novos dados
@@ -222,6 +261,43 @@ export async function saveUser(user: User): Promise<void> {
                 // Se o user não tem password, preservar a senha existente
                 if (!user.password && existingUser.password) {
                     dbUser.password = existingUser.password;
+                }
+                
+                // Se o user não tem username, preservar o username existente para evitar violação de constraint
+                if (!user.username && existingUser.username) {
+                    dbUser.username = existingUser.username;
+                }
+                
+                // Se username foi fornecido e é diferente do existente, verificar se já existe outro usuário com esse username
+                if (user.username && user.username !== existingUser.username) {
+                    // Verificar se outro usuário já tem esse username
+                    if (store.indexNames.contains('username')) {
+                        const index = store.index('username');
+                        const checkRequest = index.get(user.username);
+                        checkRequest.onsuccess = () => {
+                            if (checkRequest.result && checkRequest.result.id !== existingUser.id) {
+                                // Outro usuário já tem esse username, manter o username existente
+                                dbUser.username = existingUser.username;
+                            }
+                            // Atualizar usuário
+                            const updateRequest = store.put(dbUser);
+                            updateRequest.onsuccess = () => {
+                                console.log('Usuário atualizado no banco de dados');
+                                resolve();
+                            };
+                            updateRequest.onerror = () => reject(updateRequest.error);
+                        };
+                        checkRequest.onerror = () => {
+                            // Se verificação falhar, tentar atualizar mesmo assim
+                            const updateRequest = store.put(dbUser);
+                            updateRequest.onsuccess = () => {
+                                console.log('Usuário atualizado no banco de dados');
+                                resolve();
+                            };
+                            updateRequest.onerror = () => reject(updateRequest.error);
+                        };
+                        return;
+                    }
                 }
                 
                 const updateRequest = store.put(dbUser);
@@ -236,6 +312,12 @@ export async function saveUser(user: User): Promise<void> {
                     ...user,
                     updatedAt: new Date().toISOString(),
                 };
+                
+                // Se username não foi fornecido, gerar um único baseado no timestamp
+                if (!dbUser.username) {
+                    dbUser.username = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                }
+                
                 const addRequest = store.add(dbUser);
                 addRequest.onsuccess = () => {
                     console.log('Usuário criado no banco de dados');
@@ -243,8 +325,9 @@ export async function saveUser(user: User): Promise<void> {
                 };
                 addRequest.onerror = () => reject(addRequest.error);
             }
-        };
-        getRequest.onerror = () => reject(getRequest.error);
+        }).catch((error) => {
+            reject(error);
+        });
     });
 }
 

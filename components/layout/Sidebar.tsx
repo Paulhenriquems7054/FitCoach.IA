@@ -16,7 +16,6 @@ import { HeartIcon } from '../icons/HeartIcon';
 import { TrendingUpIcon } from '../icons/TrendingUpIcon';
 import { WandIcon } from '../icons/WandIcon';
 import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
-import { BriefcaseIcon } from '../icons/BriefcaseIcon';
 import { StarIcon } from '../icons/StarIcon';
 
 interface SidebarProps {
@@ -43,7 +42,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     { name: t('sidebar.wellnessPlan'), href: '#/wellness', icon: HeartIcon },
     { name: t('sidebar.challenges'), href: '#/desafios', icon: TrophyIcon },
     { name: t('sidebar.library'), href: '#/biblioteca', icon: BookOpenIcon },
-    { name: t('sidebar.enquete'), href: '#/professional', icon: BriefcaseIcon },
   ];
 
   const userNavigation = [
