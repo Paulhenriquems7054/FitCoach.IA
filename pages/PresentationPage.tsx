@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
 // Constante para garantir encoding correto do texto do botão
-const CTA_BUTTON_TEXT = 'Comece Agora';
+// Usando concatenação de strings para evitar problemas de encoding durante minificação
+const CTA_BUTTON_TEXT = String.fromCharCode(67, 111, 109, 101, 99, 101) + ' ' + String.fromCharCode(65, 103, 111, 114, 97);
 
 const features = [
   {
