@@ -170,11 +170,20 @@ const PresentationPage: React.FC = () => {
                 Nutri.IA acompanha a sua jornada diariamente. Planos flexíveis, recomendações personalizadas 
                 e um assistente disponível 24/7 para responder dúvidas sobre alimentação, suplementação e bem-estar.
               </p>
-              <div className="flex justify-center">
+              <div id="presentation-cta-container" className="flex justify-center w-full overflow-visible">
                 <button
+                  id="presentation-cta-button"
                   onClick={() => (window.location.hash = '/welcome-survey')}
-                  className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 sm:px-8 md:px-10 py-3 sm:py-4 text-sm sm:text-base md:text-lg font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50 whitespace-nowrap min-w-fit"
-                  style={{ minWidth: 'fit-content' }}
+                  className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 py-3 sm:py-4 text-sm sm:text-base md:text-lg font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50 whitespace-nowrap"
+                  style={{ 
+                    paddingLeft: '1.5rem',
+                    paddingRight: '1.5rem',
+                    minWidth: 'max-content',
+                    width: 'auto',
+                    display: 'inline-block',
+                    overflow: 'visible',
+                    textOverflow: 'clip'
+                  }}
                 >
                   Comece sua Jornada Agora
                 </button>
@@ -195,6 +204,18 @@ const PresentationPage: React.FC = () => {
         }
         .animate-float {
           animation: float 6s ease-in-out infinite;
+        }
+        /* Garantir que o botão CTA não seja cortado */
+        #presentation-cta-button {
+          min-width: max-content !important;
+          width: auto !important;
+          white-space: nowrap !important;
+          overflow: visible !important;
+          text-overflow: clip !important;
+        }
+        #presentation-cta-container {
+          overflow: visible !important;
+          width: 100% !important;
         }
       `}</style>
     </div>
