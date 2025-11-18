@@ -79,23 +79,23 @@ const HomePage: React.FC = () => {
   }
   
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 px-2 sm:px-4">
         <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{t('home.greeting', { name: user.isAnonymized ? t('anonymous_user') : user.nome })}</h1>
-            <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">{t('home.welcome_back')}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{t('home.greeting', { name: user.isAnonymized ? t('anonymous_user') : user.nome })}</h1>
+            <p className="mt-2 text-base sm:text-lg text-slate-600 dark:text-slate-400">{t('home.welcome_back')}</p>
         </div>
 
         {showCheckin && (
             <Alert type="info" title={t('home.checkin.title')}>
-                <p>{t('home.checkin.description')}</p>
-                <div className="mt-4 flex gap-4">
-                    <Button size="sm" onClick={() => window.location.hash = '/analysis'}>{t('home.checkin.button_log')}</Button>
-                    <Button size="sm" variant="secondary" onClick={handleCheckinDismiss}>{t('home.checkin.button_later')}</Button>
+                <p className="text-sm sm:text-base">{t('home.checkin.description')}</p>
+                <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-4">
+                    <Button size="sm" onClick={() => window.location.hash = '/analysis'} className="w-full sm:w-auto">{t('home.checkin.button_log')}</Button>
+                    <Button size="sm" variant="secondary" onClick={handleCheckinDismiss} className="w-full sm:w-auto">{t('home.checkin.button_later')}</Button>
                 </div>
             </Alert>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             <div className="lg:col-span-2">
                 <Dashboard summary={null} />
             </div>

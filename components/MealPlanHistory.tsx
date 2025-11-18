@@ -120,20 +120,21 @@ export const MealPlanHistory: React.FC<MealPlanHistoryProps> = ({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-3 sm:p-4 flex items-center justify-between z-10">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white truncate pr-2">
                         Histórico de Planos Alimentares
                     </h2>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                        className="p-1.5 sm:p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition flex-shrink-0"
+                        aria-label="Fechar"
                     >
                         <XIcon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                     </button>
                 </div>
-                <div className="p-6">
+                <div className="p-3 sm:p-4 md:p-6">
                     {isLoading ? (
                         <div className="text-center py-8">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
@@ -153,18 +154,18 @@ export const MealPlanHistory: React.FC<MealPlanHistoryProps> = ({
                         <div className="space-y-4">
                             {plans.map((savedPlan) => (
                                 <Card key={savedPlan.id} className="hover:shadow-md transition">
-                                    <div className="p-4">
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <h3 className="font-semibold text-slate-900 dark:text-white">
+                                    <div className="p-3 sm:p-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                                                    <h3 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white truncate">
                                                         Plano #{savedPlan.id || 'N/A'}
                                                     </h3>
-                                                    <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+                                                    <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 self-start sm:self-auto">
                                                         {formatDate(savedPlan.createdAt)}
                                                     </span>
                                                 </div>
-                                                <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                                                <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
                                                     <span>
                                                         <strong>{savedPlan.plan.length}</strong> refeições
                                                     </span>
@@ -172,7 +173,7 @@ export const MealPlanHistory: React.FC<MealPlanHistoryProps> = ({
                                                         <strong>{calculateTotalCalories(savedPlan.plan)}</strong> kcal total
                                                     </span>
                                                 </div>
-                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
                                                     {savedPlan.plan.slice(0, 3).map((meal, idx) => (
                                                         <span
                                                             key={idx}

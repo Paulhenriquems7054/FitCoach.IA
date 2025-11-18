@@ -278,18 +278,19 @@ const NutriAssistant: React.FC = () => {
       )}
 
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-40 flex h-[80vh] w-[90vw] max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-950/95 shadow-2xl shadow-emerald-500/10 backdrop-blur-sm sm:h-[70vh]">
-          <div className="flex items-center justify-between bg-gradient-to-r from-emerald-500/90 to-sky-500/90 px-4 py-3 text-white shadow-md">
-            <div>
-              <h2 className="text-lg font-semibold">Nutri.IA Assistente</h2>
-              <p className="text-xs text-emerald-50/80">Conversas, análise de fotos e dicas nutricionais</p>
+        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-40 flex h-[100vh] sm:h-[80vh] w-full sm:w-[90vw] sm:max-w-lg flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl border border-slate-800/60 bg-slate-950/95 shadow-2xl shadow-emerald-500/10 backdrop-blur-sm">
+          <div className="flex items-center justify-between bg-gradient-to-r from-emerald-500/90 to-sky-500/90 px-3 sm:px-4 py-2 sm:py-3 text-white shadow-md flex-wrap gap-2">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold truncate">Nutri.IA Assistente</h2>
+              <p className="text-xs text-emerald-50/80 hidden sm:block">Conversas, análise de fotos e dicas nutricionais</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               <button
                 onClick={() => setShowPromptEditor((prev) => !prev)}
-                className="rounded-full px-3 py-1 text-xs font-semibold text-emerald-50/90 transition hover:bg-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-white/50"
+                className="rounded-full px-2 sm:px-3 py-1 text-xs font-semibold text-emerald-50/90 transition hover:bg-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-white/50 whitespace-nowrap"
               >
-                {showPromptEditor ? 'Ocultar prompt' : 'Configurar prompt'}
+                <span className="hidden sm:inline">{showPromptEditor ? 'Ocultar prompt' : 'Configurar prompt'}</span>
+                <span className="sm:hidden">{showPromptEditor ? 'Ocultar' : 'Prompt'}</span>
               </button>
               <button
                 onClick={handleResetChat}

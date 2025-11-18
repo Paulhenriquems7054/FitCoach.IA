@@ -72,11 +72,11 @@ const GeneratorPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
+    <div className="max-w-7xl mx-auto px-2 sm:px-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between mb-6 sm:mb-8 gap-4">
             <div className="text-center sm:text-left flex-1">
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Gerador de Plano com IA</h1>
-                <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">Preencha seus dados para criar um plano alimentar exclusivo.</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Gerador de Plano com IA</h1>
+                <p className="mt-2 text-base sm:text-lg text-slate-600 dark:text-slate-400">Preencha seus dados para criar um plano alimentar exclusivo.</p>
             </div>
             <Button
                 onClick={() => setShowHistory(true)}
@@ -94,7 +94,7 @@ const GeneratorPage: React.FC = () => {
                 onSelectPlan={handleSelectPlanFromHistory}
             />
         )}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
         <div className="lg:col-span-4">
             <PlanGeneratorForm
                 onGeneratePlan={handleGeneratePlan}

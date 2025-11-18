@@ -497,10 +497,10 @@ const LoginPage: React.FC = () => {
 
             {/* Modal Esqueci a Senha */}
             {showForgotPassword && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" aria-modal="true">
-                    <Card className="w-full max-w-md mx-4 animate-fade-in-up">
-                        <div className="p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700">
-                            <h2 className="text-lg font-bold flex items-center gap-2">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4" aria-modal="true">
+                    <Card className="w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-y-auto animate-fade-in-up">
+                        <div className="p-3 sm:p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
+                            <h2 className="text-base sm:text-lg font-bold flex items-center gap-2 truncate pr-2">
                                 🔑 Redefinir Senha
                             </h2>
                             <button
@@ -515,12 +515,13 @@ const LoginPage: React.FC = () => {
                                     setShowNewPassword(false);
                                     setShowConfirmNewPassword(false);
                                 }}
-                                className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
+                                className="p-1 sm:p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0"
+                                aria-label="Fechar"
                             >
-                                <XIcon className="w-6 h-6 text-slate-500" />
+                                <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500" />
                             </button>
                         </div>
-                        <div className="p-6">
+                        <div className="p-4 sm:p-6">
                             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
                                 Informe seu nome de usuário e defina uma nova senha.
                             </p>

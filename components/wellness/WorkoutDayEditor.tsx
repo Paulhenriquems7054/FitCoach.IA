@@ -165,25 +165,26 @@ export const WorkoutDayEditor: React.FC<WorkoutDayEditorProps> = ({
     const isEditingExercise = editingExerciseIndex !== null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" aria-modal="true" onClick={onCancel}>
-            <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
-                <div className="p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4" aria-modal="true" onClick={onCancel}>
+            <Card className="w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
+                <div className="p-3 sm:p-4 md:p-6">
                     {/* Cabeçalho */}
-                    <div className="flex items-center justify-between mb-6 border-b border-slate-200 dark:border-slate-700 pb-4">
-                        <div>
-                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6 border-b border-slate-200 dark:border-slate-700 pb-3 sm:pb-4">
+                        <div className="flex-1 min-w-0">
+                            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white truncate">
                                 ✏️ Editar {editedDay.dia_semana}
                             </h2>
-                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                            <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                                 Edite os exercícios e informações deste dia
                             </p>
                         </div>
                         <button
                             type="button"
                             onClick={onCancel}
-                            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition self-end sm:self-auto flex-shrink-0"
+                            aria-label="Fechar"
                         >
-                            <XIcon className="w-6 h-6 text-slate-500" />
+                            <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500" />
                         </button>
                     </div>
 

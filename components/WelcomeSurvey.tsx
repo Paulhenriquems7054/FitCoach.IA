@@ -660,9 +660,9 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
   const currentQuestionNumber = step + 1;
 
   const surveyContent = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-500/20 backdrop-blur-sm px-4 py-6">
-      <div className="w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-emerald-100 dark:border-slate-700">
-        <div className="h-2 bg-emerald-100 dark:bg-slate-700">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-500/20 backdrop-blur-sm p-2 sm:p-4 md:p-6 overflow-y-auto">
+      <div className="w-full max-w-2xl bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl shadow-xl border border-emerald-100 dark:border-slate-700 my-auto max-h-[98vh] sm:max-h-[95vh] flex flex-col">
+        <div className="h-2 bg-emerald-100 dark:bg-slate-700 flex-shrink-0">
           <div
             className="h-full bg-emerald-500 transition-all duration-300 ease-out"
             style={{
@@ -673,8 +673,8 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
           />
         </div>
 
-        <div className="px-6 pt-6 text-center">
-          <h2 className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
+        <div className="px-4 sm:px-6 pt-4 sm:pt-6 text-center flex-shrink-0">
+          <h2 className="text-xl sm:text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
             👋 Bem-vindo ao Nutri.IA
           </h2>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -686,7 +686,7 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
         </div>
 
         {!showSummary ? (
-          <div className="px-6 py-8 space-y-6 transition-all duration-300">
+          <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-4 sm:space-y-6 transition-all duration-300 overflow-y-auto flex-1">
             <div className="text-sm font-semibold text-emerald-500 dark:text-emerald-400">
               Pergunta {currentQuestionNumber}/{totalQuestions}
             </div>
@@ -795,18 +795,18 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
             )}
           </div>
         ) : (
-          <div className="px-6 py-10 text-center space-y-6 transition-all duration-300">
+          <div className="px-4 sm:px-6 py-6 sm:py-10 text-center space-y-4 sm:space-y-6 transition-all duration-300 flex-1">
             <div className="text-4xl">🎉</div>
-            <h3 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            <h3 className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">
               Tudo pronto!
             </h3>
-            <p className="text-slate-600 dark:text-slate-300">
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
               Com base nas suas respostas, o Nutri.IA vai montar recomendações personalizadas para você.
             </p>
             <button
               type="button"
               onClick={handleFinishSummary}
-              className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-6 py-3 font-semibold text-white shadow-lg transition hover:bg-emerald-600 hover:shadow-xl"
+              className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-white shadow-lg transition hover:bg-emerald-600 hover:shadow-xl"
             >
               Ver meu plano inicial
             </button>
@@ -814,12 +814,12 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
         )}
 
         {!showSummary && (
-          <div className="flex items-center justify-between px-6 pb-6">
+          <div className="flex items-center justify-between px-4 sm:px-6 pb-4 sm:pb-6 gap-2 flex-shrink-0 border-t border-slate-200 dark:border-slate-700 pt-4 sm:pt-6">
             <button
               type="button"
               onClick={goBack}
               disabled={step === 0}
-              className="text-sm font-semibold text-emerald-500 dark:text-emerald-400 transition disabled:text-slate-300 dark:disabled:text-slate-600 disabled:cursor-not-allowed"
+              className="text-xs sm:text-sm font-semibold text-emerald-500 dark:text-emerald-400 transition disabled:text-slate-300 dark:disabled:text-slate-600 disabled:cursor-not-allowed px-2 sm:px-0"
             >
               ← Voltar
             </button>
@@ -827,7 +827,7 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
               type="button"
               onClick={goNext}
               disabled={!canProceed() && shouldShowQuestion(currentQuestion)}
-              className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-6 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-600 hover:shadow-lg disabled:bg-emerald-200 dark:disabled:bg-emerald-800 disabled:cursor-not-allowed disabled:shadow-none"
+              className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 sm:px-6 py-2 text-xs sm:text-sm font-semibold text-white shadow-md transition hover:bg-emerald-600 hover:shadow-lg disabled:bg-emerald-200 dark:disabled:bg-emerald-800 disabled:cursor-not-allowed disabled:shadow-none"
             >
               {step >= visibleQuestions.length - 1 ? 'Enviar →' : 'Próximo →'}
             </button>

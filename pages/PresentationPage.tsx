@@ -52,13 +52,13 @@ const PresentationPage: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 text-center">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 text-center">
           {/* Logo Section - Centered and Prominent with Video */}
-          <div className={`mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <div className={`mb-8 sm:mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <div className="relative inline-block">
               {/* Glowing effect behind logo */}
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/30 via-sky-400/30 to-blue-500/30 rounded-full blur-3xl scale-150 animate-pulse" />
-              <div className="relative rounded-full overflow-hidden shadow-2xl border-4 border-emerald-400/20 animate-float w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 flex items-center justify-center bg-white">
+              <div className="relative rounded-full overflow-hidden shadow-2xl border-4 border-emerald-400/20 animate-float w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 flex items-center justify-center bg-white">
                 <video
                   autoPlay
                   loop
@@ -96,22 +96,22 @@ const PresentationPage: React.FC = () => {
           </div>
 
           {/* Text Content */}
-          <div className={`space-y-8 transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <div className={`space-y-4 sm:space-y-6 md:space-y-8 transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <div>
-              <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-400/10 px-6 py-2 text-sm md:text-base tracking-wide text-emerald-200 mb-6 backdrop-blur-sm">
+              <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-400/10 px-3 sm:px-4 md:px-6 py-1.5 sm:py-2 text-xs sm:text-sm md:text-base tracking-wide text-emerald-200 mb-4 sm:mb-6 backdrop-blur-sm text-center">
                 🍎 Nutrição + Treinos + Inteligência Artificial 🤖
               </span>
             </div>
             
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight bg-gradient-to-r from-emerald-400 via-sky-400 to-blue-500 bg-clip-text text-transparent">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-tight bg-gradient-to-r from-emerald-400 via-sky-400 to-blue-500 bg-clip-text text-transparent px-2">
               Nutri.IA
             </h1>
             
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-semibold text-slate-200">
+            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold text-slate-200 px-2">
               Seu Coach Nutricional Inteligente
             </h2>
             
-            <p className="text-lg md:text-xl lg:text-2xl text-slate-300 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-slate-300 max-w-3xl mx-auto leading-relaxed px-2">
               Transforme hábitos alimentares com planos personalizados, análise de refeições, 
               relatórios inteligentes e desafios gamificados. Tudo em um único ambiente, guiado por IA.
             </p>
@@ -127,18 +127,18 @@ const PresentationPage: React.FC = () => {
       </div>
 
       {/* Features Section */}
-      <div className="relative py-24 bg-gradient-to-b from-slate-950/50 to-slate-900">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-emerald-400 to-blue-500 bg-clip-text text-transparent">
+      <div className="relative py-12 sm:py-16 md:py-24 bg-gradient-to-b from-slate-950/50 to-slate-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-8 sm:mb-12 md:mb-16">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 bg-gradient-to-r from-emerald-400 to-blue-500 bg-clip-text text-transparent">
               Recursos Inteligentes
             </h2>
-            <p className="text-xl text-slate-300 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl text-slate-300 max-w-2xl mx-auto px-2">
               Tudo que você precisa para uma jornada nutricional completa e personalizada
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {features.map((feature, index) => (
               <div
                 key={feature.title}
@@ -158,21 +158,21 @@ const PresentationPage: React.FC = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="relative py-24 bg-gradient-to-b from-slate-900 to-slate-950">
-        <div className="max-w-4xl mx-auto px-6 text-center">
+      <div className="relative py-12 sm:py-16 md:py-24 bg-gradient-to-b from-slate-900 to-slate-950">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 blur-3xl rounded-3xl" />
-            <div className="relative bg-slate-900/60 backdrop-blur-sm border border-slate-700/60 rounded-3xl p-12 shadow-2xl">
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+            <div className="relative bg-slate-900/60 backdrop-blur-sm border border-slate-700/60 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 shadow-2xl">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 sm:mb-6">
                 Construa uma rotina mais saudável
               </h2>
-              <p className="text-lg md:text-xl text-slate-300 mb-8 leading-relaxed">
+              <p className="text-base sm:text-lg md:text-xl text-slate-300 mb-6 sm:mb-8 leading-relaxed">
                 Nutri.IA acompanha a sua jornada diariamente. Planos flexíveis, recomendações personalizadas 
                 e um assistente disponível 24/7 para responder dúvidas sobre alimentação, suplementação e bem-estar.
               </p>
               <button
                 onClick={() => (window.location.hash = '/welcome-survey')}
-                className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-8 py-4 text-lg font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50"
+                className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50 w-full sm:w-auto"
               >
                 Comece sua Jornada Agora
               </button>

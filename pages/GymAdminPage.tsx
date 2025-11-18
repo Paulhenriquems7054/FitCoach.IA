@@ -173,24 +173,24 @@ const GymAdminPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2" style={{ color: colors.primary }}>
+    <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-4xl">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: colors.primary }}>
           Administração da Academia
         </h1>
-        <p className="text-slate-600 dark:text-slate-400">
+        <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
           Configure o branding e gere QR codes para distribuição
         </p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Configuração da Academia */}
         <Card>
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Configuração da Academia</h2>
+          <div className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
+              <h2 className="text-lg sm:text-xl font-semibold">Configuração da Academia</h2>
               {!isEditing && (
-                <Button onClick={() => setIsEditing(true)} style={{ backgroundColor: colors.primary }}>
+                <Button onClick={() => setIsEditing(true)} style={{ backgroundColor: colors.primary }} className="w-full sm:w-auto">
                   Editar
                 </Button>
               )}
@@ -223,35 +223,35 @@ const GymAdminPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Cor Primária</label>
+                    <label className="block text-xs sm:text-sm font-medium mb-1">Cor Primária</label>
                     <input
                       type="color"
                       name="primaryColor"
                       value={formData.primaryColor}
                       onChange={handleInputChange}
-                      className="w-full h-10 border rounded"
+                      className="w-full h-10 sm:h-12 border rounded"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Cor Secundária</label>
+                    <label className="block text-xs sm:text-sm font-medium mb-1">Cor Secundária</label>
                     <input
                       type="color"
                       name="secondaryColor"
                       value={formData.secondaryColor}
                       onChange={handleInputChange}
-                      className="w-full h-10 border rounded"
+                      className="w-full h-10 sm:h-12 border rounded"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Cor de Destaque</label>
+                    <label className="block text-xs sm:text-sm font-medium mb-1">Cor de Destaque</label>
                     <input
                       type="color"
                       name="accentColor"
                       value={formData.accentColor}
                       onChange={handleInputChange}
-                      className="w-full h-10 border rounded"
+                      className="w-full h-10 sm:h-12 border rounded"
                     />
                   </div>
                 </div>
@@ -273,25 +273,25 @@ const GymAdminPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Email de Contato</label>
+                    <label className="block text-xs sm:text-sm font-medium mb-1">Email de Contato</label>
                     <input
                       type="email"
                       name="contactEmail"
                       value={formData.contactEmail}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border rounded-lg"
+                      className="w-full px-3 py-2 text-sm sm:text-base border rounded-lg"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Telefone</label>
+                    <label className="block text-xs sm:text-sm font-medium mb-1">Telefone</label>
                     <input
                       type="tel"
                       name="contactPhone"
                       value={formData.contactPhone}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border rounded-lg"
+                      className="w-full px-3 py-2 text-sm sm:text-base border rounded-lg"
                     />
                   </div>
                 </div>
@@ -307,10 +307,11 @@ const GymAdminPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Button
                     onClick={handleSave}
                     style={{ backgroundColor: colors.primary }}
+                    className="w-full sm:w-auto"
                   >
                     Salvar
                   </Button>
@@ -334,6 +335,7 @@ const GymAdminPage: React.FC = () => {
                       }
                     }}
                     variant="outline"
+                    className="w-full sm:w-auto"
                   >
                     Cancelar
                   </Button>
@@ -353,9 +355,9 @@ const GymAdminPage: React.FC = () => {
         {/* QR Code para Distribuição */}
         {gym && (
           <Card>
-            <div className="p-6">
-              <h2 className="text-xl font-semibold mb-4">QR Code para Distribuição</h2>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+            <div className="p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">QR Code para Distribuição</h2>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-4">
                 Compartilhe este QR code com seus alunos para que eles possam baixar o app
               </p>
               
@@ -364,7 +366,7 @@ const GymAdminPage: React.FC = () => {
                   <img
                     src={qrCodeDataUrl}
                     alt="QR Code da Academia"
-                    className="w-64 h-64 border rounded-lg mb-4"
+                    className="w-48 h-48 sm:w-64 sm:h-64 border rounded-lg mb-4"
                   />
                   <Button
                     onClick={() => {
@@ -374,19 +376,21 @@ const GymAdminPage: React.FC = () => {
                       link.click();
                     }}
                     style={{ backgroundColor: colors.primary }}
+                    className="w-full sm:w-auto"
                   >
                     Baixar QR Code
                   </Button>
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-slate-500 mb-4">
+                <div className="text-center py-6 sm:py-8">
+                  <p className="text-sm sm:text-base text-slate-500 mb-4">
                     {isGenerating ? 'Gerando QR code...' : 'QR code será gerado automaticamente'}
                   </p>
                   {!isGenerating && (
                     <Button
                       onClick={handleGenerateQRCode}
                       style={{ backgroundColor: colors.primary }}
+                      className="w-full sm:w-auto"
                     >
                       Gerar QR Code
                     </Button>

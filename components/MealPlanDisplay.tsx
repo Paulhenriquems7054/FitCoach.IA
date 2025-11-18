@@ -123,25 +123,25 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = memo(({ plan, observatio
         </div>
       </Card>
        {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" aria-modal="true">
-            <Card className="w-full max-w-lg mx-4 animate-fade-in-up">
-                 <div className="p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700">
-                    <h2 className="text-lg font-bold flex items-center gap-2">
-                        <SparklesIcon className="w-5 h-5 text-primary-500"/>
-                        {modalContent.title}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4" aria-modal="true">
+            <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in-up">
+                 <div className="p-3 sm:p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
+                    <h2 className="text-base sm:text-lg font-bold flex items-center gap-2 truncate pr-2">
+                        <SparklesIcon className="w-4 h-4 sm:w-5 sm:h-5 text-primary-500 flex-shrink-0"/>
+                        <span className="truncate">{modalContent.title}</span>
                     </h2>
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700">
-                        <XIcon className="w-6 h-6 text-slate-500" />
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="p-1 sm:p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0" aria-label="Fechar">
+                        <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500" />
                     </button>
                 </div>
-                <div className="p-6 min-h-[100px]">
+                <div className="p-4 sm:p-6 min-h-[100px]">
                     {isExplanationLoading ? (
                         <div className="space-y-2">
                             <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full animate-pulse"></div>
                             <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-5/6 animate-pulse"></div>
                         </div>
                     ) : (
-                        <p className="text-slate-600 dark:text-slate-300">{modalContent.explanation}</p>
+                        <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">{modalContent.explanation}</p>
                     )}
                 </div>
             </Card>
