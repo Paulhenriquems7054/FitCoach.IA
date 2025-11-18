@@ -57,8 +57,15 @@ export default defineConfig(({ mode }) => {
                 if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
                   return 'react-vendor';
                 }
-                // Bibliotecas que dependem do React devem estar no mesmo chunk
-                if (id.includes('react-dropzone')) {
+                // Bibliotecas que dependem do React DEVEM estar no mesmo chunk do React
+                if (id.includes('react-dropzone') || 
+                    id.includes('@testing-library/react') ||
+                    id.includes('@heroicons/react')) {
+                  return 'react-vendor';
+                }
+                // Recharts também precisa do React, então vamos colocá-lo no react-vendor também
+                // para evitar problemas de carregamento
+                if (id.includes('recharts')) {
                   return 'react-vendor';
                 }
                 // Google GenAI separado
@@ -75,15 +82,11 @@ export default defineConfig(({ mode }) => {
                 if (id.includes('html2canvas')) {
                   return 'pdf-html2canvas';
                 }
-                // Charts separado
-                if (id.includes('recharts')) {
-                  return 'chart-vendor';
-                }
-                // UI libraries
-                if (id.includes('@heroicons/react') || id.includes('clsx')) {
+                // UI libraries que não dependem do React
+                if (id.includes('clsx')) {
                   return 'ui-vendor';
                 }
-                // Outras dependências menores juntas
+                // Outras dependências menores juntas (sem React)
                 return 'vendor-misc';
               }
             },
