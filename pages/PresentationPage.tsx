@@ -158,11 +158,11 @@ const PresentationPage: React.FC = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="relative py-12 sm:py-16 md:py-24 bg-gradient-to-b from-slate-900 to-slate-950">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <div className="relative">
+      <div className="relative py-12 sm:py-16 md:py-24 bg-gradient-to-b from-slate-900 to-slate-950 overflow-visible">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center overflow-visible">
+          <div className="relative overflow-visible">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 blur-3xl rounded-3xl" />
-            <div className="relative bg-slate-900/60 backdrop-blur-sm border border-slate-700/60 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 shadow-2xl">
+            <div className="relative bg-slate-900/60 backdrop-blur-sm border border-slate-700/60 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 shadow-2xl overflow-visible">
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 sm:mb-6">
                 Construa uma rotina mais saudável
               </h2>
@@ -170,12 +170,15 @@ const PresentationPage: React.FC = () => {
                 Nutri.IA acompanha a sua jornada diariamente. Planos flexíveis, recomendações personalizadas 
                 e um assistente disponível 24/7 para responder dúvidas sobre alimentação, suplementação e bem-estar.
               </p>
-              <button
-                onClick={() => (window.location.hash = '/welcome-survey')}
-                className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 sm:px-6 md:px-8 py-3 sm:py-4 text-sm sm:text-base md:text-lg font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50 w-full sm:w-auto whitespace-nowrap"
-              >
-                Comece sua Jornada Agora
-              </button>
+              <div className="flex justify-center">
+                <button
+                  onClick={() => (window.location.hash = '/welcome-survey')}
+                  className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 sm:px-8 md:px-10 py-3 sm:py-4 text-sm sm:text-base md:text-lg font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50 whitespace-nowrap min-w-fit"
+                  style={{ minWidth: 'fit-content' }}
+                >
+                  Comece sua Jornada Agora
+                </button>
+              </div>
             </div>
           </div>
         </div>
