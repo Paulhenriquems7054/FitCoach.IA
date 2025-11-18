@@ -137,5 +137,8 @@
             "ip": "Dirección IP",
             "timestamp": "Fecha y Hora"
         }
+    },
+    "presentation": {
+        "cta_button": "Comenzar Ahora"
     }
 }

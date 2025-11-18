@@ -138,5 +138,8 @@
             "ip": "Endereço IP",
             "timestamp": "Data e Hora"
         }
+    },
+    "presentation": {
+        "cta_button": "Comece Agora"
     }
 }

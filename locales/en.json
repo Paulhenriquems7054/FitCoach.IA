@@ -138,5 +138,8 @@
             "ip": "IP Address",
             "timestamp": "Date & Time"
         }
+    },
+    "presentation": {
+        "cta_button": "Start Now"
     }
 }

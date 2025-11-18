@@ -1,8 +1,5 @@
 import React, { useEffect, useState } from 'react';
-
-// Constante para garantir encoding correto do texto do botão
-// Usando concatenação de strings para evitar problemas de encoding durante minificação
-const CTA_BUTTON_TEXT = String.fromCharCode(67, 111, 109, 101, 99, 101) + ' ' + String.fromCharCode(65, 103, 111, 114, 97);
+import { useI18n } from '../context/I18nContext';
 
 const features = [
   {
@@ -38,6 +35,7 @@ const features = [
 ];
 
 const PresentationPage: React.FC = () => {
+  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -211,7 +209,7 @@ const PresentationPage: React.FC = () => {
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
-                  {CTA_BUTTON_TEXT}
+                  {t('presentation.cta_button')}
                 </button>
               </div>
             </div>
