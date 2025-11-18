@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
+// Constante para garantir encoding correto do texto do botão
+const CTA_BUTTON_TEXT = 'Comece Agora';
+
 const features = [
   {
     icon: '🎯',
@@ -207,7 +210,7 @@ const PresentationPage: React.FC = () => {
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
-                  {'Comece Agora'}
+                  {CTA_BUTTON_TEXT}
                 </button>
               </div>
             </div>
