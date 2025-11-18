@@ -158,11 +158,11 @@ const PresentationPage: React.FC = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="relative py-12 sm:py-16 md:py-24 bg-gradient-to-b from-slate-900 to-slate-950 overflow-visible">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center overflow-visible">
-          <div className="relative overflow-visible">
+      <div className="relative py-12 sm:py-16 md:py-24 bg-gradient-to-b from-slate-900 to-slate-950" style={{ overflow: 'visible' }}>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center" style={{ overflow: 'visible' }}>
+          <div className="relative" style={{ overflow: 'visible' }}>
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 blur-3xl rounded-3xl" />
-            <div className="relative bg-slate-900/60 backdrop-blur-sm border border-slate-700/60 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 shadow-2xl overflow-visible">
+            <div className="relative bg-slate-900/60 backdrop-blur-sm border border-slate-700/60 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 shadow-2xl" style={{ overflow: 'visible' }}>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 sm:mb-6">
                 Construa uma rotina mais saudável
               </h2>
@@ -170,19 +170,24 @@ const PresentationPage: React.FC = () => {
                 Nutri.IA acompanha a sua jornada diariamente. Planos flexíveis, recomendações personalizadas 
                 e um assistente disponível 24/7 para responder dúvidas sobre alimentação, suplementação e bem-estar.
               </p>
-              <div id="presentation-cta-container" className="flex justify-center w-full overflow-visible">
+              <div id="presentation-cta-container" className="flex justify-center" style={{ width: '100%', overflow: 'visible', minWidth: '100%' }}>
                 <button
                   id="presentation-cta-button"
                   onClick={() => (window.location.hash = '/welcome-survey')}
-                  className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 py-3 sm:py-4 text-sm sm:text-base md:text-lg font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50 whitespace-nowrap"
+                  className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50"
                   style={{ 
-                    paddingLeft: '1.5rem',
-                    paddingRight: '1.5rem',
-                    minWidth: 'max-content',
+                    paddingTop: '0.75rem',
+                    paddingBottom: '0.75rem',
+                    paddingLeft: '2rem',
+                    paddingRight: '2rem',
+                    fontSize: '1rem',
+                    minWidth: '280px',
                     width: 'auto',
                     display: 'inline-block',
                     overflow: 'visible',
-                    textOverflow: 'clip'
+                    textOverflow: 'clip',
+                    whiteSpace: 'nowrap',
+                    maxWidth: 'none'
                   }}
                 >
                   Comece sua Jornada Agora
@@ -205,17 +210,28 @@ const PresentationPage: React.FC = () => {
         .animate-float {
           animation: float 6s ease-in-out infinite;
         }
-        /* Garantir que o botão CTA não seja cortado */
+        /* Garantir que o botão CTA não seja cortado - FORÇAR COM !important */
         #presentation-cta-button {
-          min-width: max-content !important;
+          min-width: 280px !important;
           width: auto !important;
+          max-width: none !important;
           white-space: nowrap !important;
           overflow: visible !important;
           text-overflow: clip !important;
+          display: inline-block !important;
+          padding-left: 2rem !important;
+          padding-right: 2rem !important;
         }
         #presentation-cta-container {
           overflow: visible !important;
           width: 100% !important;
+          min-width: 100% !important;
+          max-width: none !important;
+        }
+        /* Garantir que containers pais não cortem */
+        #presentation-cta-container * {
+          overflow: visible !important;
+          text-overflow: clip !important;
         }
       `}</style>
     </div>
