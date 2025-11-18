@@ -156,8 +156,7 @@ body {
 
 /* Remover qualquer limitação de largura dos containers pais */
 #presentation-cta-container,
-#presentation-cta-container *,
-div:has(#presentation-cta-container) {
+#presentation-cta-container * {
   max-width: none !important;
   overflow: visible !important;
 }
