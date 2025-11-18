@@ -127,18 +127,8 @@ body {
   text-indent: 0 !important;
 }
 
-#presentation-cta-button span,
-#presentation-cta-button * {
-  display: inline !important;
-  width: auto !important;
-  max-width: none !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
-  white-space: normal !important;
-  text-align: center !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  text-indent: 0 !important;
+#presentation-cta-button {
+  white-space: nowrap !important;
 }
 
 #presentation-cta-container {

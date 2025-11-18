@@ -176,8 +176,6 @@ const PresentationPage: React.FC = () => {
                   onClick={() => (window.location.hash = '/welcome-survey')}
                   style={{ 
                     padding: '0.875rem 2.5rem',
-                    paddingLeft: '2.5rem',
-                    paddingRight: '2.5rem',
                     fontSize: '1.125rem',
                     fontWeight: '600',
                     color: '#ffffff',
@@ -198,10 +196,7 @@ const PresentationPage: React.FC = () => {
                     transition: 'all 0.2s ease-in-out',
                     lineHeight: '1.5',
                     position: 'relative',
-                    boxSizing: 'border-box',
-                    marginLeft: '0',
-                    marginRight: '0',
-                    textIndent: '0'
+                    boxSizing: 'border-box'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = 'linear-gradient(to right, rgb(52, 211, 153), rgb(16, 185, 129))';
@@ -212,24 +207,7 @@ const PresentationPage: React.FC = () => {
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
-                  <span style={{ 
-                    display: 'inline-block', 
-                    width: 'auto', 
-                    textAlign: 'center', 
-                    overflow: 'visible', 
-                    textOverflow: 'clip', 
-                    whiteSpace: 'nowrap',
-                    maxWidth: 'none',
-                    position: 'relative',
-                    paddingLeft: '0',
-                    paddingRight: '0',
-                    marginLeft: '0',
-                    marginRight: '0'
-                  }}>
-                    <span style={{ display: 'inline', margin: 0, padding: 0 }}>Comece</span>
-                    {' '}
-                    <span style={{ display: 'inline', margin: 0, padding: 0 }}>sua Jornada Agora</span>
-                  </span>
+                  Comece sua Jornada Agora
                 </button>
               </div>
             </div>
