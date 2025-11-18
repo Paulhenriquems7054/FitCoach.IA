@@ -207,7 +207,7 @@ const PresentationPage: React.FC = () => {
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
-                  Comece Agora
+                  {'Comece Agora'}
                 </button>
               </div>
             </div>
