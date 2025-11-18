@@ -7,10 +7,13 @@ import {
   searchRecipesOffline, 
   getCachedMealPlan,
   generateWellnessPlanOffline,
+  generateWeeklyReportOffline,
   isOnline 
 } from "./offlineService";
 import { resolveActiveApiKey } from "../constants/apiConfig";
 import { getAvailableExercisesPrompt } from "./exerciseGifService";
+import { logger } from "../utils/logger";
+import { generateJSONResponse } from "./iaController";
 
 // Função para obter a chave de API ativa (do localStorage ou env)
 const getApiKey = (): string | undefined => {
@@ -132,7 +135,7 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
 
     // Se offline ou sem API key, usar fallback offline
     if (!online || !hasApiKey) {
-        console.log('Modo offline: usando fallback local para gerar plano alimentar');
+        logger.info('Modo offline: usando fallback local para gerar plano alimentar', 'geminiService');
         const offlinePlan = generateMealPlanOffline(user, language);
         
         if (typeof window !== 'undefined') {
@@ -142,9 +145,46 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
         return offlinePlan;
     }
 
-    // Tentar usar API online
+    // Tentar usar IA Local primeiro, depois API online
     const prompt = buildMealPlanPrompt(user, language);
+    const systemPrompt = `Você é um nutricionista especializado. Retorne APENAS JSON válido seguindo o schema fornecido.`;
 
+    // Tentar IA Local primeiro (via IAController)
+    const localResponse = await generateJSONResponse<GeminiMealPlanResponse>(
+        prompt,
+        systemPrompt,
+        async () => {
+            // Fallback para API externa
+            try {
+                const ai = getGeminiClient();
+                const response = await ai.models.generateContent({
+                    model: "gemini-2.5-flash",
+                    contents: prompt,
+                    config: {
+                      responseMimeType: "application/json",
+                      responseSchema: mealPlanSchema,
+                      temperature: 0.7,
+                    },
+                });
+                
+                const jsonText = response.text.trim();
+                const parsedJson = JSON.parse(jsonText);
+                return parsedJson as GeminiMealPlanResponse;
+            } catch (error) {
+                logger.warn('Falha no fallback para API externa em generateMealPlan', 'geminiService', error);
+                return null;
+            }
+        }
+    );
+
+    if (localResponse) {
+        if (typeof window !== 'undefined') {
+            sessionStorage.setItem('lastMealPlan', JSON.stringify(localResponse));
+        }
+        return localResponse;
+    }
+
+    // Se IAController retornou null, tentar API diretamente (compatibilidade)
     try {
         const ai = getGeminiClient();
         const response = await ai.models.generateContent({
@@ -165,11 +205,12 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
         }
 
         return parsedJson as GeminiMealPlanResponse;
-    } catch (error: any) {
+    } catch (error: unknown) {
         // Silenciar erros de API key inválida
-        const isApiKeyError = error?.error?.code === 400 && error?.error?.message?.includes('API key');
+        const errorObj = error as { error?: { code?: number; message?: string } };
+        const isApiKeyError = errorObj?.error?.code === 400 && errorObj?.error?.message?.includes('API key');
         if (!isApiKeyError) {
-            console.error("Error calling Gemini API:", error);
+            logger.error("Erro ao chamar API do Gemini", 'geminiService', error);
         }
         // Fallback para offline em caso de erro
         const offlinePlan = generateMealPlanOffline(user, language);
@@ -190,7 +231,7 @@ export const startChat = (user: User, language: 'pt' | 'en' | 'es' = 'pt'): void
   const hasApiKey = !!apiKey;
 
   if (!online || !hasApiKey) {
-    console.log('Modo offline: chat limitado disponível');
+    logger.info('Modo offline: chat limitado disponível', 'geminiService');
     // Chat offline será gerenciado pelo componente de chat
     return;
   }
@@ -261,7 +302,7 @@ export const analyzeMealPhoto = async (base64Image: string, mimeType: string): P
 
     // Se offline ou sem API key, usar fallback offline
     if (!online || !hasApiKey) {
-        console.log('Modo offline: usando análise básica local');
+        logger.info('Modo offline: usando análise básica local', 'geminiService');
         return await analyzeMealPhotoOffline(base64Image, mimeType);
     }
 
@@ -293,11 +334,12 @@ export const analyzeMealPhoto = async (base64Image: string, mimeType: string): P
 
         const jsonText = response.text.trim();
         return JSON.parse(jsonText) as MealAnalysisResponse;
-    } catch (error: any) {
+    } catch (error: unknown) {
         // Silenciar erros de API key inválida
-        const isApiKeyError = error?.error?.code === 400 && error?.error?.message?.includes('API key');
+        const errorObj = error as { error?: { code?: number; message?: string } };
+        const isApiKeyError = errorObj?.error?.code === 400 && errorObj?.error?.message?.includes('API key');
         if (!isApiKeyError) {
-            console.error("Error calling Gemini API for meal analysis:", error);
+            logger.error("Erro ao chamar API do Gemini para análise de refeição", 'geminiService', error);
         }
         // Fallback para offline em caso de erro
         return await analyzeMealPhotoOffline(base64Image, mimeType);
@@ -349,7 +391,7 @@ export const searchRecipes = async (query: string, user: User): Promise<Recipe[]
 
     // Se offline ou sem API key, usar fallback offline
     if (!online || !hasApiKey) {
-        console.log('Modo offline: usando receitas em cache');
+        logger.info('Modo offline: usando receitas em cache', 'geminiService');
         return await searchRecipesOffline(query, user);
     }
 
@@ -384,11 +426,12 @@ export const searchRecipes = async (query: string, user: User): Promise<Recipe[]
         const jsonText = response.text.trim();
         const parsedJson = JSON.parse(jsonText);
         return parsedJson.receitas as Recipe[];
-    } catch (error: any) {
+    } catch (error: unknown) {
         // Silenciar erros de API key inválida
-        const isApiKeyError = error?.error?.code === 400 && error?.error?.message?.includes('API key');
+        const errorObj = error as { error?: { code?: number; message?: string } };
+        const isApiKeyError = errorObj?.error?.code === 400 && errorObj?.error?.message?.includes('API key');
         if (!isApiKeyError) {
-            console.error("Error calling Gemini API for recipe search:", error);
+            logger.error("Erro ao chamar API do Gemini para busca de receitas", 'geminiService', error);
         }
         // Fallback para offline em caso de erro
         return await searchRecipesOffline(query, user);
@@ -438,8 +481,8 @@ export const moderateContent = async (content: string): Promise<ModerationResult
         
         const jsonText = response.text.trim();
         return JSON.parse(jsonText) as ModerationResult;
-    } catch (error) {
-        console.error("Error calling Gemini API for content moderation:", error);
+    } catch (error: unknown) {
+        logger.error("Erro ao chamar API do Gemini para moderação de conteúdo", 'geminiService', error);
         return { is_safe: false, reason: "Falha ao conectar com o serviço de moderação." };
     }
 };
@@ -447,8 +490,17 @@ export const moderateContent = async (content: string): Promise<ModerationResult
 // --- WEEKLY REPORT ---
 
 export const generateWeeklyReport = async (user: User, language: 'pt' | 'en' | 'es' = 'pt'): Promise<string> => {
+    // Verificar se está online e se tem API key
+    const online = isOnline();
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API key for Gemini is not configured. Please set it up in Settings.");
+    const hasApiKey = !!apiKey;
+
+    // Se offline ou sem API key, usar fallback offline
+    if (!online || !hasApiKey) {
+        logger.info('Modo offline: usando fallback local para gerar relatório semanal', 'geminiService');
+        return generateWeeklyReportOffline(user, language);
+    }
+
     const langPrompts = {
       pt: {
         title: "Relatório de Progresso Semanal",
@@ -495,9 +547,21 @@ export const generateWeeklyReport = async (user: User, language: 'pt' | 'en' | '
       Seja positivo, encorajador e profissional. Use uma linguagem clara e acessível.
     `;
 
-    const ai = getGeminiClient();
-    const response = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
-    return response.text.trim();
+    try {
+        const ai = getGeminiClient();
+        const response = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
+        return response.text.trim();
+    } catch (error: unknown) {
+        // Silenciar erros de API key inválida
+        const errorObj = error as { error?: { code?: number; message?: string } };
+        const isApiKeyError = errorObj?.error?.code === 400 && errorObj?.error?.message?.includes('API key');
+        if (!isApiKeyError) {
+            logger.error("Erro ao chamar API do Gemini para relatório semanal", 'geminiService', error);
+        }
+        // Fallback para offline em caso de erro
+        logger.info('Erro na API, usando fallback offline para relatório semanal', 'geminiService');
+        return generateWeeklyReportOffline(user, language);
+    }
 };
 
 
@@ -603,7 +667,7 @@ export const generateWellnessPlan = async (user: User): Promise<WellnessPlan> =>
 
     // Se offline ou sem API key, usar fallback offline
     if (!online || !hasApiKey) {
-        console.log('Modo offline: usando plano de bem-estar offline');
+        logger.info('Modo offline: usando plano de bem-estar offline', 'geminiService');
         return generateWellnessPlanOffline(user);
     }
 
@@ -702,11 +766,12 @@ export const generateWellnessPlan = async (user: User): Promise<WellnessPlan> =>
         plan.versao = 2; // Versão expandida
         
         return plan;
-    } catch (error: any) {
+    } catch (error: unknown) {
         // Silenciar erros de API key inválida
-        const isApiKeyError = error?.error?.code === 400 && error?.error?.message?.includes('API key');
+        const errorObj = error as { error?: { code?: number; message?: string } };
+        const isApiKeyError = errorObj?.error?.code === 400 && errorObj?.error?.message?.includes('API key');
         if (!isApiKeyError) {
-            console.error("Error generating wellness plan:", error);
+            logger.error("Erro ao gerar plano de bem-estar", 'geminiService', error);
         }
         // Fallback para offline em caso de erro
         return generateWellnessPlanOffline(user);
@@ -751,7 +816,8 @@ export const getAICoachTip = async (user: User): Promise<string> => {
             return `Bom ${timeOfDay}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
         }
         // Para outros erros, logar mas ainda retornar fallback
-        console.warn("Erro ao obter dica do coach (usando fallback):", error?.message || error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.warn("Erro ao obter dica do coach (usando fallback)", 'geminiService', error);
         const timeOfDay = new Date().getHours() < 12 ? 'manhã' : new Date().getHours() < 18 ? 'tarde' : 'noite';
         return `Bom ${timeOfDay}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
     }

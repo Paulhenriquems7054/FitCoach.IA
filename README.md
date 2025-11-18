@@ -45,3 +45,45 @@ Se você receber o erro "API key not valid":
 2. Confirme que a variável está escrita como: `VITE_GEMINI_API_KEY`
 3. Certifique-se de que sua API key do Gemini está válida
 4. Após modificar o `.env.local`, reinicie o servidor (`Ctrl+C` e depois `npm run dev`)
+
+## 🚀 Deploy no Vercel (Para Demonstração)
+
+O app pode ser hospedado no Vercel para demonstração ao cliente:
+
+### Deploy Rápido
+
+1. **Instale Vercel CLI:**
+   ```bash
+   npm install -g vercel
+   ```
+
+2. **Faça login:**
+   ```bash
+   vercel login
+   ```
+
+3. **Deploy:**
+   ```bash
+   vercel
+   ```
+
+4. **Configure variáveis de ambiente:**
+   - No painel do Vercel, adicione: `VITE_GEMINI_API_KEY`
+   - Ou via CLI: `vercel env add VITE_GEMINI_API_KEY`
+
+5. **Deploy de produção:**
+   ```bash
+   vercel --prod
+   ```
+
+📖 **Guia completo:** Veja `docs/DEPLOY_VERCEL.md`
+
+### O que funciona no Vercel:
+- ✅ App completo (todas as funcionalidades)
+- ✅ API Externa (Gemini) - funciona perfeitamente
+- ✅ Fallback automático - já implementado
+- ✅ Modo Offline - respostas pré-definidas
+- ✅ PWA - pode ser instalado como app
+
+### Limitação:
+- ❌ IA Local (Ollama) - não funciona no Vercel (mas não é necessário, API externa funciona)

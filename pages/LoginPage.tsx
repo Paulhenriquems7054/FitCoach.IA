@@ -9,10 +9,13 @@ import { MoonIcon } from '../components/icons/MoonIcon';
 import { SunIcon } from '../components/icons/SunIcon';
 import { XIcon } from '../components/icons/XIcon';
 import type { LoginCredentials } from '../types';
+import { sanitizeInput, sanitizeEmail } from '../utils/security';
+import { useToast } from '../components/ui/Toast';
 
 const LoginPage: React.FC = () => {
     const { setUser } = useUser();
     const { theme, themeSetting, setThemeSetting } = useTheme();
+    const { showSuccess, showError } = useToast();
     const [isLogin, setIsLogin] = useState(true);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -127,8 +130,9 @@ const LoginPage: React.FC = () => {
             } else {
                 setForgotPasswordError('Erro ao redefinir senha. Tente novamente.');
             }
-        } catch (err: any) {
-            setForgotPasswordError(err?.message || 'Erro ao redefinir senha. Tente novamente.');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao redefinir senha. Tente novamente.';
+            setForgotPasswordError(errorMessage);
         } finally {
             setIsResettingPassword(false);
         }
@@ -141,33 +145,48 @@ const LoginPage: React.FC = () => {
         setIsLoading(true);
 
         try {
-            if (!username.trim() || !password.trim()) {
-                setError('Por favor, preencha todos os campos');
+            // Sanitizar inputs
+            const sanitizedUsername = sanitizeInput(username.trim(), 50);
+            const sanitizedPassword = password.trim();
+
+            if (!sanitizedUsername || !sanitizedPassword) {
+                const errorMsg = 'Por favor, preencha todos os campos';
+                setError(errorMsg);
+                showError(errorMsg);
                 setIsLoading(false);
                 return;
             }
 
-            const credentials: LoginCredentials = { username: username.trim(), password };
+            const credentials: LoginCredentials = { 
+                username: sanitizedUsername, 
+                password: sanitizedPassword 
+            };
             const user = await loginUser(credentials);
 
             if (user) {
                 // Salvar sessão
-                await saveLoginSession(user.username || username.trim());
+                await saveLoginSession(user.username || sanitizedUsername);
                 
                 // Atualizar contexto do usuário
                 setUser(user);
                 
-                setSuccess('Login realizado com sucesso!');
+                const successMsg = 'Login realizado com sucesso!';
+                setSuccess(successMsg);
+                showSuccess(successMsg);
                 
                 // Redirecionar após 1 segundo
                 setTimeout(() => {
                     window.location.hash = '#/';
                 }, 1000);
             } else {
-                setError('Nome de usuário ou senha incorretos');
+                const errorMsg = 'Nome de usuário ou senha incorretos';
+                setError(errorMsg);
+                showError(errorMsg);
             }
-        } catch (err: any) {
-            setError(err?.message || 'Erro ao fazer login. Tente novamente.');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao fazer login. Tente novamente.';
+            setError(errorMessage);
+            showError(errorMsg);
         } finally {
             setIsLoading(false);
         }
@@ -200,34 +219,39 @@ const LoginPage: React.FC = () => {
             }
 
             // Verificar se username já existe
-            const exists = await usernameExists(username.trim());
+            const exists = await usernameExists(sanitizedUsername);
             if (exists) {
-                setError('Nome de usuário já está em uso');
+                const errorMsg = 'Nome de usuário já está em uso';
+                setError(errorMsg);
+                showError(errorMsg);
                 setIsLoading(false);
                 return;
             }
 
             // Registrar usuário
             const newUser = await registerUser(
-                username.trim(),
-                password,
-                { nome: nome.trim() }
+                sanitizedUsername,
+                sanitizedPassword,
+                { nome: sanitizedNome }
             );
 
             // Salvar sessão
-            await saveLoginSession(newUser.username || username.trim());
+            await saveLoginSession(newUser.username || sanitizedUsername);
             
             // Atualizar contexto do usuário
             setUser(newUser);
             
-            setSuccess('Conta criada com sucesso!');
+            const successMsg = 'Conta criada com sucesso!';
+            setSuccess(successMsg);
+            showSuccess(successMsg);
             
             // Redirecionar após 1 segundo
             setTimeout(() => {
                 window.location.hash = '#/';
             }, 1000);
-        } catch (err: any) {
-            setError(err?.message || 'Erro ao criar conta. Tente novamente.');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao criar conta. Tente novamente.';
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }

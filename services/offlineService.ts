@@ -1,6 +1,7 @@
 
 import type { User, GeminiMealPlanResponse, MealAnalysisResponse, Recipe, MealPlan, DailySummary } from "../types";
 import { Goal } from "../types";
+import { logger } from "../utils/logger";
 export { generateWellnessPlanOffline } from "./wellnessOfflineService";
 
 // Cache keys
@@ -614,7 +615,7 @@ export const generateMealPlanOffline = (user: User, language: 'pt' | 'en' | 'es'
     try {
       localStorage.setItem(MEAL_PLAN_CACHE_KEY, JSON.stringify(result));
     } catch (e) {
-      console.warn('Não foi possível salvar no cache:', e);
+      logger.warn('Não foi possível salvar no cache', 'offlineService', e);
     }
   }
 
@@ -692,7 +693,7 @@ export const analyzeMealPhotoOffline = async (base64Image: string, mimeType: str
     try {
       localStorage.setItem(cacheKey, JSON.stringify(result));
     } catch (e) {
-      console.warn('Não foi possível salvar análise no cache:', e);
+      logger.warn('Não foi possível salvar análise no cache', 'offlineService', e);
     }
   }
 
@@ -773,7 +774,7 @@ export const getCachedMealPlan = (): GeminiMealPlanResponse | null => {
       return JSON.parse(cached);
     }
   } catch (e) {
-    console.warn('Erro ao ler cache:', e);
+    logger.warn('Erro ao ler cache', 'offlineService', e);
   }
   
   return null;
@@ -912,5 +913,128 @@ export const getOfflineChatResponse = (message: string, user: User): string => {
   ];
   
   return genericResponses[Math.floor(Math.random() * genericResponses.length)];
+};
+
+/**
+ * Gera um relatório semanal offline baseado nos dados do usuário
+ */
+export const generateWeeklyReportOffline = (user: User, language: 'pt' | 'en' | 'es' = 'pt'): string => {
+  const langPrompts = {
+    pt: {
+      title: "Relatório de Progresso Semanal",
+      analysis: "Análise de Progresso",
+      strengths: "Pontos Fortes",
+      improvements: "Pontos a Melhorar",
+      tip: "Dica da Semana",
+      motivation: "Mensagem Motivacional"
+    },
+    en: {
+      title: "Weekly Progress Report",
+      analysis: "Progress Analysis",
+      strengths: "Strengths",
+      improvements: "Areas for Improvement",
+      tip: "Tip of the Week",
+      motivation: "Motivational Message"
+    },
+    es: {
+      title: "Informe de Progreso Semanal",
+      analysis: "Análisis de Progreso",
+      strengths: "Puntos Fuertes",
+      improvements: "Áreas de Mejora",
+      tip: "Consejo de la Semana",
+      motivation: "Mensaje de Motivación"
+    }
+  };
+  const t = langPrompts[language];
+
+  // Calcular métricas básicas
+  const weightHistory = user.weightHistory || [];
+  const totalCheckIns = weightHistory.length;
+  const lastWeight = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].weight : user.peso;
+  const firstWeight = weightHistory.length > 0 ? weightHistory[0].weight : user.peso;
+  const weightVariation = lastWeight - firstWeight;
+  const disciplineScore = user.disciplineScore || 0;
+
+  // Determinar mensagens baseadas no objetivo
+  const goalMessages = {
+    [Goal.PERDER_PESO]: {
+      analysis: weightVariation < 0 
+        ? `Parabéns! Você está no caminho certo para ${user.objetivo}. Sua dedicação está gerando resultados positivos. Continue mantendo o foco e a disciplina.`
+        : `Você está trabalhando duro para ${user.objetivo}. Lembre-se de que o progresso nem sempre é linear. Continue persistindo e ajustando sua rotina conforme necessário.`,
+      strengths: [
+        `Você manteve ${totalCheckIns} registro${totalCheckIns !== 1 ? 's' : ''} de peso, demonstrando comprometimento com seu objetivo.`,
+        `Sua pontuação de disciplina de ${disciplineScore}% mostra que você está criando hábitos consistentes.`,
+        `Focar em ${user.objetivo} requer determinação, e você está demonstrando isso.`
+      ],
+      improvements: [
+        'Tente aumentar a frequência de check-ins para ter um acompanhamento mais preciso do progresso.',
+        'Considere adicionar mais proteínas magras às suas refeições para manter a saciedade.',
+        'Mantenha-se hidratado - beba pelo menos 2 litros de água por dia.'
+      ],
+      tip: 'Uma dica valiosa: tente fazer refeições menores e mais frequentes ao longo do dia. Isso ajuda a manter o metabolismo ativo e reduz a fome.',
+      motivation: 'Cada pequeno passo te aproxima do seu objetivo. Continue firme! 💪'
+    },
+    [Goal.GANHAR_PESO]: {
+      analysis: weightVariation > 0
+        ? `Excelente progresso! Você está ganhando peso de forma saudável em direção ao seu objetivo de ${user.objetivo}.`
+        : `Você está trabalhando para ${user.objetivo}. Lembre-se de que ganhar peso de forma saudável requer tempo e consistência.`,
+      strengths: [
+        `Seus ${totalCheckIns} registro${totalCheckIns !== 1 ? 's' : ''} mostram que você está monitorando seu progresso.`,
+        `Disciplina de ${disciplineScore}% é um bom começo para alcançar seus objetivos.`,
+        `Focar em ganho de massa magra é um objetivo nobre e você está no caminho certo.`
+      ],
+      improvements: [
+        'Inclua mais fontes de proteína de alta qualidade em cada refeição.',
+        'Considere fazer lanches nutritivos entre as refeições principais.',
+        'Mantenha um diário alimentar para garantir que está consumindo calorias suficientes.'
+      ],
+      tip: 'Para ganhar peso de forma saudável, priorize alimentos ricos em nutrientes e não apenas calorias vazias. Combine proteínas, carboidratos complexos e gorduras boas.',
+      motivation: 'Seu corpo está se transformando a cada refeição nutritiva. Continue! 🌟'
+    },
+    [Goal.MANTER_PESO]: {
+      analysis: Math.abs(weightVariation) < 1
+        ? `Perfeito! Você está mantendo seu peso estável, o que demonstra excelente controle e disciplina.`
+        : `Você está trabalhando para manter seu peso. Pequenas variações são normais, o importante é a tendência geral.`,
+      strengths: [
+        `Manter ${totalCheckIns} registro${totalCheckIns !== 1 ? 's' : ''} mostra que você está atento ao seu peso.`,
+        `Sua disciplina de ${disciplineScore}% é essencial para manter o equilíbrio.`,
+        `Manter o peso requer tanto dedicação quanto ganhar ou perder. Você está fazendo isso!`
+      ],
+      improvements: [
+        'Continue monitorando seu peso regularmente para detectar mudanças cedo.',
+        'Mantenha uma alimentação equilibrada com todos os grupos alimentares.',
+        'Inclua atividade física regular para manter o metabolismo ativo.'
+      ],
+      tip: 'Para manter o peso, é importante encontrar um equilíbrio entre o que você come e o que você gasta. Preste atenção aos sinais de fome e saciedade do seu corpo.',
+      motivation: 'Manter o equilíbrio é uma conquista diária. Continue assim! ⚖️'
+    }
+  };
+
+  const messages = goalMessages[user.objetivo] || goalMessages[Goal.PERDER_PESO];
+
+  // Construir o relatório
+  const report = `
+**${t.analysis}**
+
+${messages.analysis}
+
+**${t.strengths}**
+
+${messages.strengths.map((s, i) => `${i + 1}. ${s}`).join('\n\n')}
+
+**${t.improvements}**
+
+${messages.improvements.map((i, idx) => `${idx + 1}. ${i}`).join('\n\n')}
+
+**${t.tip}**
+
+${messages.tip}
+
+**${t.motivation}**
+
+${messages.motivation}
+  `.trim();
+
+  return report;
 };
 

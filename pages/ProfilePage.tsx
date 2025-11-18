@@ -3,20 +3,35 @@ import { Card } from '../components/ui/Card';
 import { useUser } from '../context/UserContext';
 import { Goal } from '../types';
 import { Button } from '../components/ui/Button';
+import { PhotoUploader } from '../components/ui/PhotoUploader';
+import { useToast } from '../components/ui/Toast';
 
 const ProfilePage: React.FC = () => {
     const { user, setUser } = useUser();
+    const { showSuccess } = useToast();
     const [isEditing, setIsEditing] = React.useState(false);
     const [formData, setFormData] = React.useState(user);
+
+    React.useEffect(() => {
+        setFormData(user);
+    }, [user]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: name === 'idade' || name === 'peso' || name === 'altura' ? Number(value) : value }));
     };
 
+    const handlePhotoChange = (photoUrl: string | null) => {
+        const updatedFormData = { ...formData, photoUrl: photoUrl || undefined };
+        setFormData(updatedFormData);
+        // Salvar imediatamente quando a foto for alterada
+        setUser(updatedFormData);
+    };
+
     const handleSave = () => {
         setUser(formData);
         setIsEditing(false);
+        showSuccess('Perfil atualizado com sucesso!');
     };
 
     const handleCancel = () => {
@@ -33,13 +48,23 @@ const ProfilePage: React.FC = () => {
 
             <Card>
                 <div className="p-6 space-y-6">
+                    {/* Seção de Foto de Perfil */}
+                    <div className="flex flex-col items-center pb-6 border-b border-slate-200 dark:border-slate-700">
+                        <PhotoUploader
+                            currentPhotoUrl={formData.photoUrl}
+                            userName={formData.nome || 'Usuário'}
+                            onPhotoChange={handlePhotoChange}
+                            disabled={!isEditing}
+                        />
+                    </div>
+
                     <div className="space-y-4">
                         <div>
                             <label htmlFor="nome" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Nome</label>
                             <input type="text" name="nome" id="nome" value={formData.nome} onChange={handleChange} disabled={!isEditing} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed" />
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="idade" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Idade</label>
                                 <input type="number" name="idade" id="idade" value={formData.idade} onChange={handleChange} disabled={!isEditing} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed" />
@@ -53,7 +78,7 @@ const ProfilePage: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="peso" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Peso (kg)</label>
                                 <input type="number" name="peso" id="peso" step="0.1" value={formData.peso} onChange={handleChange} disabled={!isEditing} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed" />

@@ -10,9 +10,11 @@ import { Alert } from '../components/ui/Alert';
 import { MealPlanSkeleton } from '../components/skeletons/MealPlanSkeleton';
 import { MealPlanHistory } from '../components/MealPlanHistory';
 import { Button } from '../components/ui/Button';
+import { useToast } from '../components/ui/Toast';
 
 const GeneratorPage: React.FC = () => {
   const { user, addPoints } = useUser();
+  const { showSuccess, showError } = useToast();
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [observations, setObservations] = useState<string>('');
@@ -33,20 +35,23 @@ const GeneratorPage: React.FC = () => {
         setSummary(result.resumo_diario);
         setObservations(result.observacoes);
         addPoints(10); // Award points for generating a plan
+        showSuccess('Plano alimentar gerado com sucesso!');
         
         // Salvar plano no banco de dados
         try {
           await saveMealPlan(result.planoAlimentar, user.nome);
         } catch (saveError) {
-          console.error('Erro ao salvar plano no histórico:', saveError);
-          // Não bloquear a exibição do plano se houver erro ao salvar
+          showError('Plano gerado, mas não foi possível salvar no histórico.');
         }
       } else {
-        setError('Não foi possível gerar o plano. A resposta da IA estava vazia.');
+        const errorMsg = 'Não foi possível gerar o plano. A resposta da IA estava vazia.';
+        setError(errorMsg);
+        showError(errorMsg);
       }
-    } catch (err) {
-      console.error(err);
-      setError('Ocorreu um erro ao gerar o plano alimentar. Verifique sua chave de API e tente novamente.');
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Ocorreu um erro ao gerar o plano alimentar. Verifique sua chave de API e tente novamente.';
+      setError(errorMsg);
+      showError(errorMsg);
     } finally {
       setIsLoading(false);
     }

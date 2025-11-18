@@ -1,5 +1,5 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, memo } from 'react';
 import type { Meal, MealPlan } from '../types';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { Card } from './ui/Card';
@@ -9,13 +9,14 @@ import { explainMeal } from '../services/geminiService';
 import { XIcon } from './icons/XIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { useI18n } from '../context/I18nContext';
+import { useToast } from './ui/Toast';
 
 interface MealPlanDisplayProps {
   plan: MealPlan;
   observations: string;
 }
 
-const MealPlanDisplay: React.FC<MealPlanDisplayProps> = ({ plan, observations }) => {
+const MealPlanDisplay: React.FC<MealPlanDisplayProps> = memo(({ plan, observations }) => {
   const { user } = useUser();
   const { t } = useI18n();
   const planRef = useRef<HTMLDivElement>(null);
@@ -49,9 +50,9 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = ({ plan, observations })
         heightLeft -= pdf.internal.pageSize.getHeight();
       }
       pdf.save('plano-alimentar-nutri-ia.pdf');
+      showSuccess('PDF exportado com sucesso!');
     } catch (error) {
-      console.error('Erro ao exportar PDF:', error);
-      alert('Erro ao exportar PDF. Tente novamente.');
+      showError('Erro ao exportar PDF. Tente novamente.');
     }
   };
   
@@ -63,8 +64,8 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = ({ plan, observations })
         const explanation = await explainMeal(meal.refeicao, user);
         setModalContent(prev => ({ ...prev, explanation }));
     } catch (error) {
-        console.error(error);
         setModalContent(prev => ({ ...prev, explanation: t('meal_plan.explanation.error') }));
+        showError('Não foi possível obter explicação da refeição.');
     } finally {
         setIsExplanationLoading(false);
     }
@@ -148,6 +149,14 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = ({ plan, observations })
       )}
     </>
   );
-};
+}, (prevProps, nextProps) => {
+  // Comparação customizada para evitar re-renders desnecessários
+  return (
+    prevProps.plan === nextProps.plan &&
+    prevProps.observations === nextProps.observations
+  );
+});
+
+MealPlanDisplay.displayName = 'MealPlanDisplay';
 
 export default MealPlanDisplay;

@@ -4,6 +4,7 @@ import { Layout } from './components/layout/Layout';
 import { useRouter } from './hooks/useRouter';
 import { Skeleton } from './components/ui/Skeleton';
 import { Card } from './components/ui/Card';
+import { ToastProvider } from './components/ui/Toast';
 
 // Lazy load das páginas para reduzir o bundle inicial
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -19,7 +20,6 @@ const AnalysisPage = lazy(() => import('./pages/AnalysisPage'));
 const SmartMealPage = lazy(() => import('./pages/SmartMealPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const ProfessionalDashboardPage = lazy(() => import('./pages/ProfessionalDashboardPage'));
-const PremiumPage = lazy(() => import('./pages/PremiumPage'));
 const PresentationPage = lazy(() => import('./pages/PresentationPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const WelcomeSurveyPage = lazy(() => import('./pages/WelcomeSurveyPage'));
@@ -55,7 +55,6 @@ const App: React.FC = () => {
             case '/smart-meal': return <SmartMealPage />;
             case '/privacy': return <PrivacyPage />;
             case '/professional': return <ProfessionalDashboardPage />;
-            case '/premium': return <PremiumPage />;
             case '/':
             default:
                 return <HomePage />;
@@ -87,11 +86,13 @@ const App: React.FC = () => {
     }
 
     return (
-        <Layout>
-            <Suspense fallback={<PageLoader />}>
-                {renderPage()}
-            </Suspense>
-        </Layout>
+        <ToastProvider>
+            <Layout>
+                <Suspense fallback={<PageLoader />}>
+                    {renderPage()}
+                </Suspense>
+            </Layout>
+        </ToastProvider>
     );
 };
 

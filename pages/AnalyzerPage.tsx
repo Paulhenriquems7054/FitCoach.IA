@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { SparklesIcon } from '../components/icons/SparklesIcon';
 import { CameraIcon } from '../components/icons/CameraIcon';
@@ -9,6 +9,9 @@ import type { MealAnalysisResponse } from '../types';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { Skeleton } from '../components/ui/Skeleton';
+import { usePremiumAccess } from '../hooks/usePremiumAccess';
+import { checkAndResetLimits, incrementPhotoAnalysisCount, getPhotosAnalyzedToday } from '../services/usageLimitsService';
+import { useToast } from '../components/ui/Toast';
 
 
 const AnalysisSkeleton = () => (
@@ -40,11 +43,27 @@ const AnalysisSkeleton = () => (
 
 
 const AnalyzerPage: React.FC = () => {
-    const { addPoints } = useUser();
+    const { user, setUser, addPoints } = useUser();
+    const { canAnalyzePhoto, getLimitMessage, isPremium } = usePremiumAccess();
+    const { showError, showWarning } = useToast();
     const [selectedImage, setSelectedImage] = useState<{ base64: string; mimeType: string; } | null>(null);
     const [analysis, setAnalysis] = useState<MealAnalysisResponse | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Verificar e resetar limites ao carregar (apenas uma vez)
+    useEffect(() => {
+        setUser(prevUser => {
+            const updatedUser = checkAndResetLimits(prevUser);
+            // Só atualizar se realmente mudou
+            if (JSON.stringify(updatedUser.usageLimits) !== JSON.stringify(prevUser.usageLimits)) {
+                return updatedUser;
+            }
+            return prevUser;
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const photosAnalyzedToday = getPhotosAnalyzedToday(user);
 
     const handleImageUpload = (base64: string, mimeType: string) => {
         setSelectedImage({ base64, mimeType });
@@ -60,6 +79,15 @@ const AnalyzerPage: React.FC = () => {
     const handleAnalyze = async () => {
         if (!selectedImage) return;
 
+        // Verificar limite de análises
+        if (!canAnalyzePhoto(photosAnalyzedToday)) {
+            const limitMessage = getLimitMessage('análise de fotos', '3 análises por dia');
+            setError(limitMessage);
+            showWarning(limitMessage);
+            showError('Erro ao analisar foto. Tente novamente.');
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         setAnalysis(null);
@@ -67,6 +95,11 @@ const AnalyzerPage: React.FC = () => {
         try {
             const result = await analyzeMealPhoto(selectedImage.base64, selectedImage.mimeType);
             setAnalysis(result);
+            
+            // Incrementar contador de análises
+            const updatedUser = incrementPhotoAnalysisCount(user);
+            setUser(updatedUser);
+            
             addPoints(20); // Award more points for photo analysis
         } catch (err) {
             console.error(err);
@@ -121,7 +154,7 @@ const AnalyzerPage: React.FC = () => {
                                         ))}
                                     </ul>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4 text-center">
+                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-center">
                                     <div className="p-3 bg-sky-100 dark:bg-sky-900/50 rounded-lg">
                                         <p className="text-xs text-sky-600 dark:text-sky-300">Calorias</p>
                                         <p className="text-lg font-bold text-sky-800 dark:text-sky-200">{analysis.estimativa_nutricional.total_calorias}</p>

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { DailySummary } from '../types';
 import { Card } from './ui/Card';
@@ -62,7 +62,7 @@ const CircularProgress: React.FC<{ progress: number }> = ({ progress }) => {
 };
 
 
-const Dashboard: React.FC<DashboardProps> = ({ summary }) => {
+const Dashboard: React.FC<DashboardProps> = memo(({ summary }) => {
   const { user } = useUser();
 
   return (
@@ -72,7 +72,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summary }) => {
         <Card className="lg:col-span-3">
           <div className="p-6">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white">Resumo Diário</h3>
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-center">
               <div className="p-4 bg-sky-100 dark:bg-sky-900/50 rounded-lg">
                 <p className="text-sm text-sky-600 dark:text-sky-300">Calorias</p>
                 <p className="text-2xl font-bold text-sky-800 dark:text-sky-200">{summary.total_calorias}</p>
@@ -140,6 +140,10 @@ const Dashboard: React.FC<DashboardProps> = ({ summary }) => {
       </Card>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  return prevProps.summary?.total_calorias === nextProps.summary?.total_calorias;
+});
+
+Dashboard.displayName = 'Dashboard';
 
 export default Dashboard;

@@ -11,6 +11,13 @@ import {
 } from '../components/chatbot/assistantTypes';
 import { getOfflineChatResponse, isOnline } from './offlineService';
 import type { User } from '../types';
+import { logger } from '../utils/logger';
+
+// Tipo para LiveSession - pode não estar exportado diretamente
+type LiveSession = {
+  close: () => void;
+  sendRealtimeInput: (input: { media: GeminiBlob }) => void;
+};
 
 // ---------------------------------------------------------------------------
 // Assistant profiles and voices
@@ -46,7 +53,15 @@ const IMAGE_EDIT_MODEL = 'gemini-2.5-flash-image';
 const LIVE_AUDIO_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
 
-const API_KEY = (import.meta as any)?.env?.VITE_GEMINI_API_KEY || process.env.API_KEY;
+interface ImportMetaEnv {
+  VITE_GEMINI_API_KEY?: string;
+}
+
+interface ImportMeta {
+  env?: ImportMetaEnv;
+}
+
+const API_KEY = (import.meta as ImportMeta)?.env?.VITE_GEMINI_API_KEY || (process.env as { API_KEY?: string }).API_KEY;
 const CUSTOM_PROMPT_STORAGE_KEY = 'nutria.assistant.customPrompt';
 
 // ---------------------------------------------------------------------------
@@ -54,7 +69,7 @@ const CUSTOM_PROMPT_STORAGE_KEY = 'nutria.assistant.customPrompt';
 // ---------------------------------------------------------------------------
 
 let chatSession: Chat | undefined;
-let liveAudioSession: any;
+let liveAudioSession: LiveSession | undefined;
 let inputAudioContext: AudioContext | undefined;
 let outputAudioContext: AudioContext | undefined;
 let mediaStream: MediaStream | undefined;
@@ -129,7 +144,15 @@ export async function initializeAssistantSession(
   }
 
   const ai = getGeminiClient();
-  const config: any = { systemInstruction };
+  
+  interface ChatConfig {
+    systemInstruction: string;
+    thinkingConfig?: {
+      thinkingBudget: number;
+    };
+  }
+  
+  const config: ChatConfig = { systemInstruction };
 
   if (useProModelForThinking) {
     config.thinkingConfig = { thinkingBudget: 32768 };
@@ -160,7 +183,7 @@ function getUserFromStorage(): User | null {
       return JSON.parse(stored) as User;
     }
   } catch (e) {
-    console.warn('Erro ao ler dados do usuário:', e);
+    logger.warn('Erro ao ler dados do usuário', 'assistantService', e);
   }
   return null;
 }
@@ -178,7 +201,7 @@ export async function sendAssistantMessage(
 
   if (!online || !hasApiKey) {
     // Usar chat offline
-    console.log('Modo offline: usando chat offline');
+    logger.info('Modo offline: usando chat offline', 'assistantService');
     const user = getUserFromStorage();
     if (user) {
       const response = getOfflineChatResponse(message, user);
@@ -210,9 +233,10 @@ export async function sendAssistantMessage(
         onNewChunk(chunk.text);
       }
     }
-  } catch (error: any) {
-    console.error('[assistantService] erro sendAssistantMessage', error);
-    console.log('Falha na API online, usando chat offline');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    logger.error('Erro ao enviar mensagem para assistente', 'assistantService', error);
+    logger.info('Falha na API online, usando chat offline', 'assistantService');
     
     // Fallback para chat offline em caso de erro
     const user = getUserFromStorage();
@@ -224,7 +248,7 @@ export async function sendAssistantMessage(
         onNewChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
       }
     } else {
-      onError(error?.message || 'Erro desconhecido ao conversar com a IA');
+      onError(errorMessage || 'Erro desconhecido ao conversar com a IA');
     }
   }
 }
@@ -248,9 +272,10 @@ export async function generateGroundedResponse(prompt: string): Promise<{ text: 
       .filter((web): web is { uri: string; title: string } => !!web?.uri && !!web?.title);
 
     return { text, webResults };
-  } catch (error: any) {
-    console.error('[assistantService] erro grounded', error);
-    throw new Error(error?.message || 'Falha ao buscar informações na web.');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Falha ao buscar informações na web.';
+    logger.error('Erro ao gerar resposta com busca web', 'assistantService', error);
+    throw new Error(errorMessage);
   }
 }
 
@@ -268,7 +293,16 @@ export async function generateMapsGroundedResponse(prompt: string): Promise<{ te
     );
   });
 
-  const config: any = { tools: [{ googleMaps: {} }] };
+  interface MapsConfig {
+    tools: Array<{ googleMaps: Record<string, never> }>;
+    toolConfig?: {
+      retrievalConfig: {
+        latLng: { latitude: number; longitude: number };
+      };
+    };
+  }
+  
+  const config: MapsConfig = { tools: [{ googleMaps: {} }] };
   if (location) {
     config.toolConfig = { retrievalConfig: { latLng: location } };
   }
@@ -283,14 +317,34 @@ export async function generateMapsGroundedResponse(prompt: string): Promise<{ te
     const text = response.text ?? 'Não foi possível obter resultados do Maps.';
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
 
-    const mapsResults: MapSearchResult[] = groundingChunks
-      .map((chunk: any) => chunk.maps)
-      .filter((maps: any) => !!maps)
-      .map((maps: any) => ({
+    interface MapsChunk {
+      maps?: {
+        uri?: string;
+        title?: string;
+        placeAnswerSources?: {
+          reviewSnippets?: Array<{
+            text?: string;
+            author?: string;
+            rating?: number;
+          }>;
+        };
+      };
+    }
+
+    interface ReviewSnippet {
+      text?: string;
+      author?: string;
+      rating?: number;
+    }
+
+    const mapsResults: MapSearchResult[] = (groundingChunks as MapsChunk[])
+      .map((chunk) => chunk.maps)
+      .filter((maps): maps is NonNullable<MapsChunk['maps']> => !!maps)
+      .map((maps) => ({
         uri: maps.uri || '',
         title: maps.title || '',
         reviews:
-          maps.placeAnswerSources?.reviewSnippets?.map((review: any) => ({
+          maps.placeAnswerSources?.reviewSnippets?.map((review: ReviewSnippet) => ({
             text: review.text || '',
             author: review.author || 'Anônimo',
             rating: review.rating || 0,
@@ -299,9 +353,10 @@ export async function generateMapsGroundedResponse(prompt: string): Promise<{ te
       .filter(result => result.uri && result.title);
 
     return { text, mapsResults };
-  } catch (error: any) {
-    console.error('[assistantService] erro maps', error);
-    throw new Error(error?.message || 'Falha ao buscar informações no Maps.');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Falha ao buscar informações no Maps.';
+    logger.error('Erro ao gerar resposta com busca no Maps', 'assistantService', error);
+    throw new Error(errorMessage);
   }
 }
 
@@ -343,9 +398,10 @@ export async function analyzeImageWithAssistant(
     } else {
       onError('Não recebemos uma análise da IA.');
     }
-  } catch (error: any) {
-    console.error('[assistantService] erro analyzeImage', error);
-    onError(error?.message || 'Erro ao analisar imagem.');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro ao analisar imagem.';
+    logger.error('Erro ao analisar imagem', 'assistantService', error);
+    onError(errorMessage);
   }
 }
 
@@ -385,9 +441,10 @@ export async function editImageWithAssistant(
     }
 
     onError('A IA não retornou uma imagem editada.');
-  } catch (error: any) {
-    console.error('[assistantService] erro editImage', error);
-    onError(error?.message || 'Erro ao editar imagem.');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro ao editar imagem.';
+    logger.error('Erro ao editar imagem', 'assistantService', error);
+    onError(errorMessage);
   }
 }
 
@@ -422,9 +479,10 @@ export async function analyzeVideoWithAssistant(
         onNewChunk(chunk.text);
       }
     }
-  } catch (error: any) {
-    console.error('[assistantService] erro video', error);
-    onError(error?.message || 'Erro ao analisar vídeo.');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro ao analisar vídeo.';
+    logger.error('Erro ao analisar vídeo', 'assistantService', error);
+    onError(errorMessage);
   }
 }
 
@@ -547,7 +605,7 @@ export async function startAssistantAudioSession(
           }
         },
         onerror: (event) => {
-          console.error('[assistantService] live audio error', event);
+          logger.error('Erro na sessão de áudio ao vivo', 'assistantService', event);
           onError(event.message || 'Falha na sessão de áudio.');
           stopAssistantAudioSession();
         },
@@ -564,9 +622,10 @@ export async function startAssistantAudioSession(
         inputAudioTranscription: {},
       },
     });
-  } catch (error: any) {
-    console.error('[assistantService] erro startAssistantAudioSession', error);
-    onError(error?.message || 'Erro ao iniciar áudio.');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro ao iniciar áudio.';
+    logger.error('Erro ao iniciar sessão de áudio', 'assistantService', error);
+    onError(errorMessage);
     stopAssistantAudioSession();
   }
 }
@@ -576,7 +635,7 @@ export function stopAssistantAudioSession(): void {
     try {
       liveAudioSession.close();
     } catch (error) {
-      console.warn('[assistantService] erro ao encerrar sessão de áudio', error);
+      logger.warn('Erro ao encerrar sessão de áudio', 'assistantService', error);
     }
   }
 
@@ -612,7 +671,7 @@ export function stopAssistantAudioSession(): void {
     try {
       source.stop();
     } catch (error) {
-      console.warn('[assistantService] erro ao parar source de áudio', error);
+      logger.warn('Erro ao parar source de áudio', 'assistantService', error);
     }
   }
 

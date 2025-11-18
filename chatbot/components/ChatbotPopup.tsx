@@ -18,6 +18,7 @@ import {
   ensureApiKeySelected, // New import
 } from '../services/geminiService';
 import { ChatMessage, WebSearchResult, MapSearchResult } from '../types';
+import { logger } from '../../utils/logger';
 
 const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> => {
   return new Promise((resolve, reject) => {
@@ -131,11 +132,13 @@ const ChatbotPopup: React.FC = () => {
                 : msg
             )
           );
-        } catch (error: any) {
-           setMessages((prev) =>
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+          logger.error("Erro na busca na web", 'chatbot/ChatbotPopup', error);
+          setMessages((prev) =>
             prev.map((msg) =>
               msg.content === 'Buscando na web...' && msg.isStreaming
-                ? { role: 'gemini', content: `Erro na busca na web: ${error.message}`, isError: true }
+                ? { role: 'gemini', content: `Erro na busca na web: ${errorMessage}`, isError: true }
                 : msg
             )
           );
@@ -156,11 +159,13 @@ const ChatbotPopup: React.FC = () => {
                 : msg
             )
           );
-        } catch (error: any) {
-           setMessages((prev) =>
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+          logger.error("Erro na busca no Maps", 'chatbot/ChatbotPopup', error);
+          setMessages((prev) =>
             prev.map((msg) =>
               msg.content === 'Buscando no Maps...' && msg.isStreaming
-                ? { role: 'gemini', content: `Erro na busca no Maps: ${error.message}`, isError: true }
+                ? { role: 'gemini', content: `Erro na busca no Maps: ${errorMessage}`, isError: true }
                 : msg
             )
           );
@@ -210,7 +215,7 @@ const ChatbotPopup: React.FC = () => {
           },
           (error) => {
             setMessages((prev) => prev.map((msg) => msg.isStreaming ? { ...msg, content: `Erro: ${error}`, isError: true, isStreaming: false } : msg));
-            console.error("Chatbot error:", error);
+            logger.error("Erro no chatbot", 'chatbot/ChatbotPopup', error);
           },
           isThinkingMode, undefined, PERSONALITY_OPTIONS[selectedPersonality]
         );
@@ -239,12 +244,13 @@ const ChatbotPopup: React.FC = () => {
               return prev;
             });
           })
-          .catch(err => console.error("Falha na pré-busca de áudio:", err));
+          .catch(err => logger.error("Falha na pré-busca de áudio", 'chatbot/ChatbotPopup', err));
       }
 
-    } catch (error: any) {
-      console.error("Failed to send message:", error);
-      setMessages((prev) => [...prev, { role: 'gemini', content: `Desculpe, algo deu errado: ${error.message}`, isError: true }]);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      logger.error("Falha ao enviar mensagem", 'chatbot/ChatbotPopup', error);
+      setMessages((prev) => [...prev, { role: 'gemini', content: `Desculpe, algo deu errado: ${errorMessage}`, isError: true }]);
     } finally {
       setIsLoading(false);
       autoResizeTextarea();
@@ -377,10 +383,12 @@ const ChatbotPopup: React.FC = () => {
               return prev;
             });
           })
-          .catch(err => console.error("Falha na pré-busca de áudio:", err));
+          .catch(err => logger.error("Falha na pré-busca de áudio", 'chatbot/ChatbotPopup', err));
       }
   
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      logger.error("Erro ao processar vídeo", 'chatbot/ChatbotPopup', error);
       setMessages(prev => [
         ...prev.filter(m => m.content !== processingMessage),
         { role: 'system', content: `Erro ao carregar o vídeo: ${error.message}`, isError: true },
@@ -432,7 +440,19 @@ const ChatbotPopup: React.FC = () => {
         });
       }
 
-      const ttsAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      interface WindowWithAudioContext extends Window {
+        AudioContext?: typeof AudioContext;
+        webkitAudioContext?: typeof AudioContext;
+      }
+      
+      const windowWithAudioContext = window as WindowWithAudioContext;
+      const AudioContextClass = windowWithAudioContext.AudioContext || windowWithAudioContext.webkitAudioContext;
+      
+      if (!AudioContextClass) {
+        throw new Error('AudioContext não está disponível neste navegador');
+      }
+      
+      const ttsAudioContext = new AudioContextClass({ sampleRate: 24000 });
       if (ttsAudioContext.state === 'suspended') await ttsAudioContext.resume();
       
       const audioData = decode(base64Audio);
@@ -451,9 +471,10 @@ const ChatbotPopup: React.FC = () => {
       audioControlRef.current = { context: ttsAudioContext, source };
       setPlaybackState({ index, status: 'playing' });
 
-    } catch (error: any) {
-        console.error("Falha ao reproduzir áudio:", error);
-        setMessages((prev) => [...prev, { role: 'system', content: `Falha ao gerar áudio: ${error.message}`, isError: true }]);
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+        logger.error("Falha ao reproduzir áudio", 'chatbot/ChatbotPopup', error);
+        setMessages((prev) => [...prev, { role: 'system', content: `Falha ao gerar áudio: ${errorMessage}`, isError: true }]);
         stopCurrentAudio();
     } finally {
         setLoadingAudioIndex(null);
@@ -532,7 +553,7 @@ const ChatbotPopup: React.FC = () => {
 
   const onSessionEndedUnexpectedly = useCallback(() => {
     if (isRecording || isTranscribing) {
-      console.log("Session ended unexpectedly. Updating UI.");
+      logger.info("Sessão encerrada inesperadamente. Atualizando UI.", 'chatbot/ChatbotPopup');
       setIsRecording(false);
       setIsTranscribing(false);
       setIsAudioLoading(false);
@@ -567,8 +588,17 @@ const ChatbotPopup: React.FC = () => {
         if (isApiKeyError) {
           setMessages((prev) => [...prev, { role: 'system', content: `Seu acesso à API foi revogado ou a chave expirou. Por favor, selecione uma nova chave de API.` }]);
           // Explicitly call openSelectKey if the error comes back from the session itself
-          if (typeof window !== 'undefined' && (window as any).aistudio && typeof (window as any).aistudio.openSelectKey === 'function') {
-              (window as any).aistudio.openSelectKey();
+          interface AiStudioApi {
+            openSelectKey?: () => Promise<void>;
+          }
+          
+          interface WindowWithAiStudio extends Window {
+            aistudio?: AiStudioApi;
+          }
+          
+          const windowWithAiStudio = window as WindowWithAiStudio;
+          if (typeof window !== 'undefined' && windowWithAiStudio.aistudio && typeof windowWithAiStudio.aistudio.openSelectKey === 'function') {
+              windowWithAiStudio.aistudio.openSelectKey();
           }
         } else {
           setMessages((prev) => [...prev, { role: 'system', content: `Erro de áudio: ${error}`, isError: true }]);

@@ -17,6 +17,8 @@ import {
 } from '../constants/apiConfig';
 import { resetAssistantSession } from '../services/assistantService';
 import { saveAppSetting, getAppSetting } from '../services/databaseService';
+import { setUseLocalAI, shouldUseLocalAI } from '../services/iaController';
+import { testLocalIA } from '../services/localAIService';
 
 const SettingsPage: React.FC = () => {
     const { themeSetting, setThemeSetting } = useTheme();
@@ -27,6 +29,9 @@ const SettingsPage: React.FC = () => {
     const [freeApiKey, setFreeApiKeyState] = useState<string>(DEFAULT_FREE_API_KEY);
     const [providerLink, setProviderLinkState] = useState<string>(DEFAULT_PROVIDER_LINK);
     const [isLoading, setIsLoading] = useState(true);
+    const [useLocalAI, setUseLocalAIState] = useState<boolean>(true);
+    const [localAITestResult, setLocalAITestResult] = useState<{ success: boolean; message: string } | null>(null);
+    const [isTestingLocalAI, setIsTestingLocalAI] = useState<boolean>(false);
 
     // Carregar configurações do banco de dados
     useEffect(() => {
@@ -43,6 +48,10 @@ const SettingsPage: React.FC = () => {
                 setPaidApiKeyState(savedPaidKey || '');
                 setFreeApiKeyState(savedFreeKey || DEFAULT_FREE_API_KEY);
                 setProviderLinkState(savedProviderLink || DEFAULT_PROVIDER_LINK);
+                
+                // Carregar preferência de IA Local
+                const savedUseLocalAI = shouldUseLocalAI();
+                setUseLocalAIState(savedUseLocalAI);
             } catch (error) {
                 console.error('Erro ao carregar configurações:', error);
                 // Fallback para localStorage
@@ -349,7 +358,7 @@ const SettingsPage: React.FC = () => {
                                     disabled={!providerLink}
                                     onClick={handleOpenProviderLink}
                                 >
-                                    Abrir página do provedor
+                                    Abrir Página Modelo IA
                                 </Button>
                                 <Button
                                     type="button"
@@ -362,7 +371,73 @@ const SettingsPage: React.FC = () => {
                         </div>
                     </div>
 
-                     <div className="pt-6">
+                    {/* Seção de IA Local Offline */}
+                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                            IA Local Offline
+                        </h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                            Use IA localmente sem depender de APIs externas. Requer Ollama instalado e rodando.
+                        </p>
+                        
+                        <div className="space-y-4">
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={useLocalAI}
+                                    onChange={(e) => {
+                                        setUseLocalAIState(e.target.checked);
+                                        setUseLocalAI(e.target.checked);
+                                    }}
+                                    className="w-5 h-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800"
+                                />
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    Usar IA Local Offline (Ollama)
+                                </span>
+                            </label>
+                            
+                            {useLocalAI && (
+                                <div className="ml-8 space-y-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                                        Quando habilitado, o app tentará usar IA Local primeiro. 
+                                        Se não estiver disponível, fará fallback automático para a API externa.
+                                    </p>
+                                    
+                                    <div className="flex items-center gap-3">
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            disabled={isTestingLocalAI}
+                                            onClick={async () => {
+                                                setIsTestingLocalAI(true);
+                                                setLocalAITestResult(null);
+                                                const result = await testLocalIA();
+                                                setLocalAITestResult(result);
+                                                setIsTestingLocalAI(false);
+                                            }}
+                                        >
+                                            {isTestingLocalAI ? 'Testando...' : 'Testar IA Local'}
+                                        </Button>
+                                        
+                                        {localAITestResult && (
+                                            <span className={`text-sm ${localAITestResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                {localAITestResult.success ? '✓' : '✗'} {localAITestResult.message}
+                                            </span>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                                        <p><strong>Para instalar:</strong></p>
+                                        <p>Windows: Execute <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">local-server\install_model.ps1</code></p>
+                                        <p>Linux/macOS: Execute <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">local-server/install_model.sh</code></p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                     <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t('settings.profile_type.title')}</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{t('settings.profile_type.description')}</p>
                          <div className="mt-4">

@@ -7,14 +7,16 @@ import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { Goal } from '../types';
 import { clearLoginSession } from '../services/databaseService';
+import { Avatar } from './ui/Avatar';
 
 interface HeaderProps {
   onMenuToggle: () => void;
+  sidebarOpen?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ onMenuToggle }) => {
+const Header: React.FC<HeaderProps> = ({ onMenuToggle, sidebarOpen = false }) => {
   const { theme, themeSetting, setThemeSetting } = useTheme();
-  const { setUser } = useUser();
+  const { user, setUser } = useUser();
 
   const handleToggleTheme = () => {
     if (themeSetting === 'dark') {
@@ -62,7 +64,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuToggle }) => {
           viewBox="0 0 24 24"
           strokeWidth={1.5}
           stroke="currentColor"
-          className="w-5 h-5"
+          className="w-4 h-4 sm:w-5 sm:h-5"
         >
           <path
             strokeLinecap="round"
@@ -73,9 +75,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuToggle }) => {
       );
     }
     return theme === 'dark' ? (
-      <MoonIcon className="w-5 h-5" />
+      <MoonIcon className="w-4 h-4 sm:w-5 sm:h-5" />
     ) : (
-      <SunIcon className="w-5 h-5" />
+      <SunIcon className="w-4 h-4 sm:w-5 sm:h-5" />
     );
   };
 
@@ -86,36 +88,55 @@ const Header: React.FC<HeaderProps> = ({ onMenuToggle }) => {
 
   return (
     <header className="bg-white/70 dark:bg-slate-900/80 backdrop-blur-lg sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-center h-16 relative">
+      <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+        <div className="flex items-center justify-center h-14 sm:h-16 relative">
           {/* Menu button - left side */}
           <button
             onClick={onMenuToggle}
-            className="absolute left-0 p-2 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            aria-label="Toggle menu"
+            className="absolute left-0 p-2 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+            aria-label={sidebarOpen ? "Fechar menu de navegação" : "Abrir menu de navegação"}
+            aria-expanded={sidebarOpen}
+            aria-controls="sidebar-navigation"
+            type="button"
           >
-            <MenuIcon className="w-6 h-6" />
+            <MenuIcon className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
           </button>
           
           {/* Centered logo */}
           <div className="flex-shrink-0">
-            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
-              <span className="text-primary-600 drop-shadow-lg">Nutri</span>
-              <span className="text-slate-800 dark:text-slate-200 drop-shadow-lg">.IA</span>
+            <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-extrabold tracking-tight">
+              <a href="#/" className="focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded" aria-label="Ir para página inicial">
+                <span className="text-primary-600 drop-shadow-lg">Nutri</span>
+                <span className="text-slate-800 dark:text-slate-200 drop-shadow-lg">.IA</span>
+              </a>
             </h1>
           </div>
 
           {/* Right side buttons */}
-          <div className="absolute right-0 flex items-center gap-2">
+          <div className="absolute right-0 flex items-center gap-1 sm:gap-2">
+            {/* User Avatar - Link to profile */}
+            {user.nome && (
+              <a
+                href="#/profile"
+                className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                aria-label="Ir para meu perfil"
+                title={`Perfil de ${user.nome}`}
+              >
+                <Avatar photoUrl={user.photoUrl} name={user.nome} size="sm" />
+              </a>
+            )}
+
             {/* Theme toggle button */}
             <button
               onClick={handleToggleTheme}
-              className="p-2 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative group"
-              aria-label={`Alternar tema (${getThemeLabel()})`}
+              className="p-1.5 sm:p-2 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative group focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              aria-label={`Alternar tema. Tema atual: ${getThemeLabel()}`}
               title={`Tema: ${getThemeLabel()}`}
+              type="button"
+              aria-pressed={false}
             >
               {getThemeIcon()}
-              <span className="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-slate-900 dark:bg-slate-700 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+              <span className="hidden sm:block absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-slate-900 dark:bg-slate-700 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                 {getThemeLabel()}
               </span>
             </button>
@@ -123,12 +144,13 @@ const Header: React.FC<HeaderProps> = ({ onMenuToggle }) => {
             {/* Logout button */}
             <button
               onClick={handleLogout}
-              className="p-2 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-red-600 dark:hover:text-red-400 transition-colors relative group"
+              className="p-1.5 sm:p-2 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-red-600 dark:hover:text-red-400 transition-colors relative group focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
               aria-label="Sair do sistema"
               title="Sair do sistema"
+              type="button"
             >
-              <LogoutIcon className="w-5 h-5" />
-              <span className="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-slate-900 dark:bg-slate-700 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+              <LogoutIcon className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
+              <span className="hidden sm:block absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-slate-900 dark:bg-slate-700 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                 Sair
               </span>
             </button>

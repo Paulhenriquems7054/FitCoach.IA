@@ -15,6 +15,8 @@
  */
 
 import type { User, WellnessPlan, MealPlan, MealAnalysisResponse, Recipe, ChatMessage, LoginCredentials } from '../types';
+import { Goal } from '../types';
+import { logger } from '../utils/logger';
 
 const DB_NAME = 'NutriIA_DB';
 const DB_VERSION = 2; // Incrementado para adicionar índice de username
@@ -76,7 +78,7 @@ interface DBWeightEntry {
 
 interface DBAppSetting {
     key: string;
-    value: any;
+    value: unknown;
     updatedAt: string;
 }
 
@@ -99,13 +101,13 @@ export async function initDatabase(): Promise<IDBDatabase> {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
 
         request.onerror = () => {
-            console.error('Erro ao abrir banco de dados:', request.error);
+            logger.error('Erro ao abrir banco de dados', 'databaseService', request.error);
             reject(request.error);
         };
 
         request.onsuccess = () => {
             dbInstance = request.result;
-            console.log('Banco de dados inicializado com sucesso');
+            logger.info('Banco de dados inicializado com sucesso', 'databaseService');
             resolve(dbInstance);
         };
 
@@ -121,7 +123,7 @@ export async function initDatabase(): Promise<IDBDatabase> {
                     userStore.createIndex('username', 'username', { unique: true });
                 } catch (e) {
                     // Índice pode já existir, ignorar
-                    console.log('Índice username já existe');
+                    logger.debug('Índice username já existe', 'databaseService');
                 }
             }
 
@@ -177,7 +179,7 @@ export async function initDatabase(): Promise<IDBDatabase> {
                 settingsStore.createIndex('updatedAt', 'updatedAt', { unique: false });
             }
 
-            console.log('Estrutura do banco de dados criada');
+            logger.info('Estrutura do banco de dados criada', 'databaseService');
         };
     });
 }
@@ -282,7 +284,7 @@ export async function saveUser(user: User): Promise<void> {
                             // Atualizar usuário
                             const updateRequest = store.put(dbUser);
                             updateRequest.onsuccess = () => {
-                                console.log('Usuário atualizado no banco de dados');
+                                logger.debug('Usuário atualizado no banco de dados', 'databaseService');
                                 resolve();
                             };
                             updateRequest.onerror = () => reject(updateRequest.error);
@@ -291,7 +293,7 @@ export async function saveUser(user: User): Promise<void> {
                             // Se verificação falhar, tentar atualizar mesmo assim
                             const updateRequest = store.put(dbUser);
                             updateRequest.onsuccess = () => {
-                                console.log('Usuário atualizado no banco de dados');
+                                logger.debug('Usuário atualizado no banco de dados', 'databaseService');
                                 resolve();
                             };
                             updateRequest.onerror = () => reject(updateRequest.error);
@@ -302,7 +304,7 @@ export async function saveUser(user: User): Promise<void> {
                 
                 const updateRequest = store.put(dbUser);
                 updateRequest.onsuccess = () => {
-                    console.log('Usuário atualizado no banco de dados');
+                    logger.debug('Usuário atualizado no banco de dados', 'databaseService');
                     resolve();
                 };
                 updateRequest.onerror = () => reject(updateRequest.error);
@@ -320,7 +322,7 @@ export async function saveUser(user: User): Promise<void> {
                 
                 const addRequest = store.add(dbUser);
                 addRequest.onsuccess = () => {
-                    console.log('Usuário criado no banco de dados');
+                    logger.debug('Usuário criado no banco de dados', 'databaseService');
                     resolve();
                 };
                 addRequest.onerror = () => reject(addRequest.error);
@@ -478,7 +480,7 @@ export async function registerUser(username: string, password: string, userData:
             genero: userData.genero || 'Masculino',
             peso: userData.peso || 0,
             altura: userData.altura || 0,
-            objetivo: userData.objetivo || 'perder peso' as any,
+            objetivo: (userData.objetivo || Goal.PERDER_PESO) as Goal,
             points: 0,
             disciplineScore: 0,
             completedChallengeIds: [],
@@ -579,6 +581,59 @@ export async function clearLoginSession(): Promise<void> {
 }
 
 /**
+ * Exclui um usuário do banco de dados
+ */
+export async function deleteUser(username: string): Promise<boolean> {
+    const db = await getDB();
+    
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['users'], 'readwrite');
+        const store = transaction.objectStore('users');
+        
+        // Tentar usar índice se disponível
+        if (store.indexNames.contains('username')) {
+            const index = store.index('username');
+            const request = index.get(username);
+            request.onsuccess = () => {
+                const dbUser = request.result;
+                if (!dbUser) {
+                    resolve(false);
+                    return;
+                }
+                
+                const deleteRequest = store.delete(dbUser.id);
+                deleteRequest.onsuccess = () => {
+                    logger.debug('Usuário excluído do banco de dados', 'databaseService');
+                    resolve(true);
+                };
+                deleteRequest.onerror = () => reject(deleteRequest.error);
+            };
+            request.onerror = () => reject(request.error);
+        } else {
+            // Buscar em todos os usuários
+            const getAllRequest = store.getAll();
+            getAllRequest.onsuccess = () => {
+                const users = getAllRequest.result;
+                const userToDelete = users.find((u: DBUser) => u.username === username);
+                
+                if (!userToDelete) {
+                    resolve(false);
+                    return;
+                }
+                
+                const deleteRequest = store.delete(userToDelete.id);
+                deleteRequest.onsuccess = () => {
+                    logger.debug('Usuário excluído do banco de dados', 'databaseService');
+                    resolve(true);
+                };
+                deleteRequest.onerror = () => reject(deleteRequest.error);
+            };
+            getAllRequest.onerror = () => reject(getAllRequest.error);
+        }
+    });
+}
+
+/**
  * Redefine a senha de um usuário pelo username
  */
 export async function resetPassword(username: string, newPassword: string): Promise<boolean> {
@@ -608,7 +663,7 @@ export async function resetPassword(username: string, newPassword: string): Prom
                 
                 const updateRequest = store.put(dbUser);
                 updateRequest.onsuccess = () => {
-                    console.log('Senha redefinida com sucesso');
+                    logger.info('Senha redefinida com sucesso', 'databaseService');
                     resolve(true);
                 };
                 updateRequest.onerror = () => reject(updateRequest.error);
@@ -631,7 +686,7 @@ export async function resetPassword(username: string, newPassword: string): Prom
                 
                 const updateRequest = store.put(dbUser);
                 updateRequest.onsuccess = () => {
-                    console.log('Senha redefinida com sucesso');
+                    logger.info('Senha redefinida com sucesso', 'databaseService');
                     resolve(true);
                 };
                 updateRequest.onerror = () => reject(updateRequest.error);
@@ -1120,7 +1175,7 @@ export async function getWeightHistory(): Promise<{ date: string; weight: number
 /**
  * Salva configuração do app
  */
-export async function saveAppSetting(key: string, value: any): Promise<void> {
+export async function saveAppSetting(key: string, value: unknown): Promise<void> {
     const db = await getDB();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(['appSettings'], 'readwrite');
@@ -1171,7 +1226,7 @@ export async function migrateFromLocalStorage(): Promise<void> {
         if (userData) {
             const user = JSON.parse(userData) as User;
             await saveUser(user);
-            console.log('Usuário migrado do localStorage');
+            logger.info('Usuário migrado do localStorage', 'databaseService');
         }
 
         // Migrar plano de bem-estar
@@ -1179,7 +1234,7 @@ export async function migrateFromLocalStorage(): Promise<void> {
         if (wellnessPlanData) {
             const plan = JSON.parse(wellnessPlanData) as WellnessPlan;
             await saveWellnessPlan(plan);
-            console.log('Plano de bem-estar migrado do localStorage');
+            logger.info('Plano de bem-estar migrado do localStorage', 'databaseService');
         }
 
         // Migrar treinos concluídos
@@ -1189,7 +1244,7 @@ export async function migrateFromLocalStorage(): Promise<void> {
             for (const dayIndex of completed) {
                 await saveCompletedWorkout(dayIndex);
             }
-            console.log('Treinos concluídos migrados do localStorage');
+            logger.info('Treinos concluídos migrados do localStorage', 'databaseService');
         }
 
         // Migrar configurações
@@ -1234,9 +1289,9 @@ export async function migrateFromLocalStorage(): Promise<void> {
             await saveAppSetting('nutria.api.providerLink', providerLink);
         }
 
-        console.log('Migração do localStorage concluída');
+        logger.info('Migração do localStorage concluída', 'databaseService');
     } catch (error) {
-        console.error('Erro ao migrar dados do localStorage:', error);
+        logger.error('Erro ao migrar dados do localStorage', 'databaseService', error);
     }
 }
 
@@ -1260,6 +1315,6 @@ export async function clearAllData(): Promise<void> {
         });
     }
 
-    console.log('Todos os dados foram limpos');
+    logger.info('Todos os dados foram limpos', 'databaseService');
 }
 

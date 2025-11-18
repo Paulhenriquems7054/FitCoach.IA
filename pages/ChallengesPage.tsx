@@ -94,7 +94,7 @@ const ChallengesPage: React.FC = () => {
 
             <section>
                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Conquistas</h2>
-                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                      {achievements.map(achieve => {
                          const isUnlocked = achieve.check(user);
                          return (

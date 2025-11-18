@@ -1,5 +1,5 @@
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { useUser } from '../context/UserContext';
 import { generateWeeklyReport } from '../services/geminiService';
@@ -10,6 +10,9 @@ import { Alert } from '../components/ui/Alert';
 import { Skeleton } from '../components/ui/Skeleton';
 import { StarIcon } from '../components/icons/StarIcon';
 import { useI18n } from '../context/I18nContext';
+import { useToast } from '../components/ui/Toast';
+import { usePremiumAccess } from '../hooks/usePremiumAccess';
+import { checkAndResetLimits, incrementReportCount, getReportsGeneratedThisWeek } from '../services/usageLimitsService';
 
 const REPORT_NAME = 'Relatório Semanal';
 
@@ -31,15 +34,29 @@ const ReportSkeleton = () => (
 );
 
 const ReportsPage: React.FC = () => {
-    const { user, addPoints } = useUser();
+    const { user, setUser, addPoints } = useUser();
     const { t } = useI18n();
+    const { showSuccess, showError, showWarning } = useToast();
+    const { canGenerateReport: canGenerate, getLimitMessage, isPremium } = usePremiumAccess();
     const [report, setReport] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-    const [reportCount, setReportCount] = useState<number>(0);
     const reportRef = useRef<HTMLDivElement>(null);
 
-    const canGenerateReport = user.subscription === 'premium' || reportCount < 1;
+    // Verificar e resetar limites ao carregar (apenas uma vez)
+    useEffect(() => {
+        setUser(prevUser => {
+            const updatedUser = checkAndResetLimits(prevUser);
+            // Só atualizar se realmente mudou
+            if (JSON.stringify(updatedUser.usageLimits) !== JSON.stringify(prevUser.usageLimits)) {
+                return updatedUser;
+            }
+            return prevUser;
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const reportsGeneratedThisWeek = getReportsGeneratedThisWeek(user);
+    const canGenerateReport = canGenerate(reportsGeneratedThisWeek);
 
     const localeDateTime = useMemo(
         () =>
@@ -66,7 +83,13 @@ const ReportsPage: React.FC = () => {
     }, [user.disciplineScore, user.weightHistory]);
 
     const handleGenerateReport = async () => {
-        if (!canGenerateReport) return;
+        if (!canGenerateReport) {
+            const limitMessage = getLimitMessage('relatórios', '1 relatório por semana');
+            setError(limitMessage);
+            showWarning(limitMessage);
+            showError('Erro ao gerar relatório. Tente novamente.');
+            return;
+        }
 
         setIsLoading(true);
         setError(null);
@@ -74,32 +97,56 @@ const ReportsPage: React.FC = () => {
         try {
             const result = await generateWeeklyReport(user);
             setReport(result);
-            setReportCount((prev) => prev + 1);
-            if (reportCount === 0) addPoints(15);
-        } catch (err) {
+            
+            // Incrementar contador de relatórios
+            const updatedUser = incrementReportCount(user);
+            setUser(updatedUser);
+            
+            if (reportsGeneratedThisWeek === 0) {
+                addPoints(15);
+                showSuccess('Relatório gerado com sucesso! Você ganhou 15 pontos.');
+            } else {
+                showSuccess('Relatório gerado com sucesso!');
+            }
+        } catch (err: any) {
             console.error(err);
-            setError(t('reports.error.generic'));
+            const errorMessage = err?.message?.includes('API key') 
+                ? 'Chave de API não configurada. O relatório foi gerado em modo offline.'
+                : t('reports.error.generic');
+            setError(errorMessage);
+            showError(errorMessage);
         } finally {
             setIsLoading(false);
         }
     };
 
     const exportPDF = async (nomeRelatorio: string) => {
-        if (!reportRef.current) return;
+        // Exportação de PDF sempre disponível
 
-        const { default: html2pdf } = await import('html2pdf.js');
-        const dataFormatada = new Date().toISOString().split('T')[0];
+        if (!reportRef.current) {
+            showError('Erro ao exportar PDF. Tente novamente.');
+            return;
+        }
 
-        await html2pdf()
-            .set({
-                margin: [10, 12, 10, 12],
-                filename: `relatorio_${nomeRelatorio.toLowerCase().replace(/\s+/g, '_')}_${dataFormatada}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            })
-            .from(reportRef.current)
-            .save();
+        try {
+            const { default: html2pdf } = await import('html2pdf.js');
+            const dataFormatada = new Date().toISOString().split('T')[0];
+
+            await html2pdf()
+                .set({
+                    margin: [10, 12, 10, 12],
+                    filename: `relatorio_${nomeRelatorio.toLowerCase().replace(/\s+/g, '_')}_${dataFormatada}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                })
+                .from(reportRef.current)
+                .save();
+            showSuccess('PDF exportado com sucesso!');
+        } catch (error) {
+            console.error('Erro ao exportar PDF:', error);
+            showError('Erro ao exportar PDF. Tente novamente.');
+        }
     };
 
     return (
@@ -257,12 +304,12 @@ const ReportsPage: React.FC = () => {
                                     <p>{t('reports.limit.description')}</p>
                                 </Alert>
                                 <Button
-                                    onClick={() => (window.location.hash = '/premium')}
-                                    className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+                                    onClick={handleGenerateReport}
+                                    className="w-full bg-primary-500 hover:bg-primary-600 text-white"
                                     size="lg"
                                 >
-                                    <StarIcon className="-ml-1 mr-2 h-5 w-5" />
-                                    {t('reports.limit.button')}
+                                    <SparklesIcon className="-ml-1 mr-2 h-5 w-5" />
+                                    {t('reports.initial.button')}
                                 </Button>
                             </div>
                         )}

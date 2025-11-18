@@ -20,6 +20,7 @@ import {
     clearCompletedWorkouts 
 } from '../services/databaseService';
 import type { WellnessPlan, WorkoutDay } from '../types';
+import { logger } from '../utils/logger';
 
 const WellnessPlanSkeleton = () => (
     <div className="space-y-8">
@@ -80,7 +81,7 @@ const WellnessPlanPage: React.FC = () => {
                 const completed = await getCompletedWorkouts();
                 setCompletedWorkouts(completed);
             } catch (e) {
-                console.warn('Erro ao carregar dados do banco de dados:', e);
+                logger.warn('Erro ao carregar dados do banco de dados', 'WellnessPlanPage', e);
             }
         };
 
@@ -104,9 +105,10 @@ const WellnessPlanPage: React.FC = () => {
             await saveWellnessPlan(result);
             await clearCompletedWorkouts(); // Resetar progresso
             setCompletedWorkouts(new Set());
-        } catch (err: any) {
-            console.error(err);
-            setError(err?.message || 'Ocorreu um erro ao gerar o plano de bem-estar. Tente novamente.');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro ao gerar o plano de bem-estar. Tente novamente.';
+            logger.error('Erro ao gerar plano de bem-estar', 'WellnessPlanPage', err);
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -124,7 +126,7 @@ const WellnessPlanPage: React.FC = () => {
         try {
             await saveCompletedWorkout(dayIndex);
         } catch (error) {
-            console.error('Erro ao salvar treino concluído:', error);
+            logger.error('Erro ao salvar treino concluído', 'WellnessPlanPage', error);
         }
     };
 
@@ -139,7 +141,7 @@ const WellnessPlanPage: React.FC = () => {
         try {
             await saveWellnessPlan(editedPlan);
         } catch (error) {
-            console.error('Erro ao salvar plano editado:', error);
+            logger.error('Erro ao salvar plano editado', 'WellnessPlanPage', error);
         }
     };
 
@@ -349,22 +351,22 @@ const WellnessPlanPage: React.FC = () => {
                 </div>
                 )
             ) : (
-                <Card>
-                    <div className="flex flex-col items-center justify-center h-96 p-6 text-center">
-                        <HeartIcon className="w-16 h-16 text-primary-500" />
-                        <h2 className="mt-4 text-2xl font-bold text-slate-800 dark:text-slate-100">
-                            Pronto para o próximo nível?
-                        </h2>
-                        <p className="mt-2 mb-6 max-w-md text-slate-500 dark:text-slate-400">
-                            Clique abaixo para que a Nutri.IA crie um plano de treino e suplementação 
-                            personalizado baseado no seu perfil, objetivo e histórico.
-                        </p>
-                        <Button onClick={handleGeneratePlan} className="w-full max-w-xs" size="lg">
-                            <SparklesIcon className="-ml-1 mr-2 h-5 w-5" />
-                            Gerar Meu Plano com IA
-                        </Button>
-                    </div>
-                </Card>
+                    <Card>
+                        <div className="flex flex-col items-center justify-center h-96 p-6 text-center">
+                            <HeartIcon className="w-16 h-16 text-primary-500" />
+                            <h2 className="mt-4 text-2xl font-bold text-slate-800 dark:text-slate-100">
+                                Pronto para o próximo nível?
+                            </h2>
+                            <p className="mt-2 mb-6 max-w-md text-slate-500 dark:text-slate-400">
+                                Clique abaixo para que a Nutri.IA crie um plano de treino e suplementação 
+                                personalizado baseado no seu perfil, objetivo e histórico.
+                            </p>
+                            <Button onClick={handleGeneratePlan} className="w-full max-w-xs" size="lg">
+                                <SparklesIcon className="-ml-1 mr-2 h-5 w-5" />
+                                Gerar Meu Plano com IA
+                            </Button>
+                        </div>
+                    </Card>
             )}
         </div>
     );

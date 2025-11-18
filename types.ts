@@ -9,6 +9,7 @@ export interface User {
   nome: string;
   username?: string; // Nome de usuário para login
   password?: string; // Senha (será hasheada antes de salvar)
+  photoUrl?: string; // URL da foto de perfil (base64 data URL)
   idade: number;
   genero: 'Masculino' | 'Feminino';
   peso: number;
@@ -21,6 +22,24 @@ export interface User {
   weightHistory: { date: string; weight: number }[];
   role: 'user' | 'professional';
   subscription: 'free' | 'premium';
+  usageLimits?: {
+    reportsGeneratedThisWeek?: number;
+    photosAnalyzedToday?: number;
+    lastReportDate?: string;
+    lastPhotoAnalysisDate?: string;
+  };
+  dataPermissions?: {
+    allowWeightHistory: boolean;
+    allowMealPlans: boolean;
+    allowPhotoAnalysis: boolean;
+    allowWorkoutData: boolean;
+    allowChatHistory: boolean;
+  };
+  securitySettings?: {
+    biometricEnabled: boolean;
+    securityNotifications: boolean;
+    lastPasswordChange?: string;
+  };
 }
 
 export interface LoginCredentials {

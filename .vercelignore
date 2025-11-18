@@ -1,0 +1,40 @@
+# Arquivos e pastas a ignorar no deploy do Vercel
+
+# Dependências (já instaladas no Vercel)
+node_modules/
+
+# Build local
+dist/
+build/
+
+# Arquivos de desenvolvimento
+.vscode/
+.idea/
+*.log
+*.local
+
+# Documentação (opcional - pode incluir se quiser)
+docs/
+*.md
+!README.md
+
+# Scripts de instalação local
+local-server/
+scripts/
+
+# Testes
+coverage/
+.nyc_output/
+
+# Configurações locais
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+
+# Outros
+.DS_Store
+Thumbs.db
+

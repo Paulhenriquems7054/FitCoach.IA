@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import type { User } from '../types';
 import { Goal } from '../types';
 import { saveUser, getUser, getCurrentUsername, loginUser } from '../services/databaseService';
+import { checkAndResetLimits } from '../services/usageLimitsService';
 
 interface UserContextType {
   user: User;
@@ -34,6 +35,21 @@ const initialUser: User = {
   ],
   role: 'user',
   subscription: 'free',
+  usageLimits: {
+    reportsGeneratedThisWeek: 0,
+    photosAnalyzedToday: 0,
+  },
+  dataPermissions: {
+    allowWeightHistory: true,
+    allowMealPlans: true,
+    allowPhotoAnalysis: true,
+    allowWorkoutData: true,
+    allowChatHistory: true,
+  },
+  securitySettings: {
+    biometricEnabled: false,
+    securityNotifications: true,
+  },
 };
 
 const loadStoredUser = async (): Promise<User | null> => {
@@ -82,6 +98,30 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     loadUser();
   }, []);
+
+  // Verificar e resetar limites periodicamente (a cada minuto) e ao carregar
+  useEffect(() => {
+    if (isLoading) return; // Não processar durante o carregamento inicial
+    
+    const resetLimits = () => {
+      setUser(prevUser => {
+        const updatedUser = checkAndResetLimits(prevUser);
+        // Só atualizar se realmente mudou
+        if (JSON.stringify(updatedUser.usageLimits) !== JSON.stringify(prevUser.usageLimits)) {
+          return updatedUser;
+        }
+        return prevUser;
+      });
+    };
+    
+    // Resetar imediatamente ao carregar
+    resetLimits();
+    
+    // Resetar a cada minuto para verificar se passou o dia/semana
+    const interval = setInterval(resetLimits, 60000);
+    
+    return () => clearInterval(interval);
+  }, [isLoading]); // Apenas quando terminar de carregar
 
   // Salvar usuário no banco de dados quando houver mudanças
   useEffect(() => {
@@ -143,7 +183,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   };
 
   const upgradeToPremium = () => {
-      setUser(prevUser => ({...prevUser, subscription: 'premium' }));
+      // Função mantida para compatibilidade, mas Premium foi removido
+      // Todas as funcionalidades já estão disponíveis
   };
 
   return (

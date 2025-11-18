@@ -68,18 +68,28 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
         </div>
         <div className="mt-8 flex-1 overflow-y-auto">
           <div className="flex flex-col h-full px-2 pb-6 space-y-6">
-            <nav className="space-y-1">
-            {mainNavigation.map((item) => (
+            <nav className="space-y-1" aria-label="Navegação principal">
+            {mainNavigation.map((item, index) => (
                 <a
                 key={item.name}
                 href={item.href}
                 onClick={() => setOpen(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setOpen(false);
+                    window.location.hash = item.href;
+                  }
+                }}
                 className={classNames(
                     isCurrent(item.href)
                     ? 'bg-slate-100 dark:bg-slate-800 text-primary-600 dark:text-primary-400'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50',
-                    'group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-200'
+                    'group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
                 )}
+                aria-current={isCurrent(item.href) ? 'page' : undefined}
+                role="menuitem"
+                tabIndex={0}
                 >
                 <item.icon
                     className={classNames(
@@ -93,29 +103,29 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
                 <span className="flex-1 text-left leading-snug">{item.name}</span>
                 </a>
             ))}
-            {user.subscription === 'free' && (
-                <a
-                    href="#/premium"
-                    onClick={() => setOpen(false)}
-                    className="group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-200 bg-amber-400/20 text-amber-800 dark:text-amber-300 hover:bg-amber-400/30"
-                >
-                    <StarIcon className="mr-3 flex-shrink-0 h-6 w-6 text-amber-500" />
-                    <span className="flex-1 text-left leading-snug">{t('sidebar.bePremium')}</span>
-                </a>
-            )}
             </nav>
-            <nav className="space-y-1">
+            <nav className="space-y-1" aria-label="Navegação do usuário">
             {userNavigation.map((item) => (
                 <a
                 key={item.name}
                 href={item.href}
                 onClick={() => setOpen(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setOpen(false);
+                    window.location.hash = item.href;
+                  }
+                }}
                 className={classNames(
                     isCurrent(item.href)
                     ? 'bg-slate-100 dark:bg-slate-800 text-primary-600 dark:text-primary-400'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50',
-                    'group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-200'
+                    'group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
                 )}
+                aria-current={isCurrent(item.href) ? 'page' : undefined}
+                role="menuitem"
+                tabIndex={0}
                 >
                 <item.icon
                     className="mr-3 flex-shrink-0 h-6 w-6 text-slate-400 group-hover:text-slate-500 dark:text-slate-500 dark:group-hover:text-slate-400 transition-colors duration-200"
@@ -134,16 +144,32 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
   return (
     <>
       {/* Hidden sidebar overlay - works for all screen sizes */}
-      <div className={`fixed inset-0 flex z-40 ${open ? 'block' : 'hidden'}`} role="dialog" aria-modal="true">
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75" aria-hidden="true" onClick={() => setOpen(false)}></div>
+      <div 
+        className={`fixed inset-0 flex z-40 ${open ? 'block' : 'hidden'}`} 
+        role="dialog" 
+        aria-modal="true"
+        aria-label="Menu de navegação"
+        id="sidebar-navigation"
+      >
+        <div 
+          className="fixed inset-0 bg-gray-600 bg-opacity-75" 
+          aria-hidden="true" 
+          onClick={() => setOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setOpen(false);
+            }
+          }}
+        ></div>
         <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white dark:bg-slate-900">
             <div className="absolute top-0 right-0 -mr-12 pt-2">
                 <button
                 type="button"
                 className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
                 onClick={() => setOpen(false)}
+                aria-label="Fechar menu de navegação"
                 >
-                <span className="sr-only">Close sidebar</span>
+                <span className="sr-only">Fechar menu</span>
                 <XIcon className="h-6 w-6 text-white" aria-hidden="true" />
                 </button>
             </div>

@@ -1,5 +1,6 @@
 import { GoogleGenAI, Chat, Modality, Blob, LiveSession, LiveServerMessage, FunctionDeclaration, Type } from "@google/genai";
 import { ChatMessage, MapSearchResult, WebSearchResult } from '../types';
+import { logger } from '../../utils/logger';
 
 let chatSession: Chat | undefined;
 // Live API related variables
@@ -96,9 +97,25 @@ export async function initializeChat(
 
   // Reinitialize chat session only if model changes or it's not set
   // When systemInstruction changes, we want to force a new chat session to apply it.
-  if (!chatSession || (chatSession as any).model !== modelToUse || (chatSession as any).config.systemInstruction !== systemInstruction) {
+  interface ChatSessionWithModel {
+    model?: string;
+    config?: {
+      systemInstruction?: string;
+    };
+  }
+  
+  const chatSessionTyped = chatSession as ChatSessionWithModel | undefined;
+  if (!chatSession || chatSessionTyped?.model !== modelToUse || chatSessionTyped?.config?.systemInstruction !== systemInstruction) {
     const ai = getGeminiClient();
-    const config: any = {
+    
+    interface ChatConfig {
+      systemInstruction: string;
+      thinkingConfig?: {
+        thinkingBudget: number;
+      };
+    }
+    
+    const config: ChatConfig = {
       systemInstruction: systemInstruction,
     };
     if (useProModelForThinking) {
@@ -127,7 +144,20 @@ export async function sendMessageToGemini(
   }
 
   try {
-    let requestOptions: any; // Object to hold either 'message' or 'contents' property
+    interface RequestOptions {
+      message?: string;
+      contents?: {
+        parts: Array<{
+          inlineData?: {
+            mimeType: string;
+            data: string;
+          };
+          text?: string;
+        }>;
+      };
+    }
+    
+    let requestOptions: RequestOptions;
 
     if (imageFile) {
       requestOptions = {
@@ -156,9 +186,10 @@ export async function sendMessageToGemini(
         onNewChunk(chunk.text);
       }
     }
-  } catch (error: any) {
-    console.error("Gemini API error:", error);
-    onError(`Failed to get response from Gemini: ${error.message || 'Unknown error'}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error("Erro na API do Gemini", 'chatbot/geminiService', error);
+    onError(`Failed to get response from Gemini: ${errorMessage}`);
   }
 }
 
@@ -181,9 +212,10 @@ export async function generateGroundedResponse(prompt: string): Promise<{ text: 
       .filter((web): web is { uri: string; title: string } => !!web && !!web.uri && !!web.title);
 
     return { text: text || "No text response found.", webResults };
-  } catch (error: any) {
-    console.error("Gemini Grounded Search API error:", error);
-    throw new Error(`Failed to get grounded response: ${error.message || 'Unknown error'}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error("Erro na API de busca web do Gemini", 'chatbot/geminiService', error);
+    throw new Error(`Failed to get grounded response: ${errorMessage}`);
   }
 }
 
@@ -201,7 +233,16 @@ export async function generateMapsGroundedResponse(prompt: string): Promise<{ te
     );
   });
 
-  const config: any = {
+  interface MapsConfig {
+    tools: Array<{ googleMaps: Record<string, never> }>;
+    toolConfig?: {
+      retrievalConfig: {
+        latLng: { latitude: number; longitude: number };
+      };
+    };
+  }
+  
+  const config: MapsConfig = {
     tools: [{googleMaps: {}}],
   };
 
@@ -221,13 +262,33 @@ export async function generateMapsGroundedResponse(prompt: string): Promise<{ te
     const text = response.text;
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
 
-    const mapsResults: MapSearchResult[] = groundingChunks
-      .map(maps => (maps as any).maps) // Using 'as any' to bypass type checking for direct access
-      .filter((maps): maps is { uri: any; title: any; placeAnswerSources?: any; } => !!maps)
+    interface MapsChunk {
+      maps?: {
+        uri?: string;
+        title?: string;
+        placeAnswerSources?: {
+          reviewSnippets?: Array<{
+            text?: string;
+            author?: string;
+            rating?: number;
+          }>;
+        };
+      };
+    }
+
+    interface ReviewSnippet {
+      text?: string;
+      author?: string;
+      rating?: number;
+    }
+
+    const mapsResults: MapSearchResult[] = (groundingChunks as MapsChunk[])
+      .map(chunk => chunk.maps)
+      .filter((maps): maps is NonNullable<MapsChunk['maps']> => !!maps)
       .map(maps => ({
         uri: maps.uri || '',
         title: maps.title || '',
-        reviews: maps.placeAnswerSources?.reviewSnippets?.map((review: any) => ({
+        reviews: maps.placeAnswerSources?.reviewSnippets?.map((review: ReviewSnippet) => ({
             text: review.text || '',
             author: review.author || 'N/A',
             rating: review.rating || 0
@@ -236,9 +297,10 @@ export async function generateMapsGroundedResponse(prompt: string): Promise<{ te
       .filter(result => result.uri && result.title);
 
     return { text: text || "No text response found.", mapsResults };
-  } catch (error: any) {
-    console.error("Gemini Maps Grounding API error:", error);
-    throw new Error(`Failed to get maps grounded response: ${error.message || 'Unknown error'}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error("Erro na API de Maps do Gemini", 'chatbot/geminiService', error);
+    throw new Error(`Failed to get maps grounded response: ${errorMessage}`);
   }
 }
 
@@ -305,9 +367,10 @@ export async function processImageWithGemini(
         onError("No text response from image analysis.");
       }
     }
-  } catch (error: any) {
-    console.error(`Gemini Image ${modelType} API error:`, error);
-    onError(`Failed to process image: ${error.message || 'Unknown error'}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error(`Erro na API de processamento de imagem do Gemini (${modelType})`, 'chatbot/geminiService', error);
+    onError(`Failed to process image: ${errorMessage}`);
   }
 }
 
@@ -342,9 +405,10 @@ export async function analyzeVideoWithGemini(
         onNewChunk(chunk.text);
       }
     }
-  } catch (error: any) {
-    console.error("Gemini Video Analysis API error:", error);
-    onError(`Failed to analyze video: ${error.message || 'Unknown error'}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error("Erro na API de análise de vídeo do Gemini", 'chatbot/geminiService', error);
+    onError(`Failed to analyze video: ${errorMessage}`);
   }
 }
 
@@ -359,18 +423,29 @@ export function resetChatSession(): void {
  * If no key is selected, it prompts the user to select one.
  * @returns {Promise<boolean>} True if a key is available or prompted successfully, false otherwise.
  */
+interface AiStudioApi {
+  hasSelectedApiKey?: () => Promise<boolean>;
+  openSelectKey?: () => Promise<void>;
+}
+
+interface WindowWithAiStudio extends Window {
+  aistudio?: AiStudioApi;
+}
+
 export async function ensureApiKeySelected(): Promise<boolean> {
-  if (typeof window === 'undefined' || !(window as any).aistudio || typeof (window as any).aistudio.hasSelectedApiKey !== 'function') {
-    console.warn("window.aistudio or hasSelectedApiKey not available. Cannot check API key selection.");
+  const windowWithAiStudio = window as WindowWithAiStudio;
+  
+  if (typeof window === 'undefined' || !windowWithAiStudio.aistudio || typeof windowWithAiStudio.aistudio.hasSelectedApiKey !== 'function') {
+    logger.warn("window.aistudio ou hasSelectedApiKey não disponível. Não é possível verificar seleção de API key.", 'chatbot/geminiService');
     // If aistudio methods are not available, we proceed assuming API_KEY from env is sufficient
     // or the environment handles it.
     return true; 
   }
 
-  const hasKey = await window.aistudio.hasSelectedApiKey();
+  const hasKey = await windowWithAiStudio.aistudio.hasSelectedApiKey();
   if (!hasKey) {
-    console.log("No API key selected. Opening key selection dialog.");
-    await window.aistudio.openSelectKey();
+    logger.info("Nenhuma API key selecionada. Abrindo diálogo de seleção.", 'chatbot/geminiService');
+    await windowWithAiStudio.aistudio.openSelectKey?.();
     // Assume selection was successful for the next API call attempt.
     // The actual API call will fail if the user doesn't select one.
     return true; 
@@ -395,7 +470,7 @@ export async function startLiveAudioSession(
   useMapsSearch: boolean,
 ): Promise<void> {
   if (liveAudioSession || sessionPromiseForCleanup) {
-    console.warn("Live audio session already active or connecting. Closing existing session to restart with new config.");
+    logger.warn("Sessão de áudio ao vivo já ativa ou conectando. Fechando sessão existente para reiniciar com nova configuração.", 'chatbot/geminiService');
     await stopLiveAudioSession(); // Ensure existing session is stopped
   }
 
@@ -403,8 +478,20 @@ export async function startLiveAudioSession(
     const ai = getGeminiClient();
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-    outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+    interface WindowWithAudioContext extends Window {
+      AudioContext?: typeof AudioContext;
+      webkitAudioContext?: typeof AudioContext;
+    }
+    
+    const windowWithAudioContext = window as WindowWithAudioContext;
+    const AudioContextClass = windowWithAudioContext.AudioContext || windowWithAudioContext.webkitAudioContext;
+    
+    if (!AudioContextClass) {
+      throw new Error('AudioContext não está disponível neste navegador');
+    }
+    
+    inputAudioContext = new AudioContextClass({ sampleRate: 16000 });
+    outputAudioContext = new AudioContextClass({ sampleRate: 24000 });
 
     if (inputAudioContext.state === 'suspended') await inputAudioContext.resume();
     if (outputAudioContext.state === 'suspended') await outputAudioContext.resume();
@@ -416,7 +503,20 @@ export async function startLiveAudioSession(
     if (useWebSearch) tools.push(searchWebFunctionDeclaration);
     if (useMapsSearch) tools.push(searchMapsFunctionDeclaration);
 
-    const liveConfig: any = {
+    interface LiveConfig {
+      responseModalities: Modality[];
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: string };
+        };
+      };
+      systemInstruction: string;
+      outputAudioTranscription: Record<string, never>;
+      inputAudioTranscription: Record<string, never>;
+      tools?: Array<{ functionDeclarations: FunctionDeclaration[] }>;
+    }
+    
+    const liveConfig: LiveConfig = {
         responseModalities: [Modality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
         systemInstruction: systemInstruction,
@@ -434,7 +534,7 @@ export async function startLiveAudioSession(
       model: LIVE_AUDIO_MODEL,
       callbacks: {
         onopen: () => {
-          console.debug('Live session opened');
+          logger.debug('Sessão ao vivo aberta', 'chatbot/geminiService');
           onSuccess();
         },
         onmessage: async (message: LiveServerMessage) => {
@@ -473,10 +573,11 @@ export async function startLiveAudioSession(
                 onToolCallResult(fc.name);
                 const functionResponse = { id: fc.id, name: fc.name, response: { result: results.text } };
                 sessionPromise.then((session) => session.sendToolResponse({ functionResponses: functionResponse }));
-              } catch (error: any) {
-                console.error(`Error executing tool ${fc.name}:`, error);
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                logger.error(`Erro ao executar ferramenta ${fc.name}`, 'chatbot/geminiService', error);
                 onToolCallResult(fc.name); // Still need to signal result to hide loading message
-                const errorResponse = { id: fc.id, name: fc.name, response: { error: `Failed to execute tool: ${error.message}` } };
+                const errorResponse = { id: fc.id, name: fc.name, response: { error: `Failed to execute tool: ${errorMessage}` } };
                 sessionPromise.then((session) => session.sendToolResponse({ functionResponses: errorResponse }));
               }
             }
@@ -491,14 +592,14 @@ export async function startLiveAudioSession(
           }
         },
         onerror: (e: ErrorEvent) => {
-          console.error('Live session error:', e);
+          logger.error('Erro na sessão ao vivo', 'chatbot/geminiService', e);
           const errorMessage = e.message || 'Unknown error';
           const isApiKeyIssue = errorMessage.includes("API key was reported as leaked") || errorMessage.includes("Requested entity was not found.");
           onError(`Live audio error: ${errorMessage}`, isApiKeyIssue); // Pass isApiKeyIssue
           stopLiveAudioSession().then(onSessionEndedUnexpectedly);
         },
         onclose: (e: CloseEvent) => {
-          console.debug('Live session closed');
+          logger.debug('Sessão ao vivo fechada', 'chatbot/geminiService');
           stopLiveAudioSession().then(onSessionEndedUnexpectedly);
         },
       },
@@ -519,9 +620,9 @@ export async function startLiveAudioSession(
     liveAudioSession = await sessionPromise;
     sessionPromiseForCleanup = null;
 
-  } catch (error: any) {
-    console.error("Error starting live audio session:", error);
-    const errorMessage = error.message || 'Unknown error';
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error("Erro ao iniciar sessão de áudio ao vivo", 'chatbot/geminiService', error);
     const isApiKeyIssue = errorMessage.includes("API key was reported as leaked") || errorMessage.includes("Requested entity was not found.");
     onError(`Failed to start audio session: ${errorMessage}`, isApiKeyIssue); // Pass isApiKeyIssue
     await stopLiveAudioSession();
@@ -534,7 +635,7 @@ export async function stopLiveAudioSession(): Promise<void> {
   
   try {
     if (sessionPromiseForCleanup) {
-      sessionPromiseForCleanup.then(session => session.close()).catch(e => console.error("Error closing pending session", e));
+      sessionPromiseForCleanup.then(session => session.close()).catch(e => logger.error("Erro ao fechar sessão pendente", 'chatbot/geminiService', e));
       sessionPromiseForCleanup = null;
     }
     
@@ -570,7 +671,7 @@ export async function stopLiveAudioSession(): Promise<void> {
     }
     outputSources.clear();
     nextStartTime = 0;
-    console.debug('Live audio session stopped and resources released.');
+    logger.debug('Sessão de áudio ao vivo parada e recursos liberados', 'chatbot/geminiService');
   } finally {
     isCleaningUp = false;
   }
@@ -598,9 +699,10 @@ export async function generateSpeechFromText(text: string, voiceName: string): P
       throw new Error("No audio data was returned from the API.");
     }
     return base64Audio;
-  } catch (error: any) {
-    console.error("Gemini TTS API error:", error);
-    throw new Error(`Failed to generate speech: ${error.message || 'Unknown error'}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error("Erro na API de TTS do Gemini", 'chatbot/geminiService', error);
+    throw new Error(`Failed to generate speech: ${errorMessage}`);
   }
 }
 

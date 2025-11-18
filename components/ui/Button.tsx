@@ -31,6 +31,8 @@ export const Button: React.FC<ButtonProps> = ({
     <button
       className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
       disabled={isLoading || props.disabled}
+      aria-busy={isLoading}
+      aria-disabled={isLoading || props.disabled}
       {...props}
     >
       {isLoading ? (
