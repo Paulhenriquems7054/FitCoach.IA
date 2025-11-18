@@ -159,10 +159,10 @@ const PresentationPage: React.FC = () => {
 
       {/* CTA Section */}
       <div className="relative py-12 sm:py-16 md:py-24 bg-gradient-to-b from-slate-900 to-slate-950" style={{ overflow: 'visible' }}>
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center" style={{ overflow: 'visible' }}>
+        <div className="mx-auto px-4 sm:px-6 text-center" style={{ overflow: 'visible', maxWidth: 'none', width: '100%' }}>
           <div className="relative" style={{ overflow: 'visible' }}>
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 blur-3xl rounded-3xl" />
-            <div className="relative bg-slate-900/60 backdrop-blur-sm border border-slate-700/60 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 shadow-2xl" style={{ overflow: 'visible' }}>
+            <div className="relative bg-slate-900/60 backdrop-blur-sm border border-slate-700/60 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 shadow-2xl mx-auto" style={{ overflow: 'visible', maxWidth: '56rem', width: '100%' }}>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 sm:mb-6">
                 Construa uma rotina mais saudável
               </h2>
@@ -170,7 +170,7 @@ const PresentationPage: React.FC = () => {
                 Nutri.IA acompanha a sua jornada diariamente. Planos flexíveis, recomendações personalizadas 
                 e um assistente disponível 24/7 para responder dúvidas sobre alimentação, suplementação e bem-estar.
               </p>
-              <div id="presentation-cta-container" style={{ width: '100%', overflow: 'visible', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0', margin: '0' }}>
+              <div id="presentation-cta-container">
                 <button
                   id="presentation-cta-button"
                   onClick={() => (window.location.hash = '/welcome-survey')}
@@ -183,7 +183,7 @@ const PresentationPage: React.FC = () => {
                     borderRadius: '0.75rem',
                     border: 'none',
                     cursor: 'pointer',
-                    minWidth: '320px',
+                    minWidth: '350px',
                     width: 'auto',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -194,7 +194,9 @@ const PresentationPage: React.FC = () => {
                     maxWidth: 'none',
                     boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3), 0 4px 6px -2px rgba(16, 185, 129, 0.2)',
                     transition: 'all 0.2s ease-in-out',
-                    lineHeight: '1.5'
+                    lineHeight: '1.5',
+                    position: 'relative',
+                    boxSizing: 'border-box'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = 'linear-gradient(to right, rgb(52, 211, 153), rgb(16, 185, 129))';
@@ -205,7 +207,16 @@ const PresentationPage: React.FC = () => {
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
-                  <span style={{ display: 'inline-block', width: '100%', textAlign: 'center', overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }}>
+                  <span style={{ 
+                    display: 'inline-block', 
+                    width: 'auto', 
+                    textAlign: 'center', 
+                    overflow: 'visible', 
+                    textOverflow: 'clip', 
+                    whiteSpace: 'nowrap',
+                    maxWidth: 'none',
+                    position: 'relative'
+                  }}>
                     Comece sua Jornada Agora
                   </span>
                 </button>

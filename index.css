@@ -106,3 +106,51 @@ body {
   top: 0;
 }
 
+/* FIX CRÍTICO: Garantir que o botão CTA da página de apresentação exiba texto completo */
+#presentation-cta-button {
+  min-width: 350px !important;
+  width: auto !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.875rem 2.5rem !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+}
+
+#presentation-cta-button span,
+#presentation-cta-button * {
+  display: inline-block !important;
+  width: auto !important;
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+}
+
+#presentation-cta-container {
+  overflow: visible !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: none !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  position: relative !important;
+}
+
+/* Remover qualquer limitação de largura dos containers pais */
+#presentation-cta-container,
+#presentation-cta-container *,
+div:has(#presentation-cta-container) {
+  max-width: none !important;
+  overflow: visible !important;
+}
+
