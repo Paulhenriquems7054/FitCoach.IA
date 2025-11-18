@@ -172,7 +172,7 @@ const PresentationPage: React.FC = () => {
               </p>
               <button
                 onClick={() => (window.location.hash = '/welcome-survey')}
-                className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50 w-full sm:w-auto"
+                className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 sm:px-6 md:px-8 py-3 sm:py-4 text-sm sm:text-base md:text-lg font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50 w-full sm:w-auto whitespace-nowrap"
               >
                 Comece sua Jornada Agora
               </button>
