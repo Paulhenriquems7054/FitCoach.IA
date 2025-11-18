@@ -186,7 +186,7 @@ const LoginPage: React.FC = () => {
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Erro ao fazer login. Tente novamente.';
             setError(errorMessage);
-            showError(errorMsg);
+            showError(errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -199,14 +199,19 @@ const LoginPage: React.FC = () => {
         setIsLoading(true);
 
         try {
+            // Sanitizar inputs
+            const sanitizedUsername = sanitizeInput(username.trim(), 50);
+            const sanitizedPassword = password.trim();
+            const sanitizedNome = sanitizeInput(nome.trim(), 100);
+
             // Validações
-            if (!username.trim() || !password.trim() || !nome.trim()) {
+            if (!sanitizedUsername || !sanitizedPassword || !sanitizedNome) {
                 setError('Por favor, preencha todos os campos obrigatórios');
                 setIsLoading(false);
                 return;
             }
 
-            if (password.length < 6) {
+            if (sanitizedPassword.length < 6) {
                 setError('A senha deve ter pelo menos 6 caracteres');
                 setIsLoading(false);
                 return;
@@ -252,6 +257,7 @@ const LoginPage: React.FC = () => {
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Erro ao criar conta. Tente novamente.';
             setError(errorMessage);
+            showError(errorMessage);
         } finally {
             setIsLoading(false);
         }

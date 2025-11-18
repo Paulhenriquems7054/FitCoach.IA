@@ -79,9 +79,11 @@ const App: React.FC = () => {
 
     if (path === '/login') {
         return (
-            <Suspense fallback={<PageLoader />}>
-                <LoginPage />
-            </Suspense>
+            <ToastProvider>
+                <Suspense fallback={<PageLoader />}>
+                    <LoginPage />
+                </Suspense>
+            </ToastProvider>
         );
     }
 

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import logo from '../assets/nutria-logo.png';
 
 const features = [
   {
@@ -54,20 +53,44 @@ const PresentationPage: React.FC = () => {
 
         {/* Main Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 text-center">
-          {/* Logo Section - Centered and Prominent */}
+          {/* Logo Section - Centered and Prominent with Video */}
           <div className={`mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <div className="relative inline-block">
               {/* Glowing effect behind logo */}
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/30 via-sky-400/30 to-blue-500/30 rounded-full blur-3xl scale-150 animate-pulse" />
-              <div className="relative">
-                <img 
-                  src={logo} 
-                  alt="Logo Nutri.IA" 
-                  className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 drop-shadow-2xl animate-float"
+              <div className="relative rounded-full overflow-hidden shadow-2xl border-4 border-emerald-400/20 animate-float w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 flex items-center justify-center bg-white">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-contain"
                   style={{
-                    animation: 'float 6s ease-in-out infinite'
+                    animation: 'float 6s ease-in-out infinite',
+                    maxWidth: '90%',
+                    maxHeight: '90%'
                   }}
-                />
+                  onError={(e) => {
+                    // Fallback se o vídeo não carregar
+                    const target = e.target as HTMLVideoElement;
+                    if (target) {
+                      target.style.display = 'none';
+                      const fallback = target.nextElementSibling as HTMLElement;
+                      if (fallback) {
+                        fallback.style.display = 'flex';
+                      }
+                    }
+                  }}
+                >
+                  <source src="/icons/Vídeo-Nutri.mp4" type="video/mp4" />
+                </video>
+                {/* Fallback para navegadores que não suportam vídeo */}
+                <div 
+                  className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-blue-500 flex items-center justify-center text-white text-4xl font-bold rounded-full"
+                  style={{ display: 'none' }}
+                >
+                  Nutri.IA
+                </div>
               </div>
             </div>
           </div>
