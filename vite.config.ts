@@ -23,8 +23,16 @@ export default defineConfig(({ mode }) => {
           protocol: 'ws',
           host: 'localhost',
           port: 3000
+        },
+        // Ensure static assets are served with correct MIME types
+        middlewareMode: false,
+        fs: {
+          // Allow serving files from public directory
+          strict: false,
         }
       },
+      // Ensure public assets are handled correctly
+      publicDir: 'public',
       preview: {
         port: 3000,
         host: '0.0.0.0',

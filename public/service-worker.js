@@ -3,6 +3,11 @@ const CACHE_NAME = 'nutri-ia-cache-v2';
 const urlsToCache = [
   '/',
   '/index.html',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/play_store_512.png',
+  '/icons/1024.png',
+  '/icons/favicon.svg',
   // Add other static assets here if they are not dynamically imported with changing URLs
   // For example: '/styles.css', '/main.js'
   // Note: assets loaded from CDNs (like tailwind, react) are not cached by this worker
@@ -15,8 +20,13 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache', CACHE_NAME);
-        return cache.addAll(urlsToCache);
+        console.log('[SW] Opened cache', CACHE_NAME);
+        // Use addAll with catch to handle missing files gracefully
+        return cache.addAll(urlsToCache).catch(err => {
+          console.warn('[SW] Some files failed to cache:', err);
+          // Continue anyway - cache what we can
+          return Promise.resolve();
+        });
       })
   );
 });
@@ -42,7 +52,7 @@ self.addEventListener('fetch', event => {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then(cache => {
               cache.put(event.request, responseToCache).catch(err => {
-                console.warn('[ServiceWorker] Falha ao gravar no cache:', err);
+                // Silently fail - non-critical
               });
             });
           }
@@ -50,7 +60,6 @@ self.addEventListener('fetch', event => {
         })
         .catch(error => {
           // Network failed, try cache
-          console.warn('[ServiceWorker] Network failed, trying cache:', event.request.url);
           return caches.match(event.request).then(cachedResponse => {
             return cachedResponse || caches.match('/index.html');
           });
@@ -81,15 +90,15 @@ self.addEventListener('fetch', event => {
 
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseToCache).catch(err => {
-                console.warn('[ServiceWorker] Falha ao gravar no cache:', err);
+              cache.put(event.request, responseToCache).catch(() => {
+                // Silently fail - non-critical
               });
             });
 
             return response;
           })
-          .catch(error => {
-            console.warn('[ServiceWorker] Network request failed for:', event.request.url, error);
+          .catch(() => {
+            // Network failed, try index.html
             return caches.match('/index.html');
           });
       })
@@ -104,8 +113,8 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
-            console.log('[ServiceWorker] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
+            // Silently delete old caches
+            return caches.delete(cacheName).catch(() => {});
           }
         })
       );

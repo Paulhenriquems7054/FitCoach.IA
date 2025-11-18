@@ -278,7 +278,7 @@ const NutriAssistant: React.FC = () => {
       )}
 
       {isOpen && (
-        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-40 flex h-[100vh] sm:h-[80vh] w-full sm:w-[90vw] sm:max-w-lg flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl border border-slate-800/60 bg-slate-950/95 shadow-2xl shadow-emerald-500/10 backdrop-blur-sm">
+        <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 z-40 flex h-full sm:h-[80vh] w-full sm:w-[90vw] sm:max-w-lg flex-col overflow-hidden rounded-none sm:rounded-2xl border-0 sm:border border-slate-800/60 bg-slate-950/95 shadow-2xl shadow-emerald-500/10 backdrop-blur-sm">
           <div className="flex items-center justify-between bg-gradient-to-r from-emerald-500/90 to-sky-500/90 px-3 sm:px-4 py-2 sm:py-3 text-white shadow-md flex-wrap gap-2">
             <div className="flex-1 min-w-0">
               <h2 className="text-base sm:text-lg font-semibold truncate">Nutri.IA Assistente</h2>

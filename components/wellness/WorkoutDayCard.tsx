@@ -194,7 +194,7 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                                             </div>
                                             
                                             {gifPath && isGifExpanded && (
-                                                <div className="flex-shrink-0 w-full sm:w-[280px] md:w-[320px] lg:w-[360px] rounded-lg overflow-hidden border-2 border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-900 shadow-lg flex items-center justify-center min-h-[150px] sm:min-h-[180px] md:min-h-[220px] lg:min-h-[250px]">
+                                                <div className="flex-shrink-0 w-full sm:w-[280px] md:w-[320px] lg:w-[360px] rounded-lg overflow-hidden border-2 border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-900 shadow-lg flex items-center justify-center min-h-[150px] sm:min-h-[180px] md:min-h-[220px] lg:min-h-[250px] max-w-full">
                                                     <img
                                                         src={gifPath}
                                                         alt={`Demonstração de ${exercise.name}`}

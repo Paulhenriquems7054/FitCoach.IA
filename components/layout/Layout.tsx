@@ -35,7 +35,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         <div className="flex flex-col flex-1 w-full">
           <Header onMenuToggle={() => setSidebarOpen(true)} sidebarOpen={sidebarOpen} />
           <main id="main-content" className="flex-1 relative focus:outline-none" tabIndex={-1}>
-            <div className="py-4 px-3 sm:py-6 sm:px-4 md:py-8 md:px-6 lg:px-8 animate-fade-in animate-slide-up">
+            <div className="py-4 px-2 sm:py-6 sm:px-4 md:py-8 md:px-6 lg:px-8 animate-fade-in animate-slide-up max-w-full overflow-x-hidden">
                 {children}
             </div>
           </main>

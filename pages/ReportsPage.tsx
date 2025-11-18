@@ -221,7 +221,7 @@ const ReportsPage: React.FC = () => {
                                 <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3">
                                     Histórico de Peso
                                 </h3>
-                                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 -mx-4 sm:mx-0">
+                                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 -mx-2 sm:mx-0">
                                     <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-xs sm:text-sm">
                                         <thead className="bg-slate-800 text-white">
                                             <tr>

@@ -161,7 +161,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
             }
           }}
         ></div>
-        <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white dark:bg-slate-900">
+        <div className="relative flex-1 flex flex-col max-w-xs sm:max-w-sm w-full bg-white dark:bg-slate-900">
             <div className="absolute top-0 right-0 -mr-12 pt-2">
                 <button
                 type="button"
