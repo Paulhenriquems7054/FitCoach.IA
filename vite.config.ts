@@ -53,8 +53,12 @@ export default defineConfig(({ mode }) => {
             manualChunks: (id) => {
               // Separar node_modules em chunks menores e mais específicos
               if (id.includes('node_modules')) {
-                // React e React DOM juntos (pequenos)
-                if (id.includes('react') || id.includes('react-dom')) {
+                // React e React DOM juntos - SEMPRE primeiro e com todas as dependências relacionadas
+                if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
+                  return 'react-vendor';
+                }
+                // Bibliotecas que dependem do React devem estar no mesmo chunk
+                if (id.includes('react-dropzone')) {
                   return 'react-vendor';
                 }
                 // Google GenAI separado
@@ -83,9 +87,15 @@ export default defineConfig(({ mode }) => {
                 return 'vendor-misc';
               }
             },
-            // Otimizar nomes de chunks
-            chunkFileNames: 'assets/[name]-[hash].js',
+            // Garantir ordem de carregamento - React primeiro
             entryFileNames: 'assets/[name]-[hash].js',
+            chunkFileNames: (chunkInfo) => {
+              // Garantir que react-vendor seja carregado primeiro
+              if (chunkInfo.name === 'react-vendor') {
+                return 'assets/react-vendor-[hash].js';
+              }
+              return 'assets/[name]-[hash].js';
+            },
             assetFileNames: 'assets/[name]-[hash].[ext]',
           },
         },
