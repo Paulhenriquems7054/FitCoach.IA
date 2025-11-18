@@ -170,27 +170,44 @@ const PresentationPage: React.FC = () => {
                 Nutri.IA acompanha a sua jornada diariamente. Planos flexíveis, recomendações personalizadas 
                 e um assistente disponível 24/7 para responder dúvidas sobre alimentação, suplementação e bem-estar.
               </p>
-              <div id="presentation-cta-container" className="flex justify-center" style={{ width: '100%', overflow: 'visible', minWidth: '100%' }}>
+              <div id="presentation-cta-container" style={{ width: '100%', overflow: 'visible', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0', margin: '0' }}>
                 <button
                   id="presentation-cta-button"
                   onClick={() => (window.location.hash = '/welcome-survey')}
-                  className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50"
                   style={{ 
-                    paddingTop: '0.75rem',
-                    paddingBottom: '0.75rem',
-                    paddingLeft: '2rem',
-                    paddingRight: '2rem',
-                    fontSize: '1rem',
-                    minWidth: '280px',
+                    padding: '0.875rem 2.5rem',
+                    fontSize: '1.125rem',
+                    fontWeight: '600',
+                    color: '#ffffff',
+                    background: 'linear-gradient(to right, rgb(16 185 129), rgb(5 150 105))',
+                    borderRadius: '0.75rem',
+                    border: 'none',
+                    cursor: 'pointer',
+                    minWidth: '320px',
                     width: 'auto',
-                    display: 'inline-block',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     overflow: 'visible',
                     textOverflow: 'clip',
                     whiteSpace: 'nowrap',
-                    maxWidth: 'none'
+                    maxWidth: 'none',
+                    boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3), 0 4px 6px -2px rgba(16, 185, 129, 0.2)',
+                    transition: 'all 0.2s ease-in-out',
+                    lineHeight: '1.5'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, rgb(52, 211, 153), rgb(16, 185, 129))';
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, rgb(16 185 129), rgb(5 150 105))';
+                    e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
-                  Comece sua Jornada Agora
+                  <span style={{ display: 'inline-block', width: '100%', textAlign: 'center', overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }}>
+                    Comece sua Jornada Agora
+                  </span>
                 </button>
               </div>
             </div>
@@ -210,28 +227,48 @@ const PresentationPage: React.FC = () => {
         .animate-float {
           animation: float 6s ease-in-out infinite;
         }
-        /* Garantir que o botão CTA não seja cortado - FORÇAR COM !important */
+        /* FORÇAR EXIBIÇÃO COMPLETA DO BOTÃO - CSS COM MÁXIMA PRIORIDADE */
         #presentation-cta-button {
-          min-width: 280px !important;
+          min-width: 320px !important;
           width: auto !important;
           max-width: none !important;
           white-space: nowrap !important;
           overflow: visible !important;
           text-overflow: clip !important;
+          display: inline-flex !important;
+          padding: 0.875rem 2.5rem !important;
+          box-sizing: border-box !important;
+        }
+        #presentation-cta-button span {
           display: inline-block !important;
-          padding-left: 2rem !important;
-          padding-right: 2rem !important;
+          width: 100% !important;
+          text-align: center !important;
+          overflow: visible !important;
+          text-overflow: clip !important;
+          white-space: nowrap !important;
+          max-width: none !important;
         }
         #presentation-cta-container {
           overflow: visible !important;
           width: 100% !important;
           min-width: 100% !important;
           max-width: none !important;
+          display: flex !important;
+          justify-content: center !important;
+          padding: 0 !important;
+          margin: 0 !important;
         }
         /* Garantir que containers pais não cortem */
-        #presentation-cta-container * {
+        #presentation-cta-container *,
+        #presentation-cta-container *::before,
+        #presentation-cta-container *::after {
           overflow: visible !important;
           text-overflow: clip !important;
+          max-width: none !important;
+        }
+        /* Remover qualquer limitação do container pai */
+        div[class*="max-w"]:has(#presentation-cta-container) {
+          max-width: none !important;
         }
       `}</style>
     </div>
