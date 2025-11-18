@@ -1,7 +1,9 @@
 
 import { useState, useEffect } from 'react';
 
-const SURVEY_FLAG = 'nutriIA_enquete_v1_done';
+// Usar a mesma versão da enquete que está no WelcomeSurvey
+const SURVEY_VERSION = 'v2';
+const SURVEY_FLAG = `nutriIA_enquete_${SURVEY_VERSION}_done`;
 
 const readSurveyCompletion = (): boolean => {
   if (typeof window === 'undefined') return false;
