@@ -150,10 +150,10 @@ const ReportsPage: React.FC = () => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8">
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{t('reports.title')}</h1>
-                <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">{t('reports.subtitle')}</p>
+        <div className="max-w-4xl mx-auto px-2 sm:px-4">
+            <div className="text-center mb-6 sm:mb-8">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">{t('reports.title')}</h1>
+                <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">{t('reports.subtitle')}</p>
             </div>
 
             {isLoading ? (
@@ -197,19 +197,19 @@ const ReportsPage: React.FC = () => {
                             </header>
 
                             <section>
-                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+                                <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3">
                                     Resumo da Semana
                                 </h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                                     {weightHistoryMetrics.map((metric) => (
                                         <div
                                             key={metric.label}
-                                            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4"
+                                            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3 sm:p-4"
                                         >
                                             <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                                 {metric.label}
                                             </p>
-                                            <p className="mt-1 text-xl font-bold text-slate-900 dark:text-white">
+                                            <p className="mt-1 text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
                                                 {metric.value}
                                             </p>
                                         </div>
@@ -218,16 +218,16 @@ const ReportsPage: React.FC = () => {
                             </section>
 
                             <section>
-                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+                                <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3">
                                     Histórico de Peso
                                 </h3>
-                                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-                                    <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+                                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 -mx-4 sm:mx-0">
+                                    <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-xs sm:text-sm">
                                         <thead className="bg-slate-800 text-white">
                                             <tr>
-                                                <th className="px-4 py-2 text-left font-semibold">Data</th>
-                                                <th className="px-4 py-2 text-left font-semibold">Peso (kg)</th>
-                                                <th className="px-4 py-2 text-left font-semibold">Observações</th>
+                                                <th className="px-3 sm:px-4 py-2 text-left font-semibold">Data</th>
+                                                <th className="px-3 sm:px-4 py-2 text-left font-semibold">Peso (kg)</th>
+                                                <th className="px-3 sm:px-4 py-2 text-left font-semibold">Observações</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -240,11 +240,11 @@ const ReportsPage: React.FC = () => {
                                                             : 'bg-slate-50 dark:bg-slate-800/60'
                                                     }
                                                 >
-                                                    <td className="px-4 py-2">
+                                                    <td className="px-3 sm:px-4 py-2 whitespace-nowrap">
                                                         {new Date(entry.date).toLocaleDateString('pt-BR')}
                                                     </td>
-                                                    <td className="px-4 py-2">{entry.weight} kg</td>
-                                                    <td className="px-4 py-2 text-slate-500 dark:text-slate-400">
+                                                    <td className="px-3 sm:px-4 py-2 whitespace-nowrap">{entry.weight} kg</td>
+                                                    <td className="px-3 sm:px-4 py-2 text-slate-500 dark:text-slate-400">
                                                         —
                                                     </td>
                                                 </tr>

@@ -72,16 +72,17 @@ const GeneratorPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-2 sm:px-4">
-        <div className="flex flex-col sm:flex-row items-center justify-between mb-6 sm:mb-8 gap-4">
-            <div className="text-center sm:text-left flex-1">
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Gerador de Plano com IA</h1>
-                <p className="mt-2 text-base sm:text-lg text-slate-600 dark:text-slate-400">Preencha seus dados para criar um plano alimentar exclusivo.</p>
+    <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 md:mb-8 gap-3 sm:gap-4">
+            <div className="text-left flex-1 w-full sm:w-auto">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Gerador de Plano com IA</h1>
+                <p className="mt-1 sm:mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400">Preencha seus dados para criar um plano alimentar exclusivo.</p>
             </div>
             <Button
                 onClick={() => setShowHistory(true)}
                 variant="secondary"
-                className="whitespace-nowrap"
+                className="w-full sm:w-auto whitespace-nowrap text-sm sm:text-base"
+                size="sm"
             >
                 📋 Histórico de Planos
             </Button>
@@ -95,21 +96,21 @@ const GeneratorPage: React.FC = () => {
             />
         )}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-4 order-2 lg:order-1">
             <PlanGeneratorForm
                 onGeneratePlan={handleGeneratePlan}
                 isLoading={isLoading}
             />
         </div>
-        <div className="lg:col-span-8">
+        <div className="lg:col-span-8 order-1 lg:order-2">
           {isLoading ? (
              <MealPlanSkeleton />
           ) : error ? (
             <Alert type="error" title="Erro ao Gerar Plano">
-                <p>{error}</p>
+                <p className="text-sm sm:text-base">{error}</p>
             </Alert>
           ) : mealPlan ? (
-            <div className="space-y-8">
+            <div className="space-y-4 sm:space-y-6 md:space-y-8">
               <Dashboard summary={summary} />
               <MealPlanDisplay plan={mealPlan} observations={observations} />
             </div>

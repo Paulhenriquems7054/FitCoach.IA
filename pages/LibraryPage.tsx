@@ -11,28 +11,28 @@ import { BookOpenIcon } from '../components/icons/BookOpenIcon';
 
 const RecipeCard: React.FC<{ recipe: Recipe }> = ({ recipe }) => (
     <Card className="flex flex-col h-full">
-        <div className="p-6">
-            <h3 className="text-xl font-bold text-primary-700 dark:text-primary-400">{recipe.nome_receita}</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{recipe.descricao}</p>
+        <div className="p-4 sm:p-6">
+            <h3 className="text-lg sm:text-xl font-bold text-primary-700 dark:text-primary-400">{recipe.nome_receita}</h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">{recipe.descricao}</p>
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Tempo de Preparo: {recipe.tempo_preparo_min} min</p>
         </div>
-        <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex-grow">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-grow">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div>
-                    <h4 className="font-semibold mb-2">Ingredientes</h4>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                    <h4 className="font-semibold text-sm sm:text-base mb-2">Ingredientes</h4>
+                    <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
                         {recipe.ingredientes.map((ing, i) => <li key={i}>{ing}</li>)}
                     </ul>
                 </div>
                  <div>
-                    <h4 className="font-semibold mb-2">Instruções</h4>
-                    <ol className="list-decimal list-inside space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                    <h4 className="font-semibold text-sm sm:text-base mb-2">Instruções</h4>
+                    <ol className="list-decimal list-inside space-y-1 sm:space-y-2 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
                          {recipe.instrucoes.map((step, i) => <li key={i}>{step}</li>)}
                     </ol>
                 </div>
             </div>
         </div>
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 text-xs grid grid-cols-4 text-center">
+        <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 text-xs grid grid-cols-4 gap-2 text-center">
             <div><span className="font-bold">{recipe.informacao_nutricional.calorias}</span> kcal</div>
             <div><span className="font-bold">{recipe.informacao_nutricional.proteinas_g}g</span> P</div>
             <div><span className="font-bold">{recipe.informacao_nutricional.carboidratos_g}g</span> C</div>
@@ -106,21 +106,21 @@ const LibraryPage: React.FC = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-8">
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Biblioteca Nutricional</h1>
-                <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">Encontre a receita perfeita para seu objetivo, gerada por IA.</p>
+        <div className="max-w-7xl mx-auto px-2 sm:px-4">
+            <div className="text-center mb-6 sm:mb-8">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Biblioteca Nutricional</h1>
+                <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">Encontre a receita perfeita para seu objetivo, gerada por IA.</p>
             </div>
             
-            <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-8 flex gap-2">
+            <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-6 sm:mb-8 flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <input
                     type="text"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     placeholder="Ex: um café da manhã rico em proteínas"
-                    className="flex-1 block w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    className="flex-1 block w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 />
-                <Button type="submit" isLoading={isLoading} size="lg">
+                <Button type="submit" isLoading={isLoading} size="lg" className="w-full sm:w-auto text-sm sm:text-base">
                     Buscar
                 </Button>
             </form>

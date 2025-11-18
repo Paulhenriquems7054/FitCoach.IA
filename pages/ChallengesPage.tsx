@@ -29,33 +29,33 @@ const ChallengesPage: React.FC = () => {
     const weeklyChallenges = challenges.filter(c => c.type === 'weekly');
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8">
+        <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 px-2 sm:px-4">
             <div className="text-center">
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Desafios e Conquistas</h1>
-                <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">Construa hábitos saudáveis, ganhe pontos e desbloqueie conquistas.</p>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Desafios e Conquistas</h1>
+                <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">Construa hábitos saudáveis, ganhe pontos e desbloqueie conquistas.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
                 <section>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Desafios Diários</h2>
-                    <div className="space-y-4">
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3 sm:mb-4">Desafios Diários</h2>
+                    <div className="space-y-3 sm:space-y-4">
                         {dailyChallenges.map(challenge => {
                             const isCompleted = user.completedChallengeIds.includes(challenge.id);
                             return (
                                 <Card key={challenge.id} className={`transition-all ${isCompleted ? 'bg-green-50 dark:bg-green-900/20 opacity-70' : ''}`}>
-                                    <div className="p-4 flex items-center">
-                                        <div className="flex-1">
-                                            <h3 className="font-semibold">{challenge.title}</h3>
-                                            <p className="text-sm text-slate-500 dark:text-slate-400">{challenge.description}</p>
-                                            <p className="text-sm font-bold text-primary-600 dark:text-primary-400 mt-1">+{challenge.points} Pontos</p>
+                                    <div className="p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-semibold text-sm sm:text-base">{challenge.title}</h3>
+                                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{challenge.description}</p>
+                                            <p className="text-xs sm:text-sm font-bold text-primary-600 dark:text-primary-400 mt-1">+{challenge.points} Pontos</p>
                                         </div>
                                         <button
                                             onClick={() => completeChallenge(challenge.id, challenge.points)}
                                             disabled={isCompleted}
-                                            className="ml-4 px-3 py-1.5 text-sm font-semibold rounded-full disabled:cursor-not-allowed transition-colors flex items-center gap-2
+                                            className="w-full sm:w-auto ml-0 sm:ml-4 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-full disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2
                                                 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-green-600 disabled:text-white"
                                         >
-                                            {isCompleted ? <CheckCircleIcon className="w-5 h-5" /> : 'Completar'}
+                                            {isCompleted ? <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : 'Completar'}
                                         </button>
                                     </div>
                                 </Card>
@@ -64,25 +64,25 @@ const ChallengesPage: React.FC = () => {
                     </div>
                 </section>
                 <section>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Desafios Semanais</h2>
-                    <div className="space-y-4">
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3 sm:mb-4">Desafios Semanais</h2>
+                    <div className="space-y-3 sm:space-y-4">
                         {weeklyChallenges.map(challenge => {
                              const isCompleted = user.completedChallengeIds.includes(challenge.id);
                              return (
                                 <Card key={challenge.id} className={`transition-all ${isCompleted ? 'bg-green-50 dark:bg-green-900/20 opacity-70' : ''}`}>
-                                     <div className="p-4 flex items-center">
-                                         <div className="flex-1">
-                                             <h3 className="font-semibold">{challenge.title}</h3>
-                                             <p className="text-sm text-slate-500 dark:text-slate-400">{challenge.description}</p>
-                                              <p className="text-sm font-bold text-primary-600 dark:text-primary-400 mt-1">+{challenge.points} Pontos</p>
+                                     <div className="p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                                         <div className="flex-1 min-w-0">
+                                             <h3 className="font-semibold text-sm sm:text-base">{challenge.title}</h3>
+                                             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{challenge.description}</p>
+                                              <p className="text-xs sm:text-sm font-bold text-primary-600 dark:text-primary-400 mt-1">+{challenge.points} Pontos</p>
                                          </div>
                                          <button
                                              onClick={() => completeChallenge(challenge.id, challenge.points)}
                                              disabled={isCompleted}
-                                             className="ml-4 px-3 py-1.5 text-sm font-semibold rounded-full disabled:cursor-not-allowed transition-colors flex items-center gap-2
+                                             className="w-full sm:w-auto ml-0 sm:ml-4 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-full disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2
                                                 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-green-600 disabled:text-white"
                                          >
-                                             {isCompleted ? <CheckCircleIcon className="w-5 h-5" /> : 'Completar'}
+                                             {isCompleted ? <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : 'Completar'}
                                          </button>
                                      </div>
                                  </Card>
@@ -93,17 +93,17 @@ const ChallengesPage: React.FC = () => {
             </div>
 
             <section>
-                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Conquistas</h2>
-                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                 <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3 sm:mb-4">Conquistas</h2>
+                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
                      {achievements.map(achieve => {
                          const isUnlocked = achieve.check(user);
                          return (
-                            <Card key={achieve.id} className={`text-center p-4 transition-all ${isUnlocked ? 'border-2 border-amber-400 dark:border-amber-500' : 'opacity-60'}`}>
-                                <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-2 ${isUnlocked ? 'bg-amber-100 dark:bg-amber-900/50' : 'bg-slate-100 dark:bg-slate-700'}`}>
-                                    {isUnlocked ? <TrophyIcon className="w-8 h-8 text-amber-500" /> : <LockClosedIcon className="w-8 h-8 text-slate-400" />}
+                            <Card key={achieve.id} className={`text-center p-3 sm:p-4 transition-all ${isUnlocked ? 'border-2 border-amber-400 dark:border-amber-500' : 'opacity-60'}`}>
+                                <div className={`mx-auto w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-2 ${isUnlocked ? 'bg-amber-100 dark:bg-amber-900/50' : 'bg-slate-100 dark:bg-slate-700'}`}>
+                                    {isUnlocked ? <TrophyIcon className="w-6 h-6 sm:w-8 sm:h-8 text-amber-500" /> : <LockClosedIcon className="w-6 h-6 sm:w-8 sm:h-8 text-slate-400" />}
                                 </div>
-                                <h3 className="font-semibold text-sm">{achieve.title}</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">{achieve.description}</p>
+                                <h3 className="font-semibold text-xs sm:text-sm">{achieve.title}</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{achieve.description}</p>
                             </Card>
                          );
                      })}

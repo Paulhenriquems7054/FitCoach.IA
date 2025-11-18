@@ -208,10 +208,10 @@ const WellnessPlanPage: React.FC = () => {
     const progress = calculateProgress();
 
     return (
-        <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-8">
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Plano de Bem-Estar</h1>
-                <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">
+        <div className="max-w-6xl mx-auto px-2 sm:px-4">
+            <div className="text-center mb-6 sm:mb-8">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Plano de Bem-Estar</h1>
+                <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">
                     Receba recomendações personalizadas de treinos e suplementos geradas pela IA
                 </p>
             </div>

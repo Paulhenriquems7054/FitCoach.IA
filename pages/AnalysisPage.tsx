@@ -81,75 +81,78 @@ const AnalysisPage: React.FC = () => {
 
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8">
+        <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 px-2 sm:px-4">
              <div className="text-center">
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Análise de Progresso</h1>
-                <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">Registre seu peso e veja a análise da IA sobre sua evolução.</p>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Análise de Progresso</h1>
+                <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">Registre seu peso e veja a análise da IA sobre sua evolução.</p>
             </div>
 
             <Card>
-                <div className="p-6">
-                    <h2 className="text-lg font-bold">Histórico de Peso</h2>
-                    <div style={{ width: '100%', height: 300 }} className="mt-4">
-                        <ResponsiveContainer>
+                <div className="p-4 sm:p-6">
+                    <h2 className="text-base sm:text-lg font-bold">Histórico de Peso</h2>
+                    <div style={{ width: '100%', height: 250 }} className="mt-3 sm:mt-4 overflow-x-auto">
+                        <ResponsiveContainer width="100%" minHeight={250}>
                             <LineChart data={user.weightHistory}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.2)" />
-                                <XAxis dataKey="date" stroke="rgb(100 116 139)" />
-                                <YAxis stroke="rgb(100 116 139)" domain={['dataMin - 2', 'dataMax + 2']} />
+                                <XAxis dataKey="date" stroke="rgb(100 116 139)" fontSize={12} />
+                                <YAxis stroke="rgb(100 116 139)" domain={['dataMin - 2', 'dataMax + 2']} fontSize={12} />
                                 <Tooltip
                                     contentStyle={{ 
                                         backgroundColor: 'rgba(30, 41, 59, 0.9)', 
                                         borderColor: 'rgb(51 65 85)',
                                         color: '#fff',
-                                        borderRadius: '0.5rem'
+                                        borderRadius: '0.5rem',
+                                        fontSize: '12px'
                                     }} 
                                 />
-                                <Legend />
+                                <Legend wrapperStyle={{ fontSize: '12px' }} />
                                 <Line type="monotone" dataKey="weight" name="Peso (kg)" stroke="rgb(34 197 94)" strokeWidth={2} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
-                    <form onSubmit={handleAddWeight} className="mt-6 flex items-end gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <div>
-                            <label htmlFor="newWeight" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Registrar peso de hoje (kg)</label>
+                    <form onSubmit={handleAddWeight} className="mt-4 sm:mt-6 flex flex-col sm:flex-row items-stretch sm:items-end gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="flex-1">
+                            <label htmlFor="newWeight" className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">Registrar peso de hoje (kg)</label>
                             <input
                                 type="number"
                                 id="newWeight"
                                 step="0.1"
                                 value={newWeight}
                                 onChange={e => setNewWeight(e.target.value)}
-                                className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm"
+                                className="mt-1 block w-full px-3 py-2 text-sm sm:text-base bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm"
                             />
                         </div>
-                        <Button type="submit">Adicionar Registro</Button>
+                        <Button type="submit" className="w-full sm:w-auto text-sm sm:text-base">Adicionar Registro</Button>
                     </form>
                 </div>
             </Card>
 
              <div>
-                <h2 className="text-2xl font-bold text-center mb-4">Análise da Nutri.IA</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-center mb-4 sm:mb-6">Análise da Nutri.IA</h2>
                 {isLoading ? (
                     <AnalysisSkeleton />
                 ) : error ? (
-                    <Alert type="error" title="Erro na Análise">{error}</Alert>
+                    <Alert type="error" title="Erro na Análise">
+                        <p className="text-sm sm:text-base">{error}</p>
+                    </Alert>
                 ) : analysis ? (
                     <Card>
-                        <div className="p-6 space-y-4">
+                        <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
                             <div>
-                                <h3 className="font-semibold text-lg text-primary-700 dark:text-primary-400">Análise Geral</h3>
-                                <p className="text-slate-600 dark:text-slate-300">{analysis.analise_texto}</p>
+                                <h3 className="font-semibold text-base sm:text-lg text-primary-700 dark:text-primary-400">Análise Geral</h3>
+                                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mt-1">{analysis.analise_texto}</p>
                             </div>
-                            <p className="text-sm p-3 bg-sky-50 dark:bg-sky-900/50 rounded-lg"><strong>Projeção:</strong> {analysis.projecao_proxima_semana}</p>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
-                                    <h4 className="font-semibold text-green-800 dark:text-green-300">Pontos Fortes</h4>
-                                    <ul className="list-disc list-inside text-sm text-green-700 dark:text-green-200 mt-2">
+                            <p className="text-xs sm:text-sm p-3 bg-sky-50 dark:bg-sky-900/50 rounded-lg"><strong>Projeção:</strong> {analysis.projecao_proxima_semana}</p>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                                <div className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
+                                    <h4 className="font-semibold text-sm sm:text-base text-green-800 dark:text-green-300">Pontos Fortes</h4>
+                                    <ul className="list-disc list-inside text-xs sm:text-sm text-green-700 dark:text-green-200 mt-2 space-y-1">
                                         {analysis.pontos_fortes.map((item, i) => <li key={i}>{item}</li>)}
                                     </ul>
                                 </div>
-                                <div className="p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg">
-                                     <h4 className="font-semibold text-amber-800 dark:text-amber-300">Áreas para Melhoria</h4>
-                                    <ul className="list-disc list-inside text-sm text-amber-700 dark:text-amber-200 mt-2">
+                                <div className="p-3 sm:p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg">
+                                     <h4 className="font-semibold text-sm sm:text-base text-amber-800 dark:text-amber-300">Áreas para Melhoria</h4>
+                                    <ul className="list-disc list-inside text-xs sm:text-sm text-amber-700 dark:text-amber-200 mt-2 space-y-1">
                                         {analysis.areas_melhoria.map((item, i) => <li key={i}>{item}</li>)}
                                     </ul>
                                 </div>
@@ -157,9 +160,9 @@ const AnalysisPage: React.FC = () => {
                         </div>
                     </Card>
                 ) : (
-                    <Card className="flex flex-col items-center justify-center min-h-[200px] p-6 text-center">
-                        <TrendingUpIcon className="w-12 h-12 text-slate-400" />
-                        <p className="mt-4 text-slate-500 dark:text-slate-400">Adicione mais registros de peso para que a IA possa analisar seu progresso.</p>
+                    <Card className="flex flex-col items-center justify-center min-h-[200px] p-4 sm:p-6 text-center">
+                        <TrendingUpIcon className="w-10 h-10 sm:w-12 sm:h-12 text-slate-400" />
+                        <p className="mt-3 sm:mt-4 text-sm sm:text-base text-slate-500 dark:text-slate-400">Adicione mais registros de peso para que a IA possa analisar seu progresso.</p>
                     </Card>
                 )}
             </div>

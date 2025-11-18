@@ -175,10 +175,10 @@ const SettingsPage: React.FC = () => {
     }, [errorMessage]);
 
     return (
-        <div className="max-w-2xl mx-auto space-y-8">
+        <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8 px-2 sm:px-4">
              <div className="text-center">
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{t('settings.title')}</h1>
-                <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">{t('settings.subtitle')}</p>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">{t('settings.title')}</h1>
+                <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">{t('settings.subtitle')}</p>
             </div>
             
             {(statusMessage || errorMessage) && (
@@ -195,23 +195,23 @@ const SettingsPage: React.FC = () => {
             )}
 
             <Card>
-                <div className="p-6 divide-y divide-slate-200 dark:divide-slate-700">
-                    <div className="pb-6">
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t('settings.appearance.title')}</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{t('settings.appearance.description')}</p>
+                <div className="p-4 sm:p-6 divide-y divide-slate-200 dark:divide-slate-700">
+                    <div className="pb-4 sm:pb-6">
+                        <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">{t('settings.appearance.title')}</h2>
+                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">{t('settings.appearance.description')}</p>
                         
-                        <fieldset className="mt-4">
+                        <fieldset className="mt-3 sm:mt-4">
                             <legend className="sr-only">{t('settings.appearance.legend')}</legend>
-                            <div className="flex items-center gap-4">
-                                <button onClick={() => setThemeSetting('light')} className={`flex-1 p-4 rounded-lg border-2 transition-colors ${themeSetting === 'light' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-primary-400'}`}>
-                                    <SunIcon className="w-6 h-6 mx-auto mb-2 text-slate-600 dark:text-slate-300" />
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
+                                <button onClick={() => setThemeSetting('light')} className={`flex-1 p-3 sm:p-4 rounded-lg border-2 transition-colors text-sm sm:text-base ${themeSetting === 'light' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-primary-400'}`}>
+                                    <SunIcon className="w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-2 text-slate-600 dark:text-slate-300" />
                                     <span className="font-medium text-slate-700 dark:text-slate-200">{t('settings.appearance.light')}</span>
                                 </button>
-                                <button onClick={() => setThemeSetting('dark')} className={`flex-1 p-4 rounded-lg border-2 transition-colors ${themeSetting === 'dark' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-primary-400'}`}>
-                                    <MoonIcon className="w-6 h-6 mx-auto mb-2 text-slate-600 dark:text-slate-300" />
+                                <button onClick={() => setThemeSetting('dark')} className={`flex-1 p-3 sm:p-4 rounded-lg border-2 transition-colors text-sm sm:text-base ${themeSetting === 'dark' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-primary-400'}`}>
+                                    <MoonIcon className="w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-2 text-slate-600 dark:text-slate-300" />
                                     <span className="font-medium text-slate-700 dark:text-slate-200">{t('settings.appearance.dark')}</span>
                                 </button>
-                                <button onClick={() => setThemeSetting('system')} className={`flex-1 p-4 rounded-lg border-2 transition-colors ${themeSetting === 'system' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-primary-400'}`}>
+                                <button onClick={() => setThemeSetting('system')} className={`flex-1 p-3 sm:p-4 rounded-lg border-2 transition-colors text-sm sm:text-base ${themeSetting === 'system' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-primary-400'}`}>
                                     <div className="w-6 h-6 mx-auto mb-2 text-slate-600 dark:text-slate-300 flex items-center">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z" /></svg>
                                     </div>

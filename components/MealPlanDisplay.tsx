@@ -74,12 +74,14 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = memo(({ plan, observatio
   return (
     <>
       <Card>
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('meal_plan.title')}</h2>
+        <div className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 sm:gap-4">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{t('meal_plan.title')}</h2>
             <Button
               onClick={handleExportPDF}
               variant="secondary"
+              className="w-full sm:w-auto text-sm sm:text-base"
+              size="sm"
             >
               <DownloadIcon className="w-4 h-4 mr-2" />
               {t('meal_plan.export_pdf')}
@@ -89,13 +91,13 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = memo(({ plan, observatio
           <div ref={planRef} className="p-2">
               <div className="space-y-6">
               {plan.map((meal) => (
-                  <div key={meal.refeicao} className="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <h3 className="font-semibold text-lg text-primary-700 dark:text-primary-400">{meal.refeicao}</h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">{meal.horario_sugerido}</p>
+                  <div key={meal.refeicao} className="p-3 sm:p-4 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
+                        <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-base sm:text-lg text-primary-700 dark:text-primary-400">{meal.refeicao}</h3>
+                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{meal.horario_sugerido}</p>
                         </div>
-                        <Button size="sm" variant="secondary" onClick={() => handleExplainMeal(meal)}>
+                        <Button size="sm" variant="secondary" onClick={() => handleExplainMeal(meal)} className="w-full sm:w-auto text-xs sm:text-sm">
                             {t('meal_plan.why_this_meal')}
                         </Button>
                     </div>

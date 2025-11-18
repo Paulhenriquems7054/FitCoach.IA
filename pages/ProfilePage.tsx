@@ -40,14 +40,14 @@ const ProfilePage: React.FC = () => {
     };
 
     return (
-        <div className="max-w-2xl mx-auto">
-            <div className="text-center mb-8">
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Meu Perfil</h1>
-                <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">Veja e atualize seus dados para manter a IA calibrada.</p>
+        <div className="max-w-2xl mx-auto px-2 sm:px-4">
+            <div className="text-center mb-6 sm:mb-8">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Meu Perfil</h1>
+                <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">Veja e atualize seus dados para manter a IA calibrada.</p>
             </div>
 
             <Card>
-                <div className="p-6 space-y-6">
+                <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                     {/* Seção de Foto de Perfil */}
                     <div className="flex flex-col items-center pb-6 border-b border-slate-200 dark:border-slate-700">
                         <PhotoUploader

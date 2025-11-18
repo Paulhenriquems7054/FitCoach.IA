@@ -110,15 +110,15 @@ const AnalyzerPage: React.FC = () => {
     };
     
     return (
-        <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8">
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Analisador de Prato com IA</h1>
-                <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">Envie uma foto da sua refeição e deixe a Nutri.IA analisá-la para você.</p>
+        <div className="max-w-4xl mx-auto px-2 sm:px-4">
+            <div className="text-center mb-6 sm:mb-8">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Analisador de Prato com IA</h1>
+                <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">Envie uma foto da sua refeição e deixe a Nutri.IA analisá-la para você.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white text-center md:text-left">1. Envie sua Foto</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
+                <div className="space-y-3 sm:space-y-4">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white text-center md:text-left">1. Envie sua Foto</h2>
                     <Card>
                         <div className="p-6 space-y-4">
                             <ImageUploader onImageUpload={handleImageUpload} onImageRemove={handleImageRemove} />
@@ -135,46 +135,46 @@ const AnalyzerPage: React.FC = () => {
                         </div>
                     </Card>
                 </div>
-                <div className="space-y-4">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white text-center md:text-left">2. Veja a Análise</h2>
+                <div className="space-y-3 sm:space-y-4">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white text-center md:text-left">2. Veja a Análise</h2>
                     {isLoading ? (
                          <AnalysisSkeleton />
                     ) : error ? (
                         <Alert type="error" title="Erro na Análise">
-                            <p>{error}</p>
+                            <p className="text-sm sm:text-base">{error}</p>
                         </Alert>
                     ) : analysis ? (
                         <Card>
-                            <div className="p-6 space-y-6">
+                            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                                 <div>
-                                    <h3 className="font-semibold text-primary-700 dark:text-primary-400">Alimentos Identificados</h3>
-                                    <ul className="mt-2 list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
+                                    <h3 className="font-semibold text-sm sm:text-base text-primary-700 dark:text-primary-400">Alimentos Identificados</h3>
+                                    <ul className="mt-2 list-disc list-inside space-y-1 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
                                         {analysis.alimentos_identificados.map(item => (
                                             <li key={item.alimento}><strong>{item.alimento}:</strong> {item.quantidade_estimada}</li>
                                         ))}
                                     </ul>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-center">
-                                    <div className="p-3 bg-sky-100 dark:bg-sky-900/50 rounded-lg">
+                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4 text-center">
+                                    <div className="p-2 sm:p-3 bg-sky-100 dark:bg-sky-900/50 rounded-lg">
                                         <p className="text-xs text-sky-600 dark:text-sky-300">Calorias</p>
-                                        <p className="text-lg font-bold text-sky-800 dark:text-sky-200">{analysis.estimativa_nutricional.total_calorias}</p>
+                                        <p className="text-base sm:text-lg font-bold text-sky-800 dark:text-sky-200">{analysis.estimativa_nutricional.total_calorias}</p>
                                     </div>
-                                    <div className="p-3 bg-rose-100 dark:bg-rose-900/50 rounded-lg">
+                                    <div className="p-2 sm:p-3 bg-rose-100 dark:bg-rose-900/50 rounded-lg">
                                         <p className="text-xs text-rose-600 dark:text-rose-300">Proteínas</p>
-                                        <p className="text-lg font-bold text-rose-800 dark:text-rose-200">{analysis.estimativa_nutricional.total_proteinas_g}g</p>
+                                        <p className="text-base sm:text-lg font-bold text-rose-800 dark:text-rose-200">{analysis.estimativa_nutricional.total_proteinas_g}g</p>
                                     </div>
-                                    <div className="p-3 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
+                                    <div className="p-2 sm:p-3 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
                                         <p className="text-xs text-amber-600 dark:text-amber-300">Carbs</p>
-                                        <p className="text-lg font-bold text-amber-800 dark:text-amber-200">{analysis.estimativa_nutricional.total_carboidratos_g}g</p>
+                                        <p className="text-base sm:text-lg font-bold text-amber-800 dark:text-amber-200">{analysis.estimativa_nutricional.total_carboidratos_g}g</p>
                                     </div>
-                                    <div className="p-3 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">
+                                    <div className="p-2 sm:p-3 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">
                                         <p className="text-xs text-indigo-600 dark:text-indigo-300">Gorduras</p>
-                                        <p className="text-lg font-bold text-indigo-800 dark:text-indigo-200">{analysis.estimativa_nutricional.total_gorduras_g}g</p>
+                                        <p className="text-base sm:text-lg font-bold text-indigo-800 dark:text-indigo-200">{analysis.estimativa_nutricional.total_gorduras_g}g</p>
                                     </div>
                                 </div>
                                 <div>
-                                     <h3 className="font-semibold text-primary-700 dark:text-primary-400">Avaliação da Nutri.IA</h3>
-                                     <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{analysis.avaliacao_geral}</p>
+                                     <h3 className="font-semibold text-sm sm:text-base text-primary-700 dark:text-primary-400">Avaliação da Nutri.IA</h3>
+                                     <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{analysis.avaliacao_geral}</p>
                                 </div>
                             </div>
                         </Card>
