@@ -53,26 +53,25 @@ export default defineConfig(({ mode }) => {
             manualChunks: (id) => {
               // Separar node_modules em chunks menores e mais específicos
               if (id.includes('node_modules')) {
-                // React e React DOM juntos - SEMPRE primeiro e com todas as dependências relacionadas
+                // PRIORIDADE 1: React e React DOM - SEMPRE primeiro
                 if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
                   return 'react-vendor';
                 }
-                // Bibliotecas que dependem do React DEVEM estar no mesmo chunk do React
+                // PRIORIDADE 2: Bibliotecas que dependem do React DEVEM estar no mesmo chunk
+                // Incluir TODAS as dependências que podem usar React para evitar erros
                 if (id.includes('react-dropzone') || 
                     id.includes('@testing-library/react') ||
-                    id.includes('@heroicons/react')) {
+                    id.includes('@testing-library/jest-dom') ||
+                    id.includes('@heroicons/react') ||
+                    id.includes('recharts') ||
+                    id.includes('@jest/globals')) {
                   return 'react-vendor';
                 }
-                // Recharts também precisa do React, então vamos colocá-lo no react-vendor também
-                // para evitar problemas de carregamento
-                if (id.includes('recharts')) {
-                  return 'react-vendor';
-                }
-                // Google GenAI separado
+                // PRIORIDADE 3: Google GenAI separado
                 if (id.includes('@google/genai')) {
                   return 'google-genai';
                 }
-                // Bibliotecas PDF separadas individualmente para melhor code splitting
+                // PRIORIDADE 4: Bibliotecas PDF separadas individualmente
                 if (id.includes('html2pdf.js')) {
                   return 'pdf-html2pdf';
                 }
@@ -82,24 +81,27 @@ export default defineConfig(({ mode }) => {
                 if (id.includes('html2canvas')) {
                   return 'pdf-html2canvas';
                 }
-                // UI libraries que não dependem do React
+                // PRIORIDADE 5: UI libraries que não dependem do React
                 if (id.includes('clsx')) {
                   return 'ui-vendor';
                 }
-                // Outras dependências menores juntas (sem React)
-                return 'vendor-misc';
+                // PRIORIDADE 6: Por segurança, colocar qualquer outra dependência
+                // que possa ter sub-dependências do React também no react-vendor
+                // Isso evita o erro useState undefined
+                // Apenas colocar no vendor-misc se tiver 100% de certeza que não usa React
+                // Por enquanto, vamos ser conservadores e colocar tudo no react-vendor
+                // para garantir que não haja problemas de carregamento
+                return 'react-vendor';
               }
+              // Não separar código do próprio app em chunks manuais
+              return undefined;
             },
             // Garantir ordem de carregamento - React primeiro
             entryFileNames: 'assets/[name]-[hash].js',
-            chunkFileNames: (chunkInfo) => {
-              // Garantir que react-vendor seja carregado primeiro
-              if (chunkInfo.name === 'react-vendor') {
-                return 'assets/react-vendor-[hash].js';
-              }
-              return 'assets/[name]-[hash].js';
-            },
+            chunkFileNames: 'assets/[name]-[hash].js',
             assetFileNames: 'assets/[name]-[hash].[ext]',
+            // Garantir que react-vendor seja sempre carregado primeiro através de dependências
+            // O Vite automaticamente ordena os chunks baseado nas dependências
           },
         },
       },
