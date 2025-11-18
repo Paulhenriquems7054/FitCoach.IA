@@ -4,7 +4,7 @@ import { Logo } from '../components/Logo';
 
 const WelcomeSurveyPage: React.FC = () => {
   const handleSurveyCompleted = () => {
-    window.location.hash = '#/presentation';
+    window.location.hash = '#/';
   };
 
   return (

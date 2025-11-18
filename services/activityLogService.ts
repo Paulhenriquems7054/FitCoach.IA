@@ -11,14 +11,31 @@ const STORAGE_KEY = 'nutri_ia_activity_logs';
 const MAX_LOGS = 100; // Manter apenas os últimos 100 logs
 
 /**
- * Obtém o IP do usuário (aproximado via API pública)
+ * Obtém o IP do usuário (opcional - não bloqueia se falhar)
+ * Retorna 'N/A' se offline ou se a API falhar
  */
 const getUserIP = async (): Promise<string> => {
+  // Verificar se está online
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return 'N/A';
+  }
+  
   try {
-    const response = await fetch('https://api.ipify.org?format=json');
-    const data = await response.json();
-    return data.ip || 'N/A';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // Timeout de 2s
+    
+    const response = await fetch('https://api.ipify.org?format=json', {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data.ip || 'N/A';
+    }
+    return 'N/A';
   } catch {
+    // Silenciosamente retorna 'N/A' se falhar (app funciona sem IP)
     return 'N/A';
   }
 };

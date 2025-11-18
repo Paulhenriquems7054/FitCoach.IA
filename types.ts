@@ -22,6 +22,10 @@ export interface User {
   weightHistory: { date: string; weight: number }[];
   role: 'user' | 'professional';
   subscription: 'free' | 'premium';
+  // Multi-tenancy: campos para academias
+  gymId?: string; // ID da academia (se o usuário pertence a uma)
+  gymRole?: 'student' | 'admin' | 'trainer'; // Papel na academia
+  isGymManaged?: boolean; // Se o usuário foi criado/gerenciado por uma academia
   usageLimits?: {
     reportsGeneratedThisWeek?: number;
     photosAnalyzedToday?: number;
@@ -39,6 +43,55 @@ export interface User {
     biometricEnabled: boolean;
     securityNotifications: boolean;
     lastPasswordChange?: string;
+  };
+}
+
+/**
+ * Interface para configuração de academia (multi-tenancy)
+ */
+export interface Gym {
+  id: string; // ID único da academia
+  name: string; // Nome da academia
+  logo?: string; // Logo em base64 ou URL
+  primaryColor?: string; // Cor primária (hex)
+  secondaryColor?: string; // Cor secundária (hex)
+  accentColor?: string; // Cor de destaque (hex)
+  appName?: string; // Nome personalizado do app (ex: "Academia XYZ - Nutri.IA")
+  contactEmail?: string; // Email de contato
+  contactPhone?: string; // Telefone de contato
+  website?: string; // Website
+  qrCode?: string; // QR code para distribuição (base64 ou URL)
+  createdAt: string; // Data de criação
+  updatedAt: string; // Data de última atualização
+  isActive: boolean; // Se a academia está ativa
+  maxStudents?: number; // Limite de alunos (opcional)
+  currentStudents?: number; // Número atual de alunos
+  features?: {
+    customBranding: boolean; // Se permite branding personalizado
+    customColors: boolean; // Se permite cores personalizadas
+    customLogo: boolean; // Se permite logo personalizado
+    analytics: boolean; // Se tem acesso a analytics
+    studentManagement: boolean; // Se pode gerenciar alunos
+  };
+}
+
+/**
+ * Configuração de white-labeling para uma academia
+ */
+export interface GymBranding {
+  gymId: string;
+  appName: string; // Nome do app personalizado
+  logo?: string; // Logo em base64
+  colors: {
+    primary: string; // Cor primária (hex)
+    secondary: string; // Cor secundária (hex)
+    accent: string; // Cor de destaque (hex)
+    background?: string; // Cor de fundo
+    text?: string; // Cor do texto
+  };
+  fonts?: {
+    primary?: string; // Fonte primária
+    secondary?: string; // Fonte secundária
   };
 }
 

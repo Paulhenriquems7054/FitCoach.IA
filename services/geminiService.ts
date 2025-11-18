@@ -128,24 +128,8 @@ const buildMealPlanPrompt = (user: User, language: 'pt' | 'en' | 'es'): string =
 };
 
 export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' = 'pt'): Promise<GeminiMealPlanResponse | null> => {
-    // Verificar se está online e se tem API key
-    const online = isOnline();
-    const apiKey = getApiKey();
-    const hasApiKey = !!apiKey;
-
-    // Se offline ou sem API key, usar fallback offline
-    if (!online || !hasApiKey) {
-        logger.info('Modo offline: usando fallback local para gerar plano alimentar', 'geminiService');
-        const offlinePlan = generateMealPlanOffline(user, language);
-        
-        if (typeof window !== 'undefined') {
-            sessionStorage.setItem('lastMealPlan', JSON.stringify(offlinePlan));
-        }
-        
-        return offlinePlan;
-    }
-
-    // Tentar usar IA Local primeiro, depois API online
+    // SEMPRE priorizar modo offline/local para app 100% offline
+    // Tentar IA Local primeiro (Ollama)
     const prompt = buildMealPlanPrompt(user, language);
     const systemPrompt = `Você é um nutricionista especializado. Retorne APENAS JSON válido seguindo o schema fornecido.`;
 
@@ -154,7 +138,15 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
         prompt,
         systemPrompt,
         async () => {
-            // Fallback para API externa
+            // Fallback para API externa APENAS se configurada e online
+            const online = isOnline();
+            const apiKey = getApiKey();
+            const hasApiKey = !!apiKey;
+            
+            if (!online || !hasApiKey) {
+                return null; // Não tentar API se offline ou sem key
+            }
+            
             try {
                 const ai = getGeminiClient();
                 const response = await ai.models.generateContent({
@@ -184,43 +176,15 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
         return localResponse;
     }
 
-    // Se IAController retornou null, tentar API diretamente (compatibilidade)
-    try {
-        const ai = getGeminiClient();
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-              responseMimeType: "application/json",
-              responseSchema: mealPlanSchema,
-              temperature: 0.7,
-            },
-        });
-        
-        const jsonText = response.text.trim();
-        const parsedJson = JSON.parse(jsonText);
-
-        if (typeof window !== 'undefined') {
-            sessionStorage.setItem('lastMealPlan', JSON.stringify(parsedJson));
-        }
-
-        return parsedJson as GeminiMealPlanResponse;
-    } catch (error: unknown) {
-        // Silenciar erros de API key inválida
-        const errorObj = error as { error?: { code?: number; message?: string } };
-        const isApiKeyError = errorObj?.error?.code === 400 && errorObj?.error?.message?.includes('API key');
-        if (!isApiKeyError) {
-            logger.error("Erro ao chamar API do Gemini", 'geminiService', error);
-        }
-        // Fallback para offline em caso de erro
-        const offlinePlan = generateMealPlanOffline(user, language);
-        
-        if (typeof window !== 'undefined') {
-            sessionStorage.setItem('lastMealPlan', JSON.stringify(offlinePlan));
-        }
-        
-        return offlinePlan;
+    // Se IA Local não disponível, usar fallback offline (sempre funciona)
+    logger.info('Usando modo offline: gerando plano alimentar local', 'geminiService');
+    const offlinePlan = generateMealPlanOffline(user, language);
+    
+    if (typeof window !== 'undefined') {
+        sessionStorage.setItem('lastMealPlan', JSON.stringify(offlinePlan));
     }
+    
+    return offlinePlan;
 };
 
 // --- CHAT ---
@@ -295,55 +259,14 @@ const mealAnalysisSchema = {
 };
 
 export const analyzeMealPhoto = async (base64Image: string, mimeType: string): Promise<MealAnalysisResponse> => {
-    // Verificar se está online e se tem API key
-    const online = isOnline();
-    const apiKey = getApiKey();
-    const hasApiKey = !!apiKey;
-
-    // Se offline ou sem API key, usar fallback offline
-    if (!online || !hasApiKey) {
-        logger.info('Modo offline: usando análise básica local', 'geminiService');
-        return await analyzeMealPhotoOffline(base64Image, mimeType);
-    }
-
-    // Tentar usar API online
-    const prompt = "Analise a imagem desta refeição. Identifique cada alimento e estime a quantidade. Forneça uma estimativa nutricional completa (calorias, proteínas, carboidratos, gorduras). Dê uma avaliação geral sobre quão saudável é a refeição, sugerindo melhorias se necessário. Retorne os dados estritamente no formato JSON, seguindo o schema fornecido.";
-
-    const imagePart = {
-        inlineData: {
-            data: base64Image,
-            mimeType: mimeType,
-        },
-    };
-
-    const textPart = {
-        text: prompt,
-    };
-
-    try {
-        const ai = getGeminiClient();
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: { parts: [imagePart, textPart] },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: mealAnalysisSchema,
-                temperature: 0.3,
-            },
-        });
-
-        const jsonText = response.text.trim();
-        return JSON.parse(jsonText) as MealAnalysisResponse;
-    } catch (error: unknown) {
-        // Silenciar erros de API key inválida
-        const errorObj = error as { error?: { code?: number; message?: string } };
-        const isApiKeyError = errorObj?.error?.code === 400 && errorObj?.error?.message?.includes('API key');
-        if (!isApiKeyError) {
-            logger.error("Erro ao chamar API do Gemini para análise de refeição", 'geminiService', error);
-        }
-        // Fallback para offline em caso de erro
-        return await analyzeMealPhotoOffline(base64Image, mimeType);
-    }
+    // SEMPRE priorizar modo offline para app 100% offline
+    // Análise de imagem requer IA com visão, então usamos fallback offline
+    logger.info('Usando modo offline: análise básica local de refeição', 'geminiService');
+    return await analyzeMealPhotoOffline(base64Image, mimeType);
+    
+    // Nota: Análise de imagem com IA requer modelo de visão (Gemini Vision ou Ollama com modelo de visão)
+    // Para app 100% offline, usamos análise baseada em padrões e cache
+    // Se precisar de análise avançada, pode ser adicionada via Ollama com modelo de visão local
 };
 
 // --- RECIPE SEARCH ---
@@ -384,58 +307,12 @@ const recipeSearchSchema = {
 
 
 export const searchRecipes = async (query: string, user: User): Promise<Recipe[]> => {
-    // Verificar se está online e se tem API key
-    const online = isOnline();
-    const apiKey = getApiKey();
-    const hasApiKey = !!apiKey;
-
-    // Se offline ou sem API key, usar fallback offline
-    if (!online || !hasApiKey) {
-        logger.info('Modo offline: usando receitas em cache', 'geminiService');
-        return await searchRecipesOffline(query, user);
-    }
-
-    // Tentar usar API online
-    const prompt = `
-        Você é um chef e nutricionista. Um usuário está buscando por receitas.
-        Busca do usuário: "${query}"
-
-        Considere o perfil do usuário para adaptar as receitas:
-        - Objetivo: ${user.objetivo}
-        - Idade: ${user.idade}
-        - Gênero: ${user.genero}
-
-        Crie 2 receitas que atendam à busca e sejam adequadas ao perfil do usuário.
-        Para cada receita, forneça: nome, uma breve descrição, tempo de preparo em minutos, lista de ingredientes com quantidades, instruções passo a passo, e uma estimativa da informação nutricional (calorias, proteínas, carboidratos, gorduras).
-        Use ingredientes comuns no Brasil.
-        Retorne os dados estritamente no formato JSON, seguindo o schema fornecido.
-    `;
-
-    try {
-        const ai = getGeminiClient();
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: recipeSearchSchema,
-                temperature: 0.8,
-            },
-        });
-        
-        const jsonText = response.text.trim();
-        const parsedJson = JSON.parse(jsonText);
-        return parsedJson.receitas as Recipe[];
-    } catch (error: unknown) {
-        // Silenciar erros de API key inválida
-        const errorObj = error as { error?: { code?: number; message?: string } };
-        const isApiKeyError = errorObj?.error?.code === 400 && errorObj?.error?.message?.includes('API key');
-        if (!isApiKeyError) {
-            logger.error("Erro ao chamar API do Gemini para busca de receitas", 'geminiService', error);
-        }
-        // Fallback para offline em caso de erro
-        return await searchRecipesOffline(query, user);
-    }
+    // SEMPRE priorizar modo offline para app 100% offline
+    logger.info('Usando modo offline: buscando receitas em cache', 'geminiService');
+    return await searchRecipesOffline(query, user);
+    
+    // Nota: Para receitas personalizadas com IA, pode usar Ollama local se disponível
+    // Por enquanto, usamos receitas pré-definidas em cache
 };
 
 // --- CONTENT MODERATION ---
@@ -490,78 +367,12 @@ export const moderateContent = async (content: string): Promise<ModerationResult
 // --- WEEKLY REPORT ---
 
 export const generateWeeklyReport = async (user: User, language: 'pt' | 'en' | 'es' = 'pt'): Promise<string> => {
-    // Verificar se está online e se tem API key
-    const online = isOnline();
-    const apiKey = getApiKey();
-    const hasApiKey = !!apiKey;
-
-    // Se offline ou sem API key, usar fallback offline
-    if (!online || !hasApiKey) {
-        logger.info('Modo offline: usando fallback local para gerar relatório semanal', 'geminiService');
-        return generateWeeklyReportOffline(user, language);
-    }
-
-    const langPrompts = {
-      pt: {
-        title: "Relatório de Progresso Semanal",
-        analysis: "Análise de Progresso",
-        strengths: "Pontos Fortes",
-        improvements: "Pontos a Melhorar",
-        tip: "Dica da Semana",
-        motivation: "Mensagem Motivacional"
-      },
-      en: {
-        title: "Weekly Progress Report",
-        analysis: "Progress Analysis",
-        strengths: "Strengths",
-        improvements: "Areas for Improvement",
-        tip: "Tip of the Week",
-        motivation: "Motivational Message"
-      },
-      es: {
-        title: "Informe de Progreso Semanal",
-        analysis: "Análisis de Progreso",
-        strengths: "Puntos Fuertes",
-        improvements: "Áreas de Mejora",
-        tip: "Consejo de la Semana",
-        motivation: "Mensaje de Motivación"
-      }
-    };
-    const t = langPrompts[language];
-
-    const prompt = `
-      Você é o Nutri.IA, um especialista em nutrição e bem-estar.
-      Com base nos dados do usuário abaixo, gere um relatório de progresso semanal simulado e forneça recomendações personalizadas no idioma ${language}.
-
-      Dados do Usuário:
-      - Nome: ${user.nome}
-      - Objetivo: ${user.objetivo}
-
-      O relatório deve ter o seguinte formato de texto, usando markdown simples para títulos (ex: **Título**):
-      1.  **${t.analysis}:** Uma análise motivacional sobre como a semana pode ter sido em direção ao objetivo de ${user.objetivo}.
-      2.  **${t.strengths}:** Destaque 2 ou 3 hábitos positivos que o usuário deve manter.
-      3.  **${t.improvements}:** Sugira 2 ou 3 áreas para focar na próxima semana.
-      4.  **${t.tip}:** Uma dica prática e acionável sobre nutrição, hidratação ou exercício.
-      5.  **${t.motivation}:** Uma frase curta para inspirar o usuário a continuar.
-
-      Seja positivo, encorajador e profissional. Use uma linguagem clara e acessível.
-    `;
-
-    try {
-        const ai = getGeminiClient();
-        const response = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
-        return response.text.trim();
-    } catch (error: unknown) {
-        // Silenciar erros de API key inválida
-        const errorObj = error as { error?: { code?: number; message?: string } };
-        const isApiKeyError = errorObj?.error?.code === 400 && errorObj?.error?.message?.includes('API key');
-        if (!isApiKeyError) {
-            logger.error("Erro ao chamar API do Gemini para relatório semanal", 'geminiService', error);
-        }
-        // Fallback para offline em caso de erro
-        logger.info('Erro na API, usando fallback offline para relatório semanal', 'geminiService');
-        return generateWeeklyReportOffline(user, language);
-    }
+    // SEMPRE priorizar modo offline para app 100% offline
+    logger.info('Usando modo offline: gerando relatório semanal local', 'geminiService');
+    return generateWeeklyReportOffline(user, language);
+    
+    // Nota: Para relatórios mais personalizados, pode usar Ollama local se disponível
+    // Por enquanto, usamos geração baseada em templates e dados do usuário
 };
 
 
@@ -660,122 +471,12 @@ const wellnessPlanSchema = {
  * @returns Plano de bem-estar completo com treinos, suplementos e dicas
  */
 export const generateWellnessPlan = async (user: User): Promise<WellnessPlan> => {
-    // Verificar se está online e se tem API key
-    const online = isOnline();
-    const apiKey = getApiKey();
-    const hasApiKey = !!apiKey;
-
-    // Se offline ou sem API key, usar fallback offline
-    if (!online || !hasApiKey) {
-        logger.info('Modo offline: usando plano de bem-estar offline', 'geminiService');
-        return generateWellnessPlanOffline(user);
-    }
-
-    // Calcular IMC para ajustar intensidade
-    const alturaMetros = user.altura / 100;
-    const imc = user.peso / (alturaMetros * alturaMetros);
-    const imcStatus = imc < 18.5 ? 'abaixo do peso' : imc < 25 ? 'peso normal' : imc < 30 ? 'sobrepeso' : 'obesidade';
-
-    // Determinar nível de condicionamento baseado em histórico e disciplina
-    const nivelCondicionamento = user.disciplineScore >= 80 ? 'avançado' : 
-                                 user.disciplineScore >= 60 ? 'intermediário' : 'iniciante';
-
-    // Analisar tendência de peso
-    const weightHistory = user.weightHistory || [];
-    const tendenciaPeso = weightHistory.length >= 2 
-        ? (weightHistory[weightHistory.length - 1].weight > weightHistory[0].weight ? 'aumentando' : 'diminuindo')
-        : 'estável';
-
-    const prompt = `
-        Você é um personal trainer e nutricionista especializado em criar planos de bem-estar personalizados.
-        
-        DADOS DO USUÁRIO:
-        - Nome: ${user.nome}
-        - Idade: ${user.idade} anos
-        - Gênero: ${user.genero}
-        - Peso: ${user.peso} kg
-        - Altura: ${user.altura} cm
-        - IMC: ${imc.toFixed(1)} (${imcStatus})
-        - Objetivo principal: ${user.objetivo}
-        - Nível de condicionamento estimado: ${nivelCondicionamento} (baseado em disciplina: ${user.disciplineScore}/100)
-        - Tendência de peso: ${tendenciaPeso}
-        ${weightHistory.length > 0 ? `- Histórico recente: ${JSON.stringify(weightHistory.slice(-3))}` : ''}
-
-        CRIE UM PLANO DE BEM-ESTAR HOLÍSTICO PERSONALIZADO:
-
-        1. PLANO DE TREINO SEMANAL (5-7 dias):
-           - Adapte a intensidade baseado no IMC (${imcStatus}) e nível (${nivelCondicionamento})
-           - Para cada dia, forneça:
-             * Dia da semana
-             * Foco do treino (ex: "Corpo Inteiro", "Pernas", "Cardio", "Descanso Ativo")
-             * Lista de exercícios com detalhes (nome, séries, repetições, descanso, dicas)
-             * Duração estimada
-             * Intensidade (baixa/moderada/alta)
-             * Observações específicas
-           - Inclua 1-2 dias de descanso
-           - Ajuste cargas e reps conforme o objetivo "${user.objetivo}"
-           - Se ${user.objetivo.includes('perder') ? 'perder peso' : user.objetivo.includes('ganhar') ? 'ganhar massa' : 'manter peso'}, adapte o treino adequadamente
-
-        2. RECOMENDAÇÕES DE SUPLEMENTOS (2-4 suplementos):
-           - Escolha suplementos relevantes para o objetivo "${user.objetivo}"
-           - Para cada suplemento:
-             * Nome
-             * Dosagem sugerida (específica)
-             * Melhor horário para tomar (baseado na rotina)
-             * Justificativa clara e personalizada
-             * Lista de 2-3 benefícios principais
-             * Contraindicações se houver (especialmente para idade ${user.idade})
-           - Exemplos: Whey Protein, Creatina, Vitamina D, Ômega-3, Multivitamínico, etc.
-
-        3. DICAS ADICIONAIS:
-           - 2-3 dicas sobre recuperação, sono ou bem-estar geral
-           - Seja específico e acionável
-
-        4. DICAS INTELIGENTES PERSONALIZADAS:
-           - Hidratação: Sugestão baseada no peso (${user.peso}kg) e objetivo
-           - Horário de treino: Recomendação baseada na idade (${user.idade} anos) e objetivo
-           - Descanso: Ajustes caso falhe treinos ou precise recuperar
-           - Sono: Recomendações para otimizar recuperação
-           - Nutrição: Dica nutricional relacionada ao treino e objetivo
-
-        IMPORTANTE:
-        - Seja específico e detalhado nos exercícios (séries, reps, descanso)
-        - Adapte tudo ao perfil do usuário
-        - Use linguagem motivacional mas profissional
-        - Retorne estritamente no formato JSON seguindo o schema fornecido
-        
-        ${getAvailableExercisesPrompt()}
-    `;
-
-    try {
-        const ai = getGeminiClient();
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: { 
-                responseMimeType: "application/json", 
-                responseSchema: wellnessPlanSchema,
-                temperature: 0.8 // Mais criatividade para variações
-            }
-        });
-        
-        const plan = JSON.parse(response.text) as WellnessPlan;
-        
-        // Adicionar metadados
-        plan.data_geracao = new Date().toISOString();
-        plan.versao = 2; // Versão expandida
-        
-        return plan;
-    } catch (error: unknown) {
-        // Silenciar erros de API key inválida
-        const errorObj = error as { error?: { code?: number; message?: string } };
-        const isApiKeyError = errorObj?.error?.code === 400 && errorObj?.error?.message?.includes('API key');
-        if (!isApiKeyError) {
-            logger.error("Erro ao gerar plano de bem-estar", 'geminiService', error);
-        }
-        // Fallback para offline em caso de erro
-        return generateWellnessPlanOffline(user);
-    }
+    // SEMPRE priorizar modo offline para app 100% offline
+    logger.info('Usando modo offline: gerando plano de bem-estar local', 'geminiService');
+    return generateWellnessPlanOffline(user);
+    
+    // Nota: Para planos mais personalizados, pode usar Ollama local se disponível
+    // Por enquanto, usamos geração baseada em templates e dados do usuário
 };
 
 // --- AI COACH TIP ---

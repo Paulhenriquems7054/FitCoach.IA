@@ -196,60 +196,74 @@ export async function sendAssistantMessage(
   personalityKey: string = DEFAULT_PERSONALITY_KEY,
 ): Promise<void> {
   // Verificar se está offline
-  const online = isOnline();
-  const hasApiKey = !!API_KEY;
-
-  if (!online || !hasApiKey) {
-    // Usar chat offline
-    logger.info('Modo offline: usando chat offline', 'assistantService');
-    const user = getUserFromStorage();
-    if (user) {
-      const response = getOfflineChatResponse(message, user);
-      // Simular streaming para manter consistência com a UI
-      const words = response.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 30)); // Pequeno delay para simular streaming
-        onNewChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
-      }
-      return;
-    } else {
-      onError('Dados do usuário não encontrados. Por favor, recarregue a página.');
-      return;
-    }
+  // SEMPRE priorizar modo offline para app 100% offline
+  // Tentar IA Local primeiro (Ollama), depois chat offline
+  logger.info('Usando modo offline: chat local', 'assistantService');
+  
+  const user = getUserFromStorage();
+  if (!user) {
+    onError('Dados do usuário não encontrados. Por favor, recarregue a página.');
+    return;
   }
 
-  // Tentar usar API online
+  // Tentar IA Local primeiro (via Ollama se disponível)
   try {
-    await initializeAssistantSession(useProModelForThinking, personalityKey);
+    const { generateResponse } = await import('./iaController');
+    const localResponse = await generateResponse(
+      message,
+      `Você é a Nutri.IA, uma coach nutricional especializada. Responda de forma amigável e educativa sobre nutrição, dietas e saúde.`,
+      async () => {
+        // Fallback para API externa APENAS se configurada e online
+        const online = isOnline();
+        const hasApiKey = !!API_KEY;
+        
+        if (!online || !hasApiKey) {
+          return null;
+        }
+        
+        try {
+          await initializeAssistantSession(useProModelForThinking, personalityKey);
+          if (!chatSession) {
+            return null;
+          }
+          const responseStream = await chatSession.sendMessageStream({ message });
+          let fullResponse = '';
+          for await (const chunk of responseStream) {
+            if (chunk.text) {
+              fullResponse += chunk.text;
+              onNewChunk(chunk.text);
+            }
+          }
+          return fullResponse;
+        } catch (error) {
+          logger.warn('Falha na API externa', 'assistantService', error);
+          return null;
+        }
+      }
+    );
 
-    if (!chatSession) {
-      onError('Sessão indisponível.');
+    if (localResponse) {
+      // Se já foi enviado via streaming na API, não precisa enviar novamente
+      if (!API_KEY || !isOnline()) {
+        // Se foi resposta local, simular streaming
+        const words = localResponse.split(' ');
+        for (let i = 0; i < words.length; i++) {
+          await new Promise(resolve => setTimeout(resolve, 30));
+          onNewChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
+        }
+      }
       return;
     }
+  } catch (error) {
+    logger.warn('Falha ao usar IA Local, usando chat offline', 'assistantService', error);
+  }
 
-    const responseStream = await chatSession.sendMessageStream({ message });
-    for await (const chunk of responseStream) {
-      if (chunk.text) {
-        onNewChunk(chunk.text);
-      }
-    }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    logger.error('Erro ao enviar mensagem para assistente', 'assistantService', error);
-    logger.info('Falha na API online, usando chat offline', 'assistantService');
-    
-    // Fallback para chat offline em caso de erro
-    const user = getUserFromStorage();
-    if (user) {
-      const response = getOfflineChatResponse(message, user);
-      const words = response.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 30));
-        onNewChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
-      }
-    } else {
-      onError(errorMessage || 'Erro desconhecido ao conversar com a IA');
-    }
+  // Fallback para chat offline (sempre funciona)
+  const response = getOfflineChatResponse(message, user);
+  const words = response.split(' ');
+  for (let i = 0; i < words.length; i++) {
+    await new Promise(resolve => setTimeout(resolve, 30));
+    onNewChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
   }
 }
 

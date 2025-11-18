@@ -5,6 +5,7 @@ import { useRouter } from './hooks/useRouter';
 import { Skeleton } from './components/ui/Skeleton';
 import { Card } from './components/ui/Card';
 import { ToastProvider } from './components/ui/Toast';
+import { GymBrandingProvider } from './components/GymBrandingProvider';
 
 // Lazy load das páginas para reduzir o bundle inicial
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -21,8 +22,8 @@ const SmartMealPage = lazy(() => import('./pages/SmartMealPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const ProfessionalDashboardPage = lazy(() => import('./pages/ProfessionalDashboardPage'));
 const PresentationPage = lazy(() => import('./pages/PresentationPage'));
-const LoginPage = lazy(() => import('./pages/LoginPage'));
 const WelcomeSurveyPage = lazy(() => import('./pages/WelcomeSurveyPage'));
+const GymAdminPage = lazy(() => import('./pages/GymAdminPage'));
 
 // Componente de loading
 const PageLoader = () => (
@@ -55,6 +56,7 @@ const App: React.FC = () => {
             case '/smart-meal': return <SmartMealPage />;
             case '/privacy': return <PrivacyPage />;
             case '/professional': return <ProfessionalDashboardPage />;
+            case '/gym-admin': return <GymAdminPage />;
             case '/':
             default:
                 return <HomePage />;
@@ -77,24 +79,16 @@ const App: React.FC = () => {
         );
     }
 
-    if (path === '/login') {
-        return (
-            <ToastProvider>
-                <Suspense fallback={<PageLoader />}>
-                    <LoginPage />
-                </Suspense>
-            </ToastProvider>
-        );
-    }
-
     return (
-        <ToastProvider>
-            <Layout>
-                <Suspense fallback={<PageLoader />}>
-                    {renderPage()}
-                </Suspense>
-            </Layout>
-        </ToastProvider>
+        <GymBrandingProvider>
+            <ToastProvider>
+                <Layout>
+                    <Suspense fallback={<PageLoader />}>
+                        {renderPage()}
+                    </Suspense>
+                </Layout>
+            </ToastProvider>
+        </GymBrandingProvider>
     );
 };
 

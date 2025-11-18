@@ -99,7 +99,7 @@ const PresentationPage: React.FC = () => {
           <div className={`space-y-8 transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <div>
               <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-400/10 px-6 py-2 text-sm md:text-base tracking-wide text-emerald-200 mb-6 backdrop-blur-sm">
-                🍎 Nutrição + Inteligência Artificial 🤖
+                🍎 Nutrição + Treinos + Inteligência Artificial 🤖
               </span>
             </div>
             
@@ -115,15 +115,6 @@ const PresentationPage: React.FC = () => {
               Transforme hábitos alimentares com planos personalizados, análise de refeições, 
               relatórios inteligentes e desafios gamificados. Tudo em um único ambiente, guiado por IA.
             </p>
-            
-            <div className="flex flex-wrap items-center justify-center gap-4 pt-6">
-              <button
-                onClick={() => (window.location.hash = '/login')}
-                className="rounded-xl border-2 border-slate-200/40 bg-slate-900/40 backdrop-blur-sm px-8 py-4 text-lg font-semibold text-slate-100 transition-all hover:bg-slate-200/10 hover:border-slate-200/60 hover:scale-105"
-              >
-                Fazer login
-              </button>
-            </div>
           </div>
         </div>
 
@@ -180,10 +171,10 @@ const PresentationPage: React.FC = () => {
                 e um assistente disponível 24/7 para responder dúvidas sobre alimentação, suplementação e bem-estar.
               </p>
               <button
-                onClick={() => (window.location.hash = '/login')}
+                onClick={() => (window.location.hash = '/welcome-survey')}
                 className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-8 py-4 text-lg font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 hover:scale-105 shadow-lg shadow-emerald-500/50"
               >
-                Comece sua jornada agora
+                Comece sua Jornada Agora
               </button>
             </div>
           </div>

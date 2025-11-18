@@ -59,7 +59,7 @@ export const useAutoLogout = (timeoutMinutes: number = 30) => {
       subscription: 'free',
     });
     
-    window.location.hash = '#/login';
+    window.location.hash = '#/presentation';
   };
 
   useEffect(() => {
