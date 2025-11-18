@@ -46,17 +46,42 @@ export default defineConfig(({ mode }) => {
         }
       },
       build: {
-        chunkSizeWarningLimit: 1000,
+        chunkSizeWarningLimit: 1500, // Aumentar limite para evitar avisos desnecessários
         minify: 'esbuild', // Usar esbuild que já vem com Vite (mais rápido que terser)
         rollupOptions: {
           output: {
-            manualChunks: {
-              // Separar bibliotecas grandes em chunks próprios
-              'react-vendor': ['react', 'react-dom'],
-              'google-genai': ['@google/genai'],
-              'pdf-vendor': ['html2pdf.js', 'jspdf', 'html2canvas'],
-              'chart-vendor': ['recharts'],
-              'ui-vendor': ['@heroicons/react', 'clsx'],
+            manualChunks: (id) => {
+              // Separar node_modules em chunks menores e mais específicos
+              if (id.includes('node_modules')) {
+                // React e React DOM juntos (pequenos)
+                if (id.includes('react') || id.includes('react-dom')) {
+                  return 'react-vendor';
+                }
+                // Google GenAI separado
+                if (id.includes('@google/genai')) {
+                  return 'google-genai';
+                }
+                // Bibliotecas PDF separadas individualmente para melhor code splitting
+                if (id.includes('html2pdf.js')) {
+                  return 'pdf-html2pdf';
+                }
+                if (id.includes('jspdf')) {
+                  return 'pdf-jspdf';
+                }
+                if (id.includes('html2canvas')) {
+                  return 'pdf-html2canvas';
+                }
+                // Charts separado
+                if (id.includes('recharts')) {
+                  return 'chart-vendor';
+                }
+                // UI libraries
+                if (id.includes('@heroicons/react') || id.includes('clsx')) {
+                  return 'ui-vendor';
+                }
+                // Outras dependências menores juntas
+                return 'vendor-misc';
+              }
             },
             // Otimizar nomes de chunks
             chunkFileNames: 'assets/[name]-[hash].js',
