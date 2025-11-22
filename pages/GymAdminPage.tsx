@@ -218,7 +218,7 @@ const GymAdminPage: React.FC = () => {
                     value={formData.appName}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="Ex: Academia XYZ - Nutri.IA"
+                    placeholder="Ex: Academia XYZ - FitCoach.IA"
                     required
                   />
                 </div>

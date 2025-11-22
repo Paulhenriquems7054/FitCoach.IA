@@ -6,6 +6,8 @@ import { Skeleton } from './components/ui/Skeleton';
 import { Card } from './components/ui/Card';
 import { ToastProvider } from './components/ui/Toast';
 import { GymBrandingProvider } from './components/GymBrandingProvider';
+import { useUser } from './context/UserContext';
+import { usePermissions } from './hooks/usePermissions';
 
 // Lazy load das páginas para reduzir o bundle inicial
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -23,7 +25,10 @@ const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const ProfessionalDashboardPage = lazy(() => import('./pages/ProfessionalDashboardPage'));
 const PresentationPage = lazy(() => import('./pages/PresentationPage'));
 const WelcomeSurveyPage = lazy(() => import('./pages/WelcomeSurveyPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
 const GymAdminPage = lazy(() => import('./pages/GymAdminPage'));
+const StudentManagementPage = lazy(() => import('./pages/StudentManagementPage'));
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 
 // Componente de loading
 const PageLoader = () => (
@@ -41,6 +46,23 @@ const PageLoader = () => (
 
 const App: React.FC = () => {
     const { path } = useRouter();
+    const { user } = useUser();
+    const permissions = usePermissions();
+
+    // Verificar se é aluno tentando acessar rotas administrativas
+    const isStudent = user.gymRole === 'student';
+    const adminRoutes = ['/gym-admin', '/student-management', '/professional'];
+    const isAccessingAdminRoute = adminRoutes.includes(path);
+
+    // Se aluno tentar acessar rota administrativa, redirecionar para home
+    if (isStudent && isAccessingAdminRoute) {
+        window.location.hash = '#/';
+        return null;
+    }
+
+    // Verificar se é admin
+    const isDefaultAdmin = user.username === 'Administrador' || user.username === 'Desenvolvedor';
+    const isAdmin = user.gymRole === 'admin' || isDefaultAdmin;
 
     const renderPage = () => {
         switch (path) {
@@ -57,8 +79,14 @@ const App: React.FC = () => {
             case '/privacy': return <PrivacyPage />;
             case '/professional': return <ProfessionalDashboardPage />;
             case '/gym-admin': return <GymAdminPage />;
+            case '/student-management': return <StudentManagementPage />;
+            case '/admin-dashboard': return <AdminDashboardPage />;
             case '/':
             default:
+                // Se for admin, mostrar dashboard administrativo; caso contrário, mostrar home do aluno
+                if (isAdmin) {
+                    return <AdminDashboardPage />;
+                }
                 return <HomePage />;
         }
     };
@@ -68,6 +96,16 @@ const App: React.FC = () => {
             <Suspense fallback={<PageLoader />}>
                 <PresentationPage />
             </Suspense>
+        );
+    }
+
+    if (path === '/login') {
+        return (
+            <ToastProvider>
+                <Suspense fallback={<PageLoader />}>
+                    <LoginPage />
+                </Suspense>
+            </ToastProvider>
         );
     }
 

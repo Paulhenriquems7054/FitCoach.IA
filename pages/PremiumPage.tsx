@@ -44,7 +44,7 @@ const PremiumPage: React.FC = () => {
                     <StarIcon className="w-8 h-8 sm:w-12 sm:h-12 text-white" />
                 </div>
                 <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-slate-900 dark:text-white mt-4 bg-gradient-to-r from-primary-600 to-amber-500 bg-clip-text text-transparent px-2">
-                    Nutri.IA Premium
+                    FitCoach.IA Premium
                 </h1>
                 <p className="mt-4 text-base sm:text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto px-2">
                     Desbloqueie todo o potencial da IA para atingir seus objetivos mais rápido.
@@ -62,7 +62,7 @@ const PremiumPage: React.FC = () => {
                                 Você já é Premium! 🎉
                             </h2>
                             <p className="text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 mb-4 sm:mb-6 max-w-md mx-auto px-2">
-                                Obrigado por apoiar o Nutri.IA. Aproveite todos os recursos exclusivos e acelere sua jornada nutricional.
+                                Obrigado por apoiar o FitCoach.IA. Aproveite todos os recursos exclusivos e acelere sua jornada de treinos.
                             </p>
                             <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 sm:gap-4 mt-6 sm:mt-8">
                                 <a

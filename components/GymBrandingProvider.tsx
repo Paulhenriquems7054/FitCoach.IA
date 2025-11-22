@@ -24,7 +24,7 @@ export const useGymBrandingContext = () => {
   const context = useContext(GymBrandingContext);
   if (!context) {
     return {
-      appName: 'Nutri.IA',
+      appName: 'FitCoach.IA',
       logo: null,
       colors: {
         primary: '#10b981',

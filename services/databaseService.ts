@@ -19,7 +19,7 @@ import { Goal } from '../types';
 import { logger } from '../utils/logger';
 
 const DB_NAME = 'NutriIA_DB';
-const DB_VERSION = 2; // Incrementado para adicionar índice de username
+const DB_VERSION = 3; // Incrementado para adicionar índices de gymId e gymRole
 
 // Interfaces para os objetos do banco
 interface DBUser extends User {
@@ -115,8 +115,9 @@ export async function initDatabase(): Promise<IDBDatabase> {
             const db = (event.target as IDBOpenDBRequest).result;
 
             // Object Store: Users
+            let userStore: IDBObjectStore;
             if (!db.objectStoreNames.contains('users')) {
-                const userStore = db.createObjectStore('users', { keyPath: 'id', autoIncrement: true });
+                userStore = db.createObjectStore('users', { keyPath: 'id', autoIncrement: true });
                 userStore.createIndex('nome', 'nome', { unique: false });
                 // Tentar criar índice de username (pode falhar se já existir em upgrade)
                 try {
@@ -124,6 +125,33 @@ export async function initDatabase(): Promise<IDBDatabase> {
                 } catch (e) {
                     // Índice pode já existir, ignorar
                     logger.debug('Índice username já existe', 'databaseService');
+                }
+            } else {
+                // Em upgrade, precisamos usar a transação existente
+                const transaction = (event.target as IDBOpenDBRequest).transaction;
+                if (transaction) {
+                    userStore = transaction.objectStore('users');
+                } else {
+                    // Fallback: criar nova transação (pode não funcionar em todos os casos)
+                    userStore = db.transaction(['users'], 'readwrite').objectStore('users');
+                }
+            }
+            
+            // Adicionar novos índices em upgrade (se não existirem)
+            if (userStore) {
+                try {
+                    if (!userStore.indexNames.contains('gymId')) {
+                        userStore.createIndex('gymId', 'gymId', { unique: false });
+                    }
+                } catch (e) {
+                    logger.debug('Índice gymId pode já existir ou erro ao criar', 'databaseService');
+                }
+                try {
+                    if (!userStore.indexNames.contains('gymRole')) {
+                        userStore.createIndex('gymRole', 'gymRole', { unique: false });
+                    }
+                } catch (e) {
+                    logger.debug('Índice gymRole pode já existir ou erro ao criar', 'databaseService');
                 }
             }
 
@@ -413,6 +441,64 @@ export async function getUser(): Promise<User | null> {
 }
 
 /**
+ * Inicializa os usuários padrão (Administrador e Desenvolvedor) se não existirem
+ */
+export async function initializeDefaultUsers(): Promise<void> {
+    try {
+        const defaultGymId = 'default-gym';
+        
+        // Verificar se Administrador existe
+        const adminExists = await usernameExists('Administrador');
+        if (!adminExists) {
+            await registerUser('Administrador', 'admin123', {
+                nome: 'Administrador',
+                role: 'professional',
+                subscription: 'premium',
+                gymRole: 'admin',
+                gymId: defaultGymId,
+            });
+            logger.info('Usuário Administrador criado', 'databaseService');
+        } else {
+            // Atualizar Administrador existente para garantir que tem gymId e gymRole
+            const admin = await getUserByUsername('Administrador');
+            if (admin && (!admin.gymId || !admin.gymRole)) {
+                await saveUser({
+                    ...admin,
+                    gymId: admin.gymId || defaultGymId,
+                    gymRole: admin.gymRole || 'admin',
+                });
+            }
+        }
+
+        // Verificar se Desenvolvedor existe
+        const devExists = await usernameExists('Desenvolvedor');
+        if (!devExists) {
+            await registerUser('Desenvolvedor', 'dev123', {
+                nome: 'Desenvolvedor',
+                role: 'professional',
+                subscription: 'premium',
+                gymRole: 'admin',
+                gymId: defaultGymId,
+            });
+            logger.info('Usuário Desenvolvedor criado', 'databaseService');
+        } else {
+            // Atualizar Desenvolvedor existente para garantir que tem gymId e gymRole
+            const dev = await getUserByUsername('Desenvolvedor');
+            if (dev && (!dev.gymId || !dev.gymRole)) {
+                await saveUser({
+                    ...dev,
+                    gymId: dev.gymId || defaultGymId,
+                    gymRole: dev.gymRole || 'admin',
+                });
+            }
+        }
+    } catch (error) {
+        logger.error('Erro ao inicializar usuários padrão', 'databaseService', error);
+        // Não lançar erro para não bloquear a inicialização do app
+    }
+}
+
+/**
  * Função simples de hash para senha (SHA-256)
  */
 async function hashPassword(password: string): Promise<string> {
@@ -631,6 +717,85 @@ export async function deleteUser(username: string): Promise<boolean> {
             getAllRequest.onerror = () => reject(getAllRequest.error);
         }
     });
+}
+
+/**
+ * Busca todos os usuários de uma academia
+ */
+export async function getUsersByGymId(gymId: string): Promise<User[]> {
+    const db = await getDB();
+    
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['users'], 'readonly');
+        const store = transaction.objectStore('users');
+        
+        // Tentar usar índice se disponível
+        if (store.indexNames.contains('gymId')) {
+            const index = store.index('gymId');
+            const request = index.getAll(gymId);
+            request.onsuccess = () => {
+                const dbUsers = request.result as DBUser[];
+                const users = dbUsers.map(({ id, updatedAt, password: _, ...user }) => user as User);
+                resolve(users);
+            };
+            request.onerror = () => reject(request.error);
+        } else {
+            // Buscar em todos os usuários
+            const getAllRequest = store.getAll();
+            getAllRequest.onsuccess = () => {
+                const allUsers = getAllRequest.result as DBUser[];
+                const filteredUsers = allUsers.filter((u: DBUser) => u.gymId === gymId);
+                const users = filteredUsers.map(({ id, updatedAt, password: _, ...user }) => user as User);
+                resolve(users);
+            };
+            getAllRequest.onerror = () => reject(getAllRequest.error);
+        }
+    });
+}
+
+/**
+ * Busca usuários por gymRole em uma academia
+ */
+export async function getUsersByGymRole(gymId: string, gymRole: 'student' | 'admin' | 'trainer'): Promise<User[]> {
+    const db = await getDB();
+    
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['users'], 'readonly');
+        const store = transaction.objectStore('users');
+        
+        // Buscar todos os usuários da academia e filtrar por role
+        const getAllRequest = store.getAll();
+        getAllRequest.onsuccess = () => {
+            const allUsers = getAllRequest.result as DBUser[];
+            const filteredUsers = allUsers.filter(
+                (u: DBUser) => u.gymId === gymId && u.gymRole === gymRole
+            );
+            const users = filteredUsers.map(({ id, updatedAt, password: _, ...user }) => user as User);
+            resolve(users);
+        };
+        getAllRequest.onerror = () => reject(getAllRequest.error);
+    });
+}
+
+/**
+ * Busca todos os alunos (students) de uma academia
+ */
+export async function getStudentsByGymId(gymId: string): Promise<User[]> {
+    return getUsersByGymRole(gymId, 'student');
+}
+
+/**
+ * Busca todos os treinadores (trainers) de uma academia
+ */
+export async function getTrainersByGymId(gymId: string): Promise<User[]> {
+    return getUsersByGymRole(gymId, 'trainer');
+}
+
+/**
+ * Busca um usuário por ID (username)
+ */
+export async function getUserById(username: string): Promise<User | null> {
+    return getUserByUsername(username);
 }
 
 /**

@@ -1,5 +1,5 @@
 {
-  "name": "Nutri.IA: Agente Nutricional Inteligente",
+  "name": "FitCoach.IA: Agente de Treinamento Inteligente",
   "description": "Um assistente nutricional com inteligência artificial integrada, capaz de gerar planos alimentares personalizados, acompanhar progresso e interagir por chat.",
   "requestFramePermissions": [
     "camera",

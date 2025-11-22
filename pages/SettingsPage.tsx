@@ -19,6 +19,8 @@ import { resetAssistantSession } from '../services/assistantService';
 import { saveAppSetting, getAppSetting } from '../services/databaseService';
 import { setUseLocalAI, shouldUseLocalAI } from '../services/iaController';
 import { testLocalIA } from '../services/localAIService';
+import { configureGymServer, getGymServerUrlConfig, checkServerAvailability } from '../services/syncService';
+import { useToast } from '../components/ui/Toast';
 
 const SettingsPage: React.FC = () => {
     const { themeSetting, setThemeSetting } = useTheme();
@@ -32,6 +34,9 @@ const SettingsPage: React.FC = () => {
     const [useLocalAI, setUseLocalAIState] = useState<boolean>(true);
     const [localAITestResult, setLocalAITestResult] = useState<{ success: boolean; message: string } | null>(null);
     const [isTestingLocalAI, setIsTestingLocalAI] = useState<boolean>(false);
+    const [gymServerUrl, setGymServerUrlState] = useState<string>('');
+    const [isCheckingServer, setIsCheckingServer] = useState<boolean>(false);
+    const { showSuccess, showError } = useToast();
 
     // Carregar configurações do banco de dados
     useEffect(() => {
@@ -41,6 +46,7 @@ const SettingsPage: React.FC = () => {
                 const savedPaidKey = await getAppSetting<string>(PAID_API_KEY_STORAGE_KEY, '');
                 const savedFreeKey = await getAppSetting<string>(FREE_API_KEY_STORAGE_KEY, DEFAULT_FREE_API_KEY);
                 const savedProviderLink = await getAppSetting<string>(PROVIDER_LINK_STORAGE_KEY, DEFAULT_PROVIDER_LINK);
+                const savedGymServerUrl = getGymServerUrlConfig();
 
                 if (savedApiMode === 'paid' || savedApiMode === 'free') {
                     setApiModeState(savedApiMode);
@@ -48,6 +54,7 @@ const SettingsPage: React.FC = () => {
                 setPaidApiKeyState(savedPaidKey || '');
                 setFreeApiKeyState(savedFreeKey || DEFAULT_FREE_API_KEY);
                 setProviderLinkState(savedProviderLink || DEFAULT_PROVIDER_LINK);
+                setGymServerUrlState(savedGymServerUrl || '');
                 
                 // Carregar preferência de IA Local
                 const savedUseLocalAI = shouldUseLocalAI();
@@ -436,6 +443,63 @@ const SettingsPage: React.FC = () => {
                             )}
                         </div>
                     </div>
+
+                    {/* Configuração do Servidor da Academia */}
+                    {(user.gymRole === 'admin' || user.gymRole === 'trainer' || user.gymRole === 'student') && (
+                        <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                                Servidor da Academia
+                            </h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                Configure a URL do servidor da academia para sincronização de dados e bloqueio de acesso.
+                            </p>
+                            <div className="mt-4 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
+                                        URL do Servidor
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="url"
+                                            value={gymServerUrl}
+                                            onChange={(e) => setGymServerUrlState(e.target.value)}
+                                            placeholder="http://192.168.1.100:3001"
+                                            className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                        />
+                                        <Button
+                                            onClick={async () => {
+                                                if (!gymServerUrl.trim()) {
+                                                    showError('Por favor, informe a URL do servidor');
+                                                    return;
+                                                }
+                                                setIsCheckingServer(true);
+                                                try {
+                                                    configureGymServer(gymServerUrl.trim());
+                                                    const isAvailable = await checkServerAvailability();
+                                                    if (isAvailable) {
+                                                        showSuccess('Servidor configurado e disponível!');
+                                                    } else {
+                                                        showError('Servidor configurado, mas não está disponível. Verifique a URL e se o servidor está rodando.');
+                                                    }
+                                                } catch (error: any) {
+                                                    showError(error.message || 'Erro ao configurar servidor');
+                                                } finally {
+                                                    setIsCheckingServer(false);
+                                                }
+                                            }}
+                                            variant="secondary"
+                                            disabled={isCheckingServer || !gymServerUrl.trim()}
+                                        >
+                                            {isCheckingServer ? 'Verificando...' : 'Testar & Salvar'}
+                                        </Button>
+                                    </div>
+                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                        Exemplo: http://192.168.1.100:3001 ou http://localhost:3001
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                      <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t('settings.profile_type.title')}</h2>

@@ -4,13 +4,14 @@ import Dashboard from '../components/Dashboard';
 import { SparklesIcon } from '../components/icons/SparklesIcon';
 import { useUser } from '../context/UserContext';
 import { Card } from '../components/ui/Card';
-import { ChartBarIcon } from '../components/icons/ChartBarIcon';
+import { HeartIcon } from '../components/icons/HeartIcon';
 import { BookOpenIcon } from '../components/icons/BookOpenIcon';
 import { TrophyIcon } from '../components/icons/TrophyIcon';
 import { getAICoachTip } from '../services/geminiService';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { useI18n } from '../context/I18nContext';
+import { getAppSetting, saveAppSetting } from '../services/databaseService';
 
 const QuickActionCard: React.FC<{ href: string; title: string; description: string; icon: React.ElementType }> = ({ href, title, description, icon: Icon }) => (
     <a href={href} className="block group">
@@ -117,24 +118,24 @@ const HomePage: React.FC = () => {
         </div>
 
         <div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">{t('home.smart_navigation.title')}</h2>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">💪 Acesso Rápido</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                  <QuickActionCard 
-                    href="#/generator"
-                    title={t('home.smart_navigation.generator_title')}
-                    description={t('home.smart_navigation.generator_desc')}
-                    icon={SparklesIcon}
+                    href="#/wellness"
+                    title="Meu Plano de Treino"
+                    description="Visualize e gerencie seu plano de treino semanal personalizado"
+                    icon={HeartIcon}
                 />
                  <QuickActionCard 
                     href="#/biblioteca"
-                    title={t('home.smart_navigation.library_title')}
-                    description={t('home.smart_navigation.library_desc')}
+                    title="Biblioteca de Exercícios"
+                    description="Explore exercícios com GIFs animados e instruções detalhadas"
                     icon={BookOpenIcon}
                 />
                  <QuickActionCard 
                     href="#/desafios"
-                    title={t('home.smart_navigation.challenges_title')}
-                    description={t('home.smart_navigation.challenges_desc')}
+                    title="Desafios e Conquistas"
+                    description="Complete desafios e ganhe pontos para manter sua motivação"
                     icon={TrophyIcon}
                 />
             </div>

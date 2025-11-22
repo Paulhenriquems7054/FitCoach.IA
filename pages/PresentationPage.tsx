@@ -37,93 +37,54 @@ const features = [
 const PresentationPage: React.FC = () => {
   const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
 
+  // Caminho do vídeo - usando encodeURI para lidar com espaços e caracteres especiais
+  const videoPath = encodeURI("/icons/grok-video-d45d92f1-5d9b-4760-a5c1-40b9eebeb978 (2).mp4");
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-slate-100 overflow-x-hidden">
-      {/* Hero Section with Logo */}
-      <div className="relative min-h-screen flex items-center justify-center overflow-x-hidden overflow-y-auto">
-        {/* Animated Background */}
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 via-sky-500/20 to-blue-600/20 blur-3xl animate-pulse" />
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-2000" />
-        </div>
-
-        {/* Main Content */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 text-center">
-          {/* Logo Section - Centered and Prominent with Video */}
-          <div className={`mb-8 sm:mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-            <div className="relative inline-block">
-              {/* Glowing effect behind logo */}
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/30 via-sky-400/30 to-blue-500/30 rounded-full blur-3xl scale-150 animate-pulse" />
-              <div className="relative rounded-full overflow-hidden shadow-2xl border-4 border-emerald-400/20 animate-float w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 flex items-center justify-center bg-white">
-                <video
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-contain"
-                  style={{
-                    animation: 'float 6s ease-in-out infinite',
-                    maxWidth: '90%',
-                    maxHeight: '90%'
-                  }}
-                  onError={(e) => {
-                    // Fallback se o vídeo não carregar
-                    const target = e.target as HTMLVideoElement;
-                    if (target) {
-                      target.style.display = 'none';
-                      const fallback = target.nextElementSibling as HTMLElement;
-                      if (fallback) {
-                        fallback.style.display = 'flex';
-                      }
-                    }
-                  }}
-                >
-                  <source src="/icons/Vídeo-Nutri.mp4" type="video/mp4" />
-                </video>
-                {/* Fallback para navegadores que não suportam vídeo */}
-                <div 
-                  className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-blue-500 flex items-center justify-center text-white text-4xl font-bold rounded-full"
-                  style={{ display: 'none' }}
-                >
-                  Nutri.IA
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Text Content */}
-          <div className={`space-y-4 sm:space-y-6 md:space-y-8 transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-            <div>
-              <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-400/10 px-3 sm:px-4 md:px-6 py-1.5 sm:py-2 text-xs sm:text-sm md:text-base tracking-wide text-emerald-200 mb-4 sm:mb-6 backdrop-blur-sm text-center">
-                🍎 Nutrição + Treinos + Inteligência Artificial 🤖
-              </span>
-            </div>
-            
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-tight bg-gradient-to-r from-emerald-400 via-sky-400 to-blue-500 bg-clip-text text-transparent px-2">
-              Nutri.IA
-            </h1>
-            
-            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold text-slate-200 px-2">
-              Seu Coach Nutricional Inteligente
-            </h2>
-            
-            <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-slate-300 max-w-3xl mx-auto leading-relaxed px-2">
-              Transforme hábitos alimentares com planos personalizados, análise de refeições, 
-              relatórios inteligentes e desafios gamificados. Tudo em um único ambiente, guiado por IA.
-            </p>
-          </div>
-        </div>
-
-        {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-          <div className="w-6 h-10 border-2 border-slate-400/50 rounded-full flex justify-center">
-            <div className="w-1 h-3 bg-slate-400/50 rounded-full mt-2" />
+      {/* Hero Section with Video Background */}
+      <div className="relative min-h-screen flex flex-col justify-end overflow-hidden">
+        {/* Video Background */}
+        <div className="absolute inset-0 w-full h-full">
+          {!videoError && (
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                zIndex: 0
+              }}
+              onError={(e) => {
+                // Fallback se o vídeo não carregar
+                console.warn('Erro ao carregar vídeo de apresentação:', e);
+                setVideoError(true);
+                const target = e.target as HTMLVideoElement;
+                if (target) {
+                  target.style.display = 'none';
+                }
+              }}
+              onLoadedData={() => {
+                console.log('Vídeo de apresentação carregado com sucesso');
+              }}
+            >
+              <source src={videoPath} type="video/mp4" />
+            </video>
+          )}
+          {/* Overlay muito leve para clarear o vídeo */}
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/10 via-slate-950/20 to-slate-900/40 z-0" />
+          {/* Animated Background Effects */}
+          <div className="absolute inset-0 z-0">
+            <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 via-sky-500/20 to-blue-600/20 blur-3xl animate-pulse" />
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-2000" />
           </div>
         </div>
       </div>
@@ -132,11 +93,20 @@ const PresentationPage: React.FC = () => {
       <div className="relative py-12 sm:py-16 md:py-24 bg-gradient-to-b from-slate-950/50 to-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-8 sm:mb-12 md:mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 bg-gradient-to-r from-emerald-400 to-blue-500 bg-clip-text text-transparent">
-              Recursos Inteligentes
+            <div className="mb-4 sm:mb-6">
+              <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-400/10 px-3 sm:px-4 md:px-6 py-1.5 sm:py-2 text-xs sm:text-sm md:text-base tracking-wide text-emerald-200 backdrop-blur-sm">
+                Nutrição + Treinos + Inteligência Artificial 🤖
+              </span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-3 sm:mb-4 bg-gradient-to-r from-emerald-400 via-sky-400 to-blue-500 bg-clip-text text-transparent">
+              FitCoach.IA
             </h2>
-            <p className="text-base sm:text-lg md:text-xl text-slate-300 max-w-2xl mx-auto px-2">
-              Tudo que você precisa para uma jornada nutricional completa e personalizada
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold text-slate-200 mb-4 sm:mb-6">
+              Seu Coach de Treino Inteligente
+            </h3>
+            <p className="text-base sm:text-lg md:text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed px-2">
+              Transforme seus treinos com planos personalizados, análise de exercícios, 
+              relatórios inteligentes e desafios gamificados. Tudo em um único ambiente, guiado por IA.
             </p>
           </div>
 
@@ -169,13 +139,13 @@ const PresentationPage: React.FC = () => {
                 Construa uma rotina mais saudável
               </h2>
               <p className="text-base sm:text-lg md:text-xl text-slate-300 mb-6 sm:mb-8 leading-relaxed">
-                Nutri.IA acompanha a sua jornada diariamente. Planos flexíveis, recomendações personalizadas 
-                e um assistente disponível 24/7 para responder dúvidas sobre alimentação, suplementação e bem-estar.
+                FitCoach.IA acompanha a sua jornada diariamente. Planos flexíveis, recomendações personalizadas 
+                e um assistente disponível 24/7 para responder dúvidas sobre treinos, exercícios, suplementação e bem-estar.
               </p>
               <div id="presentation-cta-container">
                 <button
                   id="presentation-cta-button"
-                  onClick={() => (window.location.hash = '/welcome-survey')}
+                  onClick={() => (window.location.hash = '/login')}
                   style={{ 
                     padding: '0.875rem 2.5rem',
                     fontSize: '1.125rem',

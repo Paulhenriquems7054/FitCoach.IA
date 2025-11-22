@@ -55,8 +55,8 @@ const WellnessPlanSkeleton = () => (
 );
 
 /**
- * Página principal do Plano de Bem-Estar
- * Exibe plano de treinos, suplementos e dicas inteligentes geradas pela IA
+ * Página principal do Plano de Treino
+ * Exibe plano de treinos personalizado, suplementos e dicas inteligentes geradas pela IA
  */
 const WellnessPlanPage: React.FC = () => {
     const { user } = useUser();
@@ -89,7 +89,7 @@ const WellnessPlanPage: React.FC = () => {
     }, []);
 
     /**
-     * Gera um novo plano de bem-estar usando IA
+     * Gera um novo plano de treino usando IA
      */
     const handleGeneratePlan = async () => {
         setIsLoading(true);
@@ -106,8 +106,8 @@ const WellnessPlanPage: React.FC = () => {
             await clearCompletedWorkouts(); // Resetar progresso
             setCompletedWorkouts(new Set());
         } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro ao gerar o plano de bem-estar. Tente novamente.';
-            logger.error('Erro ao gerar plano de bem-estar', 'WellnessPlanPage', err);
+            const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro ao gerar o plano de treino. Tente novamente.';
+            logger.error('Erro ao gerar plano de treino', 'WellnessPlanPage', err);
             setError(errorMessage);
         } finally {
             setIsLoading(false);
@@ -210,16 +210,16 @@ const WellnessPlanPage: React.FC = () => {
     return (
         <div className="max-w-6xl mx-auto px-2 sm:px-4">
             <div className="text-center mb-6 sm:mb-8">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Plano de Bem-Estar</h1>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">💪 Meu Plano de Treino</h1>
                 <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">
-                    Receba recomendações personalizadas de treinos e suplementos geradas pela IA
+                    Plano de treino personalizado com exercícios, séries, repetições e dicas geradas pela IA
                 </p>
             </div>
 
             {isLoading ? (
                 <WellnessPlanSkeleton />
             ) : error ? (
-                <Alert type="error" title="Erro ao Gerar Plano">
+                <Alert type="error" title="Erro ao Gerar Plano de Treino">
                     <p>{error}</p>
                     <Button onClick={handleGeneratePlan} className="mt-4">
                         Tentar Novamente
@@ -233,44 +233,45 @@ const WellnessPlanPage: React.FC = () => {
                         onCancel={handleCancelEdit}
                     />
                 ) : (
-                <div className="space-y-8">
+                <div className="space-y-6 sm:space-y-8">
                     {/* Cabeçalho com progresso e ações */}
                     <Card>
-                        <div className="p-6">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                                <div className="flex-1">
-                                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                        <div className="p-4 sm:p-6">
+                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
+                                <div className="flex-1 min-w-0">
+                                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-2">
                                         Meu Plano Semanal
                                     </h2>
                                     {plan.data_geracao && (
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                                             Gerado em {new Date(plan.data_geracao).toLocaleDateString('pt-BR')}
                                         </p>
                                     )}
                                     {progress.total > 0 && (
                                         <div className="mt-3">
-                                            <div className="flex items-center justify-between text-sm mb-2">
+                                            <div className="flex items-center justify-between text-xs sm:text-sm mb-2">
                                                 <span className="text-slate-600 dark:text-slate-400">
                                                     Progresso da semana
                                                 </span>
-                                                <span className="font-semibold text-primary-600 dark:text-primary-400">
+                                                <span className="font-semibold text-primary-600 dark:text-primary-400 whitespace-nowrap ml-2">
                                                     {progress.completed}/{progress.total} treinos
                                                 </span>
                                             </div>
-                                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3">
+                                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 sm:h-3">
                                                 <div
-                                                    className="bg-primary-500 h-3 rounded-full transition-all duration-300"
+                                                    className="bg-primary-500 h-2 sm:h-3 rounded-full transition-all duration-300"
                                                     style={{ width: `${progress.percentage}%` }}
                                                 />
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex gap-3">
+                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full md:w-auto">
                                     <Button
                                         onClick={() => setIsEditing(true)}
                                         variant="secondary"
                                         size="sm"
+                                        className="w-full sm:w-auto text-xs sm:text-sm"
                                     >
                                         ✏️ Editar Plano
                                     </Button>
@@ -278,6 +279,7 @@ const WellnessPlanPage: React.FC = () => {
                                         onClick={handleGeneratePlan}
                                         variant="secondary"
                                         size="sm"
+                                        className="w-full sm:w-auto text-xs sm:text-sm"
                                     >
                                         <SparklesIcon className="w-4 h-4 mr-2" />
                                         Gerar Novo Plano
@@ -289,10 +291,10 @@ const WellnessPlanPage: React.FC = () => {
 
                     {/* Plano de Treino Semanal */}
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">
+                        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3 sm:mb-4">
                             📅 Plano de Treino Semanal
                         </h2>
-                        <div className="space-y-4">
+                        <div className="space-y-3 sm:space-y-4">
                             {plan.plano_treino_semanal.map((workoutDay, index) => (
                                 <WorkoutDayCard
                                     key={workoutDay.dia_semana}
@@ -318,10 +320,10 @@ const WellnessPlanPage: React.FC = () => {
 
                     {/* Recomendações de Suplementos */}
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">
+                        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3 sm:mb-4">
                             💊 Recomendações de Suplementos
                         </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                             {plan.recomendacoes_suplementos.map((supplement, index) => (
                                 <SupplementCard
                                     key={supplement.nome}
@@ -339,11 +341,11 @@ const WellnessPlanPage: React.FC = () => {
 
                     {/* Dicas Adicionais */}
                     <Card>
-                        <div className="p-6">
-                            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+                        <div className="p-4 sm:p-6">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-3 sm:mb-4">
                                 💡 Dicas Adicionais
                             </h2>
-                            <p className="text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed break-words">
                                 {plan.dicas_adicionais}
                             </p>
                         </div>
@@ -355,15 +357,15 @@ const WellnessPlanPage: React.FC = () => {
                         <div className="flex flex-col items-center justify-center h-96 p-6 text-center">
                             <HeartIcon className="w-16 h-16 text-primary-500" />
                             <h2 className="mt-4 text-2xl font-bold text-slate-800 dark:text-slate-100">
-                                Pronto para o próximo nível?
+                                Pronto para começar seus treinos?
                             </h2>
                             <p className="mt-2 mb-6 max-w-md text-slate-500 dark:text-slate-400">
-                                Clique abaixo para que a Nutri.IA crie um plano de treino e suplementação 
-                                personalizado baseado no seu perfil, objetivo e histórico.
+                                Clique abaixo para que a IA crie um plano de treino personalizado 
+                                baseado no seu perfil, objetivo e histórico de treinos.
                             </p>
                             <Button onClick={handleGeneratePlan} className="w-full max-w-xs" size="lg">
                                 <SparklesIcon className="-ml-1 mr-2 h-5 w-5" />
-                                Gerar Meu Plano com IA
+                                Gerar Meu Plano de Treino
                             </Button>
                         </div>
                     </Card>

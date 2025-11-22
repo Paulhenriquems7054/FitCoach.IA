@@ -8,7 +8,7 @@ interface LogoProps {
 }
 
 /**
- * Componente de Logo do Nutri.IA
+ * Componente de Logo do Academia.IA
  * Utiliza o vídeo como logo principal ou logo da academia se disponível
  */
 export const Logo: React.FC<LogoProps> = ({ 
@@ -74,7 +74,7 @@ export const Logo: React.FC<LogoProps> = ({
           <source src="/icons/Vídeo-Nutri.mp4" type="video/mp4" />
           {/* Fallback para navegadores que não suportam vídeo */}
           <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-blue-500 flex items-center justify-center text-white font-bold text-xs">
-            N.IA
+            A.IA
           </div>
         </video>
       </div>

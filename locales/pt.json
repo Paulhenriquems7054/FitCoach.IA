@@ -49,16 +49,16 @@
         "title": "Seu Plano Alimentar",
         "export_pdf": "Exportar PDF",
         "why_this_meal": "Por que esta refeição?",
-        "observations_title": "Observações da Nutri.IA",
+        "observations_title": "Observações do FitCoach.IA",
         "explanation": {
             "title": "Análise da IA para",
             "error": "Não foi possível obter a explicação da IA no momento."
         }
     },
     "chat": {
-        "title": "Chat com Nutri.IA",
-        "subtitle": "Tire suas dúvidas sobre nutrição",
-        "initial_greeting": "Olá, {{name}}! Eu sou o Nutri.IA, seu assistente nutricional. Sabendo que seu objetivo é {{objective}}, como posso te ajudar hoje?",
+        "title": "Chat com FitCoach.IA",
+        "subtitle": "Tire suas dúvidas sobre treinos e exercícios",
+        "initial_greeting": "Olá, {{name}}! Eu sou o FitCoach.IA, seu assistente de treino. Sabendo que seu objetivo é {{objective}}, como posso te ajudar hoje?",
         "placeholder": "Digite sua mensagem...",
         "send": "Enviar",
         "error": "Desculpe, ocorreu um erro ao me comunicar. Por favor, tente novamente.",
@@ -70,7 +70,7 @@
         "subtitle": "Receba análises semanais do seu progresso pela IA.",
         "initial": {
             "title": "Pronto para sua análise semanal?",
-            "description": "A Nutri.IA analisará seu progresso, destacando vitórias e sugerindo os próximos passos para atingir seu objetivo.",
+            "description": "O FitCoach.IA analisará seu progresso, destacando vitórias e sugerindo os próximos passos para atingir seu objetivo.",
             "button": "Gerar meu Relatório"
         },
         "error": {
@@ -104,7 +104,7 @@
             "description": "Receba lembretes e dicas proativas da IA.",
             "button": "Ativar Notificações",
             "grantedTitle": "Notificações Ativadas!",
-            "grantedBody": "Você agora receberá dicas e lembretes do Nutri.IA."
+            "grantedBody": "Você agora receberá dicas e lembretes do FitCoach.IA."
         },
         "profile_type": {
             "title": "Tipo de Perfil",

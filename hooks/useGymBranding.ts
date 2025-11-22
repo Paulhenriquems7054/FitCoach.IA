@@ -15,7 +15,7 @@ import type { Gym, GymBranding } from '../types';
 export const useGymBranding = () => {
   const [branding, setBranding] = useState<GymBranding | null>(null);
   const [gym, setGym] = useState<Gym | null>(null);
-  const [appName, setAppName] = useState<string>('Nutri.IA');
+  const [appName, setAppName] = useState<string>('FitCoach.IA');
   const [logo, setLogo] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 

@@ -44,6 +44,14 @@ export interface User {
     securityNotifications: boolean;
     lastPasswordChange?: string;
   };
+  // Controle de acesso para alunos
+  accessBlocked?: boolean; // Se o acesso do aluno está bloqueado
+  blockedAt?: string; // Data/hora do bloqueio
+  blockedBy?: string; // Username de quem bloqueou
+  blockedReason?: string; // Motivo do bloqueio
+  // Sincronização com servidor da academia
+  lastSyncAt?: string; // Última sincronização com servidor
+  gymServerUrl?: string; // URL do servidor da academia (opcional)
 }
 
 /**
@@ -56,7 +64,7 @@ export interface Gym {
   primaryColor?: string; // Cor primária (hex)
   secondaryColor?: string; // Cor secundária (hex)
   accentColor?: string; // Cor de destaque (hex)
-  appName?: string; // Nome personalizado do app (ex: "Academia XYZ - Nutri.IA")
+  appName?: string; // Nome personalizado do app (ex: "Academia XYZ - FitCoach.IA")
   contactEmail?: string; // Email de contato
   contactPhone?: string; // Telefone de contato
   website?: string; // Website

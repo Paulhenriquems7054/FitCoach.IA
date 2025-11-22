@@ -675,7 +675,7 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
 
         <div className="px-4 sm:px-6 pt-4 sm:pt-6 text-center flex-shrink-0">
           <h2 className="text-xl sm:text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
-            👋 Bem-vindo ao Nutri.IA
+            👋 Bem-vindo ao FitCoach.IA
           </h2>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Responda as perguntas para personalizarmos sua experiência!
@@ -801,7 +801,7 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
               Tudo pronto!
             </h3>
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
-              Com base nas suas respostas, o Nutri.IA vai montar recomendações personalizadas para você.
+              Com base nas suas respostas, o FitCoach.IA vai montar recomendações personalizadas para você.
             </p>
             <button
               type="button"

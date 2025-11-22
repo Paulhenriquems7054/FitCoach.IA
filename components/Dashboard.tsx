@@ -1,22 +1,19 @@
 
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import type { DailySummary } from '../types';
 import { Card } from './ui/Card';
 import { useUser } from '../context/UserContext';
-
-const mockWeeklyProgress = [
-  { name: 'Seg', calorias: 2200, meta: 2500 },
-  { name: 'Ter', calorias: 2450, meta: 2500 },
-  { name: 'Qua', calorias: 2550, meta: 2500 },
-  { name: 'Qui', calorias: 2300, meta: 2500 },
-  { name: 'Sex', calorias: 2600, meta: 2500 },
-  { name: 'Sáb', calorias: 2800, meta: 2500 },
-  { name: 'Dom', calorias: 2700, meta: 2500 },
-];
+import { getWellnessPlan, getCompletedWorkouts } from '../services/databaseService';
+import type { WellnessPlan } from '../types';
 
 interface DashboardProps {
-  summary: DailySummary | null;
+  summary?: null; // Mantido para compatibilidade, mas não usado mais
+}
+
+interface WeeklyWorkoutData {
+  name: string;
+  completos: number;
+  total: number;
 }
 
 const CircularProgress: React.FC<{ progress: number }> = ({ progress }) => {
@@ -64,49 +61,116 @@ const CircularProgress: React.FC<{ progress: number }> = ({ progress }) => {
 
 const Dashboard: React.FC<DashboardProps> = memo(({ summary }) => {
   const { user } = useUser();
+  const [workoutPlan, setWorkoutPlan] = useState<WellnessPlan | null>(null);
+  const [completedWorkouts, setCompletedWorkouts] = useState<Set<number>>(new Set());
+  const [weeklyData, setWeeklyData] = useState<WeeklyWorkoutData[]>([]);
+  const [workoutStats, setWorkoutStats] = useState({
+    totalTreinos: 0,
+    treinosCompletos: 0,
+    progressoPercentual: 0,
+    treinosEstaSemana: 0,
+  });
+
+  useEffect(() => {
+    const loadWorkoutData = async () => {
+      try {
+        const plan = await getWellnessPlan();
+        const completed = await getCompletedWorkouts();
+        
+        setWorkoutPlan(plan);
+        setCompletedWorkouts(completed);
+
+        if (plan) {
+          // Calcular estatísticas
+          const totalTreinos = plan.plano_treino_semanal.filter(day => 
+            !day.foco_treino.toLowerCase().includes('descanso')
+          ).length;
+          const treinosCompletos = completed.size;
+          const progressoPercentual = totalTreinos > 0 
+            ? Math.round((treinosCompletos / totalTreinos) * 100) 
+            : 0;
+
+          // Calcular treinos desta semana
+          const hoje = new Date();
+          const inicioSemana = new Date(hoje);
+          inicioSemana.setDate(hoje.getDate() - hoje.getDay());
+          
+          setWorkoutStats({
+            totalTreinos,
+            treinosCompletos,
+            progressoPercentual,
+            treinosEstaSemana: treinosCompletos,
+          });
+
+          // Preparar dados semanais para o gráfico
+          const diasSemana = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+          const weekly = plan.plano_treino_semanal.map((day, index) => {
+            const isRestDay = day.foco_treino.toLowerCase().includes('descanso');
+            return {
+              name: diasSemana[index] || day.dia_semana.substring(0, 3),
+              completos: completed.has(index) ? 1 : 0,
+              total: isRestDay ? 0 : 1,
+            };
+          });
+          setWeeklyData(weekly);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados de treino:', error);
+      }
+    };
+
+    loadWorkoutData();
+  }, []);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
       
-      {summary && (
-        <Card className="lg:col-span-3">
-          <div className="p-4 sm:p-6">
-            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">Resumo Diário</h3>
-            <div className="mt-3 sm:mt-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4 text-center">
-              <div className="p-3 sm:p-4 bg-sky-100 dark:bg-sky-900/50 rounded-lg">
-                <p className="text-xs sm:text-sm text-sky-600 dark:text-sky-300">Calorias</p>
-                <p className="text-xl sm:text-2xl font-bold text-sky-800 dark:text-sky-200">{summary.total_calorias}</p>
-              </div>
-              <div className="p-3 sm:p-4 bg-rose-100 dark:bg-rose-900/50 rounded-lg">
-                <p className="text-xs sm:text-sm text-rose-600 dark:text-rose-300">Proteínas</p>
-                <p className="text-xl sm:text-2xl font-bold text-rose-800 dark:text-rose-200">{summary.total_proteinas_g}g</p>
-              </div>
-              <div className="p-3 sm:p-4 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
-                <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-300">Carboidratos</p>
-                <p className="text-xl sm:text-2xl font-bold text-amber-800 dark:text-amber-200">{summary.total_carboidratos_g}g</p>
-              </div>
-              <div className="p-3 sm:p-4 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">
-                <p className="text-xs sm:text-sm text-indigo-600 dark:text-indigo-300">Gorduras</p>
-                <p className="text-xl sm:text-2xl font-bold text-indigo-800 dark:text-indigo-200">{summary.total_gorduras_g}g</p>
-              </div>
+      {/* Estatísticas de Treino */}
+      <Card className="lg:col-span-3">
+        <div className="p-4 sm:p-6">
+          <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-4">📊 Estatísticas de Treino</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4 text-center">
+            <div className="p-3 sm:p-4 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
+              <p className="text-xs sm:text-sm text-emerald-600 dark:text-emerald-300">Treinos Completos</p>
+              <p className="text-xl sm:text-2xl font-bold text-emerald-800 dark:text-emerald-200">
+                {workoutStats.treinosCompletos}/{workoutStats.totalTreinos}
+              </p>
+            </div>
+            <div className="p-3 sm:p-4 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+              <p className="text-xs sm:text-sm text-blue-600 dark:text-blue-300">Progresso Semanal</p>
+              <p className="text-xl sm:text-2xl font-bold text-blue-800 dark:text-blue-200">
+                {workoutStats.progressoPercentual}%
+              </p>
+            </div>
+            <div className="p-3 sm:p-4 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
+              <p className="text-xs sm:text-sm text-purple-600 dark:text-purple-300">Treinos Esta Semana</p>
+              <p className="text-xl sm:text-2xl font-bold text-purple-800 dark:text-purple-200">
+                {workoutStats.treinosEstaSemana}
+              </p>
+            </div>
+            <div className="p-3 sm:p-4 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
+              <p className="text-xs sm:text-sm text-orange-600 dark:text-orange-300">Pontos de Disciplina</p>
+              <p className="text-xl sm:text-2xl font-bold text-orange-800 dark:text-orange-200">
+                {user.points}
+              </p>
             </div>
           </div>
-        </Card>
-      )}
+        </div>
+      </Card>
       
       <Card>
         <div className="p-6 space-y-6 text-center">
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white">Seu Progresso</h3>
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white">💪 Seu Progresso</h3>
           <div className="space-y-6">
             <div className="space-y-3">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Pontuação de Disciplina</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Progresso Semanal</p>
               <div className="flex items-center justify-center">
-                <CircularProgress progress={user.disciplineScore} />
+                <CircularProgress progress={workoutStats.progressoPercentual} />
               </div>
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Pontos Acumulados</p>
-              <p className="text-4xl font-bold text-primary-600 dark:text-primary-400">{user.points}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Disciplina</p>
+              <p className="text-4xl font-bold text-primary-600 dark:text-primary-400">{user.disciplineScore}%</p>
             </div>
           </div>
         </div>
@@ -114,28 +178,37 @@ const Dashboard: React.FC<DashboardProps> = memo(({ summary }) => {
 
       <Card className="lg:col-span-2">
           <div className="p-6">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Progresso Semanal (Exemplo)</h3>
-            <div style={{ width: '100%', height: 300 }}>
-              <ResponsiveContainer>
-                <BarChart data={mockWeeklyProgress}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.2)" />
-                  <XAxis dataKey="name" stroke="rgb(100 116 139)" />
-                  <YAxis stroke="rgb(100 116 139)" />
-                  <Tooltip
-                    contentStyle={{ 
-                      backgroundColor: 'rgba(30, 41, 59, 0.9)', 
-                      borderColor: 'rgb(51 65 85)',
-                      color: '#fff',
-                      borderRadius: '0.5rem'
-                    }} 
-                    cursor={{fill: 'rgba(100, 116, 139, 0.1)'}}
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">📅 Progresso Semanal de Treinos</h3>
+            {weeklyData.length > 0 ? (
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer>
+                  <BarChart data={weeklyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.2)" />
+                    <XAxis dataKey="name" stroke="rgb(100 116 139)" />
+                    <YAxis stroke="rgb(100 116 139)" domain={[0, 1]} />
+                    <Tooltip
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)', 
+                        borderColor: 'rgb(51 65 85)',
+                        color: '#fff',
+                        borderRadius: '0.5rem'
+                      }} 
+                      cursor={{fill: 'rgba(100, 116, 139, 0.1)'}}
+                      formatter={(value: number) => value === 1 ? 'Completo ✓' : 'Pendente'}
                     />
-                  <Legend />
-                  <Bar dataKey="calorias" fill="rgb(34 197 94)" name="Consumido" />
-                  <Bar dataKey="meta" fill="rgb(71 85 105)" name="Meta"/>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+                    <Legend />
+                    <Bar dataKey="completos" fill="rgb(34 197 94)" name="Treinos Completos" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-slate-500 dark:text-slate-400">
+                <div className="text-center">
+                  <p className="text-lg mb-2">📋 Nenhum plano de treino ainda</p>
+                  <p className="text-sm">Gere um plano de treino para ver seu progresso aqui!</p>
+                </div>
+              </div>
+            )}
           </div>
       </Card>
     </div>

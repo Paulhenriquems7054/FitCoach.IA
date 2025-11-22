@@ -3,6 +3,7 @@ import React from 'react';
 import { useRouter } from '../../hooks/useRouter';
 import { useUser } from '../../context/UserContext';
 import { useI18n } from '../../context/I18nContext';
+import { usePermissions } from '../../hooks/usePermissions';
 import { HomeIcon } from '../icons/HomeIcon';
 import { ChartBarIcon } from '../icons/ChartBarIcon';
 import { XIcon } from '../icons/XIcon';
@@ -17,6 +18,7 @@ import { TrendingUpIcon } from '../icons/TrendingUpIcon';
 import { WandIcon } from '../icons/WandIcon';
 import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
 import { StarIcon } from '../icons/StarIcon';
+import { UsersIcon } from '../icons/UsersIcon';
 
 interface SidebarProps {
   open: boolean;
@@ -31,18 +33,48 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
   const { path } = useRouter();
   const { user } = useUser();
   const { t } = useI18n();
+  const permissions = usePermissions();
+
+  // Verificar se é aluno
+  const isStudent = user.gymRole === 'student';
+
+  // Áreas permitidas para alunos
+  const studentAllowedRoutes = [
+    '/',
+    '/wellness',
+    '/biblioteca',
+    '/desafios',
+    '/analysis',
+    '/reports',
+    '/generator',
+    '/smart-meal',
+    '/analyzer',
+    '/perfil',
+    '/privacy',
+    '/configuracoes'
+  ];
 
   const mainNavigation = [
     { name: t('sidebar.home'), href: '#/', icon: HomeIcon },
+    { name: 'Meu Plano de Treino', href: '#/wellness', icon: HeartIcon },
+    { name: 'Biblioteca de Exercícios', href: '#/biblioteca', icon: BookOpenIcon },
+    { name: t('sidebar.challenges'), href: '#/desafios', icon: TrophyIcon },
+    { name: t('sidebar.progressAnalysis'), href: '#/analysis', icon: TrendingUpIcon },
+    { name: t('sidebar.aiReports'), href: '#/reports', icon: ChartBarIcon },
     { name: t('sidebar.planGenerator'), href: '#/generator', icon: SparklesIcon },
     { name: t('sidebar.smartMeal'), href: '#/smart-meal', icon: WandIcon },
     { name: t('sidebar.plateAnalyzer'), href: '#/analyzer', icon: CameraIcon },
-    { name: t('sidebar.progressAnalysis'), href: '#/analysis', icon: TrendingUpIcon },
-    { name: t('sidebar.aiReports'), href: '#/reports', icon: ChartBarIcon },
-    { name: t('sidebar.wellnessPlan'), href: '#/wellness', icon: HeartIcon },
-    { name: t('sidebar.challenges'), href: '#/desafios', icon: TrophyIcon },
-    { name: t('sidebar.library'), href: '#/biblioteca', icon: BookOpenIcon },
-  ];
+    { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
+  ]
+    .filter(item => {
+      // Se é aluno, mostrar apenas rotas permitidas
+      if (isStudent) {
+        const route = item.href.replace('#', '');
+        return studentAllowedRoutes.includes(route);
+      }
+      // Para admin/trainer, mostrar todos exceto os que têm show: false
+      return item.show !== false;
+    });
 
   const userNavigation = [
       { name: t('sidebar.myProfile'), href: '#/perfil', icon: UserCircleIcon },
@@ -62,7 +94,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
       <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
         <div className="flex items-center flex-shrink-0 px-4">
           <h1 className="text-2xl font-bold">
-            <span className="text-primary-600">Nutri</span>
+            <span className="text-primary-600">FitCoach</span>
             <span className="text-slate-800 dark:text-slate-200">.IA</span>
           </h1>
         </div>

@@ -101,7 +101,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
     };
 
     /**
-     * Atualiza um dia de treino
+     * Atualiza um dia de treino (sem fechar o modo de edição)
      */
     const handleUpdateDay = (dayIndex: number, updates: Partial<WorkoutDay>) => {
         const newDays = [...editedPlan.plano_treino_semanal];
@@ -110,6 +110,13 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
             ...editedPlan,
             plano_treino_semanal: newDays,
         });
+        // Não fechar o modo de edição automaticamente - usuário deve clicar em "Salvar"
+    };
+
+    /**
+     * Salva as alterações de um dia e fecha o modo de edição
+     */
+    const handleSaveDay = (dayIndex: number) => {
         setEditingDayIndex(null);
     };
 
@@ -188,7 +195,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
     };
 
     /**
-     * Atualiza um exercício
+     * Atualiza um exercício (sem fechar o modo de edição)
      */
     const handleUpdateExercise = (dayIndex: number, exerciseIndex: number, updates: Partial<Exercise>) => {
         const newDays = [...editedPlan.plano_treino_semanal];
@@ -199,7 +206,21 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
             ...editedPlan,
             plano_treino_semanal: newDays,
         });
+        // Não fechar o modo de edição automaticamente - usuário deve clicar em "Salvar"
+    };
+
+    /**
+     * Salva as alterações de um exercício e fecha o modo de edição
+     */
+    const handleSaveExercise = (dayIndex: number, exerciseIndex: number) => {
+        const exercise = (editedPlan.plano_treino_semanal[dayIndex].exercicios as Exercise[])[exerciseIndex];
+        // Validar se o exercício tem GIF antes de salvar
+        if (exercise.name && !isExerciseAvailable(exercise.name)) {
+            alert('Por favor, selecione um exercício da lista que tenha GIF disponível.');
+            return;
+        }
         setEditingExerciseIndex(null);
+        setExerciseSearch('');
     };
 
     /**
@@ -229,10 +250,10 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
                         <div className="flex-1 min-w-0">
                             <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
-                                ✏️ Editar Plano de Bem-Estar
+                                ✏️ Editar Plano de Treino
                             </h2>
                             <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                                Adicione, edite ou remova dias de treino e exercícios
+                                Adicione, edite ou remova dias de treino e exercícios. Use apenas exercícios da biblioteca para garantir que tenham GIFs disponíveis.
                             </p>
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
@@ -336,14 +357,28 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                 placeholder="Observações sobre o treino..."
                                             />
                                         </div>
-                                        <Button
-                                            onClick={() => setEditingDayIndex(null)}
-                                            variant="secondary"
-                                            size="sm"
-                                            className="w-full sm:w-auto text-xs sm:text-sm"
-                                        >
-                                            ✓ Concluir Edição
-                                        </Button>
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <Button
+                                                onClick={() => handleSaveDay(dayIndex)}
+                                                variant="primary"
+                                                size="sm"
+                                                className="w-full sm:w-auto text-xs sm:text-sm"
+                                            >
+                                                💾 Salvar Alterações
+                                            </Button>
+                                            <Button
+                                                onClick={() => {
+                                                    // Reverter alterações não salvas
+                                                    setEditedPlan({ ...plan });
+                                                    setEditingDayIndex(null);
+                                                }}
+                                                variant="secondary"
+                                                size="sm"
+                                                className="w-full sm:w-auto text-xs sm:text-sm"
+                                            >
+                                                ❌ Cancelar
+                                            </Button>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-4 mb-4">
@@ -401,7 +436,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                     <div className="space-y-3">
                                                         <div>
                                                             <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                                                Nome do Exercício (apenas exercícios com GIF disponível)
+                                                                Nome do Exercício * (apenas exercícios com GIF disponível)
                                                             </label>
                                                             <div className="relative">
                                                                 <input
@@ -410,9 +445,12 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                                     onChange={(e) => {
                                                                         const newName = e.target.value;
                                                                         setExerciseSearch(newName);
-                                                                        handleUpdateExercise(dayIndex, exerciseIndex, { name: newName });
                                                                     }}
-                                                                    onFocus={() => setExerciseSearch(exercise.name)}
+                                                                    onFocus={() => {
+                                                                        if (!exerciseSearch) {
+                                                                            setExerciseSearch(exercise.name);
+                                                                        }
+                                                                    }}
                                                                     className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                                     placeholder="Digite para buscar exercício..."
                                                                 />
@@ -424,7 +462,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                                                 type="button"
                                                                                 onClick={() => {
                                                                                     handleUpdateExercise(dayIndex, exerciseIndex, { name: ex });
-                                                                                    setExerciseSearch(ex);
+                                                                                    setExerciseSearch('');
                                                                                 }}
                                                                                 className="w-full text-left px-3 sm:px-4 py-2 text-xs sm:text-sm hover:bg-primary-50 dark:hover:bg-primary-900/20 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 last:border-b-0"
                                                                             >
@@ -437,6 +475,11 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                             {exercise.name && !isExerciseAvailable(exercise.name) && (
                                                                 <p className="mt-1 text-xs text-red-600 dark:text-red-400">
                                                                     ⚠️ Este exercício não possui GIF disponível. Selecione um da lista.
+                                                                </p>
+                                                            )}
+                                                            {exercise.name && isExerciseAvailable(exercise.name) && (
+                                                                <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+                                                                    ✓ Exercício com GIF disponível
                                                                 </p>
                                                             )}
                                                         </div>
@@ -504,17 +547,29 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                                 placeholder="Dicas para executar o exercício..."
                                                             />
                                                         </div>
-                                                        <Button
-                                                            onClick={() => {
-                                                                setEditingExerciseIndex(null);
-                                                                setExerciseSearch('');
-                                                            }}
-                                                            variant="secondary"
-                                                            size="sm"
-                                                            className="w-full sm:w-auto text-xs sm:text-sm"
-                                                        >
-                                                            ✓ Concluir
-                                                        </Button>
+                                                        <div className="flex flex-col sm:flex-row gap-2">
+                                                            <Button
+                                                                onClick={() => handleSaveExercise(dayIndex, exerciseIndex)}
+                                                                variant="primary"
+                                                                size="sm"
+                                                                className="w-full sm:w-auto text-xs sm:text-sm"
+                                                            >
+                                                                💾 Salvar Exercício
+                                                            </Button>
+                                                            <Button
+                                                                onClick={() => {
+                                                                    // Reverter alterações não salvas
+                                                                    setEditedPlan({ ...plan });
+                                                                    setEditingExerciseIndex(null);
+                                                                    setExerciseSearch('');
+                                                                }}
+                                                                variant="secondary"
+                                                                size="sm"
+                                                                className="w-full sm:w-auto text-xs sm:text-sm"
+                                                            >
+                                                                ❌ Cancelar
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 ) : (
                                                     <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-4">

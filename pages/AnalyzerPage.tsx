@@ -113,7 +113,7 @@ const AnalyzerPage: React.FC = () => {
         <div className="max-w-4xl mx-auto px-2 sm:px-4">
             <div className="text-center mb-6 sm:mb-8">
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Analisador de Prato com IA</h1>
-                <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">Envie uma foto da sua refeição e deixe a Nutri.IA analisá-la para você.</p>
+                <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">Envie uma foto da sua refeição e deixe o FitCoach.IA analisá-la para você.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
@@ -173,7 +173,7 @@ const AnalyzerPage: React.FC = () => {
                                     </div>
                                 </div>
                                 <div>
-                                     <h3 className="font-semibold text-sm sm:text-base text-primary-700 dark:text-primary-400">Avaliação da Nutri.IA</h3>
+                                     <h3 className="font-semibold text-sm sm:text-base text-primary-700 dark:text-primary-400">Avaliação do FitCoach.IA</h3>
                                      <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{analysis.avaliacao_geral}</p>
                                 </div>
                             </div>

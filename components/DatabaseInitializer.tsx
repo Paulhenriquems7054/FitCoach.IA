@@ -39,7 +39,7 @@ export const DatabaseInitializer: React.FC<DatabaseInitializerProps> = ({ childr
                 <div className="max-w-md w-full space-y-4">
                     <div className="text-center">
                         <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                            Nutri.IA
+                            FitCoach.IA
                         </h2>
                         <p className="text-slate-600 dark:text-slate-400">
                             Inicializando banco de dados...

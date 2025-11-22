@@ -49,7 +49,7 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = memo(({ plan, observatio
         pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
         heightLeft -= pdf.internal.pageSize.getHeight();
       }
-      pdf.save('plano-alimentar-nutri-ia.pdf');
+      pdf.save('plano-alimentar-fitcoach-ia.pdf');
       showSuccess('PDF exportado com sucesso!');
     } catch (error) {
       showError('Erro ao exportar PDF. Tente novamente.');

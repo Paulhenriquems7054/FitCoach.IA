@@ -128,7 +128,7 @@ const AnalysisPage: React.FC = () => {
             </Card>
 
              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-center mb-4 sm:mb-6">Análise da Nutri.IA</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-center mb-4 sm:mb-6">Análise do FitCoach.IA</h2>
                 {isLoading ? (
                     <AnalysisSkeleton />
                 ) : error ? (

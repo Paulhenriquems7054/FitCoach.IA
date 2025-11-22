@@ -234,7 +234,7 @@ export const getAppName = (): string => {
     return gym.appName;
   }
   
-  return 'Nutri.IA'; // Nome padrão
+  return 'FitCoach.IA'; // Nome padrão
 };
 
 /**

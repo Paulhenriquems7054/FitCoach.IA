@@ -25,24 +25,24 @@ export const WellnessTipsCard: React.FC<WellnessTipsCardProps> = ({ tips }) => {
 
     return (
         <Card>
-            <div className="p-6">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                    <span className="text-2xl">🧠</span>
-                    Dicas Inteligentes Personalizadas
+            <div className="p-4 sm:p-6">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
+                    <span className="text-xl sm:text-2xl">🧠</span>
+                    <span className="break-words">Dicas Inteligentes Personalizadas</span>
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     {tipSections.map((section) => (
                         <div
                             key={section.key}
-                            className="p-4 bg-gradient-to-br from-primary-50 to-emerald-50 dark:from-primary-900/20 dark:to-emerald-900/20 rounded-lg border border-primary-200 dark:border-primary-800"
+                            className="p-3 sm:p-4 bg-gradient-to-br from-primary-50 to-emerald-50 dark:from-primary-900/20 dark:to-emerald-900/20 rounded-lg border border-primary-200 dark:border-primary-800"
                         >
                             <div className="flex items-center gap-2 mb-2">
-                                <span className="text-2xl">{section.icon}</span>
-                                <h3 className="font-semibold text-slate-800 dark:text-slate-200">
+                                <span className="text-xl sm:text-2xl flex-shrink-0">{section.icon}</span>
+                                <h3 className="font-semibold text-sm sm:text-base text-slate-800 dark:text-slate-200 break-words">
                                     {section.label}
                                 </h3>
                             </div>
-                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed break-words">
                                 {section.value}
                             </p>
                         </div>

@@ -72,6 +72,7 @@ function normalizeText(text: string): string {
 
 // Mapeamento de grupos musculares para pastas de GIFs
 const muscleGroupFolders: Record<string, string> = {
+  'abd': 'Abdômen (18)-20241202T155424Z-001/Abdômen (18)',
   'abdomen': 'Abdômen (18)-20241202T155424Z-001/Abdômen (18)',
   'abdominal': 'Abdômen (18)-20241202T155424Z-001/Abdômen (18)',
   'core': 'Abdômen (18)-20241202T155424Z-001/Abdômen (18)',
@@ -123,10 +124,14 @@ const muscleGroupFolders: Record<string, string> = {
   'deltoide': 'Ombro (73)-20241202T165511Z-001/Ombro (73)',
   
   'panturrilha': 'Panturrilha (20)-20241202T173337Z-001/Panturrilha (20)',
+  'panturrinha': 'Panturrilha (20)-20241202T173337Z-001/Panturrilha (20)',
   'gêmeos': 'Panturrilha (20)-20241202T173337Z-001/Panturrilha (20)',
   'gemeos': 'Panturrilha (20)-20241202T173337Z-001/Panturrilha (20)',
   'flexão plantar': 'Panturrilha (20)-20241202T173337Z-001/Panturrilha (20)',
   'flexao plantar': 'Panturrilha (20)-20241202T173337Z-001/Panturrilha (20)',
+  'elevação de panturrilha': 'Panturrilha (20)-20241202T173337Z-001/Panturrilha (20)',
+  'elevacao de panturrilha': 'Panturrilha (20)-20241202T173337Z-001/Panturrilha (20)',
+  'levantamento de panturrilha': 'Panturrilha (20)-20241202T173337Z-001/Panturrilha (20)',
   
   'peitoral': 'Peitoral (67)-20241202T175211Z-001/Peitoral (67)',
   'peito': 'Peitoral (67)-20241202T175211Z-001/Peitoral (67)',
@@ -180,7 +185,6 @@ const availableGifsByGroup: Record<string, string[]> = {
     'Prancha Lateral.gif',
     'Prancha Frontal Alta (1).gif',
     'Abdominal Oblíquo Deitada.gif',
-    'Abdominal Concentrado.gif',
     'Abdominal com Carga.gif',
     'Abd Concentrado Braços estendidos.gif',
   ],
@@ -352,14 +356,11 @@ const availableGifsByGroup: Record<string, string[]> = {
     'Afundo com landmine.gif',
     'Adução do Quadril com Cabo.gif',
     'Agachamento em plié com halteres.gif',
-    'Flexão Plantar no Smith.gif',
-    'Flexão Plantar Máquina.gif',
     'Cadeira Abdutora.gif',
     'Agachamento livre com barra.gif',
     'agachamento na maquina.gif',
     'agachamento no cross.gif',
     'levantamento tarra com halteres.gif',
-    'panturrinha no leg press.gif',
     'leg press pés afastados.gif',
     'passada a frente com halteres.gif',
     'passada a frente com barra.gif',
@@ -674,11 +675,38 @@ const availableGifsByGroup: Record<string, string[]> = {
 
 /**
  * Encontra o grupo muscular baseado no nome do exercício
+ * Verifica keywords mais específicas primeiro para evitar falsos positivos
  */
 function findMuscleGroup(exerciseName: string): string | null {
   const normalized = normalizeText(exerciseName);
   
+  // Keywords específicas que devem ser verificadas primeiro (mais longas e específicas)
+  const specificKeywords = [
+    'elevação de panturrilha',
+    'elevacao de panturrilha',
+    'levantamento de panturrilha',
+    'flexão plantar',
+    'flexao plantar',
+    'elevação pélvica',
+    'elevacao pelvica',
+    'barra fixa',
+    'levantamento terra',
+    'remada alta',
+    'puxada alta',
+  ];
+  
+  // Verificar keywords específicas primeiro
+  for (const keyword of specificKeywords) {
+    if (normalized.includes(keyword) && muscleGroupFolders[keyword]) {
+      return muscleGroupFolders[keyword];
+    }
+  }
+  
+  // Depois verificar todas as outras keywords
   for (const [keyword, folder] of Object.entries(muscleGroupFolders)) {
+    // Pular keywords já verificadas
+    if (specificKeywords.includes(keyword)) continue;
+    
     if (normalized.includes(keyword)) {
       return folder;
     }
@@ -739,20 +767,62 @@ export function getExerciseGif(exerciseName: string): string | null {
   // 1. Buscar por grupo muscular
   const muscleGroup = findMuscleGroup(exerciseName);
   if (muscleGroup) {
-    // 2. Tentar encontrar GIF similar por similaridade de nome
-    const similarGif = findSimilarGif(normalized, muscleGroup, 0.4);
-    if (similarGif) {
-      result = `/GIFS/${muscleGroup}/${similarGif}`;
-      // Armazenar no cache
-      gifCache.set(cacheKey, result);
-      return result;
-    }
-    
-    // 3. Se não encontrou similar, tentar retornar um GIF genérico do grupo
-    const genericGifs = availableGifsByGroup[muscleGroup];
-    if (genericGifs && genericGifs.length > 0) {
+    const availableGifs = availableGifsByGroup[muscleGroup];
+    if (availableGifs && availableGifs.length > 0) {
+      // 2. PRIMEIRO: Tentar encontrar match exato (ignorando case e acentos)
+      const exactMatch = availableGifs.find(gif => {
+        const gifNameNormalized = normalizeText(gif.replace('.gif', ''));
+        return gifNameNormalized === normalized;
+      });
+      
+      if (exactMatch) {
+        result = `/GIFS/${muscleGroup}/${exactMatch}`;
+        gifCache.set(cacheKey, result);
+        return result;
+      }
+      
+      // 3. SEGUNDO: Tentar encontrar match parcial (nome do exercício contém no nome do GIF ou vice-versa)
+      const partialMatch = availableGifs.find(gif => {
+        const gifNameNormalized = normalizeText(gif.replace('.gif', ''));
+        return gifNameNormalized.includes(normalized) || normalized.includes(gifNameNormalized);
+      });
+      
+      if (partialMatch) {
+        result = `/GIFS/${muscleGroup}/${partialMatch}`;
+        gifCache.set(cacheKey, result);
+        return result;
+      }
+      
+      // 4. TERCEIRO: Buscar por palavras-chave principais (ex: "Abd Concentrado" deve encontrar "Abd Concentrado Braços estendidos")
+      const exerciseWords = normalized.split(/\s+/).filter(w => w.length > 2); // Palavras com mais de 2 caracteres
+      if (exerciseWords.length > 0) {
+        const keywordMatch = availableGifs.find(gif => {
+          const gifNameNormalized = normalizeText(gif.replace('.gif', ''));
+          // Verificar se todas as palavras principais estão no nome do GIF
+          const allWordsMatch = exerciseWords.every(word => gifNameNormalized.includes(word));
+          // Ou se o nome do GIF contém o nome do exercício
+          return allWordsMatch || gifNameNormalized.includes(normalized);
+        });
+        
+        if (keywordMatch) {
+          result = `/GIFS/${muscleGroup}/${keywordMatch}`;
+          gifCache.set(cacheKey, result);
+          return result;
+        }
+      }
+      
+      // 5. QUARTO: Tentar encontrar GIF similar por similaridade de nome
+      const similarGif = findSimilarGif(normalized, muscleGroup, 0.3); // Reduzido threshold para 0.3
+      if (similarGif) {
+        result = `/GIFS/${muscleGroup}/${similarGif}`;
+        // Armazenar no cache
+        gifCache.set(cacheKey, result);
+        return result;
+      }
+      
+      // 6. ÚLTIMO: Se não encontrou similar, tentar retornar um GIF genérico do grupo
       // Retornar o primeiro GIF do grupo como fallback genérico
-      result = `/GIFS/${muscleGroup}/${genericGifs[0]}`;
+      result = `/GIFS/${muscleGroup}/${availableGifs[0]}`;
       gifCache.set(cacheKey, result);
       return result;
     }
@@ -832,9 +902,26 @@ export function isExerciseAvailable(exerciseName: string): boolean {
 export function getAvailableExercisesByGroup(): Record<string, string[]> {
   const grouped: Record<string, string[]> = {};
   
+  // Mapeamento de pastas para nomes de grupos limpos
+  const groupNameMap: Record<string, string> = {
+    'Abdômen (18)-20241202T155424Z-001/Abdômen (18)': 'Abdômen',
+    'Antebraço (15)-20241202T155453Z-001/Antebraço (15)': 'Antebraço',
+    'Bíceps (51)-20241202T155806Z-001/Bíceps (51)': 'Bíceps',
+    'Cárdio Academia (11)-20241202T161427Z-001/Cárdio Academia (11)': 'Cárdio',
+    'Costas (60)-20241202T162754Z-001/Costas (60)': 'Costas',
+    'Eretores da Espinha (8)-20241202T164933Z-001/Eretores da Espinha (8)': 'Eretores da Espinha',
+    'Glúteo (31)-20241202T165017Z-001/Glúteo (31)': 'Glúteo',
+    'Ombro (73)-20241202T165511Z-001/Ombro (73)': 'Ombro',
+    'Panturrilha (20)-20241202T173337Z-001/Panturrilha (20)': 'Panturrilha',
+    'Peitoral (67)-20241202T175211Z-001/Peitoral (67)': 'Peitoral',
+    'Pernas (70)-20241202T181042Z-001/Pernas (70)': 'Pernas',
+    'Trapézio (9)-20241202T183753Z-001/Trapézio (9)': 'Trapézio',
+    'Tríceps (47)-20241202T183816Z-001/Tríceps (47)': 'Tríceps',
+  };
+  
   for (const [folder, gifs] of Object.entries(availableGifsByGroup)) {
-    // Extrair nome do grupo muscular da pasta
-    const groupName = folder.split('/')[0].split('-')[0].trim();
+    // Usar mapeamento para obter nome limpo do grupo
+    const groupName = groupNameMap[folder] || folder.split('/')[0].split('-')[0].trim();
     const exercises = gifs.map(gif => gif.replace('.gif', ''));
     
     if (!grouped[groupName]) {

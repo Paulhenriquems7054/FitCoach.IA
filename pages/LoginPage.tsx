@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
-import { loginUser, registerUser, usernameExists, saveLoginSession, resetPassword } from '../services/databaseService';
+import { loginUser, usernameExists, saveLoginSession, resetPassword } from '../services/databaseService';
 import { useUser } from '../context/UserContext';
 import { useTheme } from '../context/ThemeContext';
 import { MoonIcon } from '../components/icons/MoonIcon';
@@ -15,14 +15,11 @@ import { sanitizeInput, sanitizeEmail } from '../utils/security';
 import { useToast } from '../components/ui/Toast';
 
 const LoginPage: React.FC = () => {
-    const { setUser } = useUser();
+    const { user, setUser } = useUser();
     const { theme, themeSetting, setThemeSetting } = useTheme();
     const { showSuccess, showError } = useToast();
-    const [isLogin, setIsLogin] = useState(true);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [nome, setNome] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +31,6 @@ const LoginPage: React.FC = () => {
     const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState<string | null>(null);
     const [isResettingPassword, setIsResettingPassword] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
@@ -172,6 +168,31 @@ const LoginPage: React.FC = () => {
             const user = await loginUser(credentials);
 
             if (user) {
+                // Para alunos, sincronizar status com servidor antes de verificar bloqueio
+                if (user.gymRole === 'student') {
+                    try {
+                        const { syncBlockStatus } = await import('../services/syncService');
+                        await syncBlockStatus(user.username || sanitizedUsername);
+                        // Recarregar usuário após sincronização
+                        const syncedUser = await getUserByUsername(user.username || sanitizedUsername);
+                        if (syncedUser) {
+                            Object.assign(user, syncedUser);
+                        }
+                    } catch (error) {
+                        // Se falhar a sincronização, continuar com dados locais
+                        console.warn('Erro ao sincronizar status no login:', error);
+                    }
+                }
+
+                // Verificar se o aluno está com acesso bloqueado
+                if (user.gymRole === 'student' && user.accessBlocked) {
+                    const blockedMsg = user.blockedReason || 'Seu acesso está bloqueado. Entre em contato com a administração da academia.';
+                    setError(blockedMsg);
+                    showError(blockedMsg);
+                    setIsLoading(false);
+                    return;
+                }
+
                 // Salvar sessão
                 await saveLoginSession(user.username || sanitizedUsername);
                 
@@ -182,9 +203,19 @@ const LoginPage: React.FC = () => {
                 setSuccess(successMsg);
                 showSuccess(successMsg);
                 
+                // Redirecionar baseado no role
+                let redirectPath = '#/';
+                if (user.gymRole === 'admin') {
+                    redirectPath = '#/student-management';
+                } else if (user.gymRole === 'trainer') {
+                    redirectPath = '#/';
+                } else if (user.gymRole === 'student') {
+                    redirectPath = '#/';
+                }
+                
                 // Redirecionar após 1 segundo
                 setTimeout(() => {
-                    window.location.hash = '#/';
+                    window.location.hash = redirectPath;
                 }, 1000);
             } else {
                 const errorMsg = 'Nome de usuário ou senha incorretos';
@@ -200,76 +231,6 @@ const LoginPage: React.FC = () => {
         }
     };
 
-    const handleRegister = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError(null);
-        setSuccess(null);
-        setIsLoading(true);
-
-        try {
-            // Sanitizar inputs
-            const sanitizedUsername = sanitizeInput(username.trim(), 50);
-            const sanitizedPassword = password.trim();
-            const sanitizedNome = sanitizeInput(nome.trim(), 100);
-
-            // Validações
-            if (!sanitizedUsername || !sanitizedPassword || !sanitizedNome) {
-                setError('Por favor, preencha todos os campos obrigatórios');
-                setIsLoading(false);
-                return;
-            }
-
-            if (sanitizedPassword.length < 6) {
-                setError('A senha deve ter pelo menos 6 caracteres');
-                setIsLoading(false);
-                return;
-            }
-
-            if (password !== confirmPassword) {
-                setError('As senhas não coincidem');
-                setIsLoading(false);
-                return;
-            }
-
-            // Verificar se username já existe
-            const exists = await usernameExists(sanitizedUsername);
-            if (exists) {
-                const errorMsg = 'Nome de usuário já está em uso';
-                setError(errorMsg);
-                showError(errorMsg);
-                setIsLoading(false);
-                return;
-            }
-
-            // Registrar usuário
-            const newUser = await registerUser(
-                sanitizedUsername,
-                sanitizedPassword,
-                { nome: sanitizedNome }
-            );
-
-            // Salvar sessão
-            await saveLoginSession(newUser.username || sanitizedUsername);
-            
-            // Atualizar contexto do usuário
-            setUser(newUser);
-            
-            const successMsg = 'Conta criada com sucesso!';
-            setSuccess(successMsg);
-            showSuccess(successMsg);
-            
-            // Redirecionar após 1 segundo
-            setTimeout(() => {
-                window.location.hash = '#/';
-            }, 1000);
-        } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : 'Erro ao criar conta. Tente novamente.';
-            setError(errorMessage);
-            showError(errorMessage);
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 py-12 px-4 sm:px-6 lg:px-8">
@@ -277,17 +238,14 @@ const LoginPage: React.FC = () => {
                 {/* Header */}
                 <div className="text-center">
                     <h1 className="text-4xl font-extrabold">
-                        <span className="text-primary-600">Nutri</span>
+                        <span className="text-primary-600">FitCoach</span>
                         <span className="text-slate-800 dark:text-slate-200">.IA</span>
                     </h1>
                     <h2 className="mt-6 text-3xl font-bold text-slate-900 dark:text-white">
-                        {isLogin ? 'Fazer Login' : 'Criar Conta'}
+                        Fazer Login
                     </h2>
                     <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                        {isLogin 
-                            ? 'Entre com seu nome de usuário e senha'
-                            : 'Crie sua conta para começar sua jornada nutricional'
-                        }
+                        Entre com seu nome e senha
                     </p>
                 </div>
 
@@ -308,39 +266,6 @@ const LoginPage: React.FC = () => {
                             </button>
                         </div>
 
-                        {/* Toggle Login/Register */}
-                        <div className="flex mb-6 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsLogin(true);
-                                    setError(null);
-                                    setSuccess(null);
-                                }}
-                                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition ${
-                                    isLogin
-                                        ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow'
-                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                                }`}
-                            >
-                                Login
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsLogin(false);
-                                    setError(null);
-                                    setSuccess(null);
-                                }}
-                                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition ${
-                                    !isLogin
-                                        ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow'
-                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                                }`}
-                            >
-                                Registrar
-                            </button>
-                        </div>
 
                         {/* Messages */}
                         {error && (
@@ -355,27 +280,11 @@ const LoginPage: React.FC = () => {
                         )}
 
                         {/* Form */}
-                        <form onSubmit={isLogin ? handleLogin : handleRegister} className="space-y-4">
-                            {!isLogin && (
-                                <div>
-                                    <label htmlFor="nome" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Nome Completo *
-                                    </label>
-                                    <input
-                                        id="nome"
-                                        type="text"
-                                        value={nome}
-                                        onChange={(e) => setNome(e.target.value)}
-                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                        placeholder="Seu nome completo"
-                                        required={!isLogin}
-                                    />
-                                </div>
-                            )}
+                        <form onSubmit={handleLogin} className="space-y-4">
 
                             <div>
                                 <label htmlFor="username" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    Nome de Usuário *
+                                    Nome *
                                 </label>
                                 <input
                                     id="username"
@@ -383,7 +292,7 @@ const LoginPage: React.FC = () => {
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    placeholder="seu_usuario"
+                                    placeholder="Seu nome"
                                     required
                                     autoComplete="username"
                                 />
@@ -402,7 +311,7 @@ const LoginPage: React.FC = () => {
                                         className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         placeholder="••••••••"
                                         required
-                                        autoComplete={isLogin ? "current-password" : "new-password"}
+                                        autoComplete="current-password"
                                         minLength={6}
                                     />
                                     <button
@@ -418,44 +327,7 @@ const LoginPage: React.FC = () => {
                                         )}
                                     </button>
                                 </div>
-                                {!isLogin && (
-                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                        Mínimo de 6 caracteres
-                                    </p>
-                                )}
                             </div>
-
-                            {!isLogin && (
-                                <div>
-                                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Confirmar Senha *
-                                    </label>
-                                    <div className="relative">
-                                        <input
-                                            id="confirmPassword"
-                                            type={showConfirmPassword ? "text" : "password"}
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                            className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                            placeholder="••••••••"
-                                            required={!isLogin}
-                                            autoComplete="new-password"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none"
-                                            aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
-                                        >
-                                            {showConfirmPassword ? (
-                                                <EyeSlashIcon className="w-5 h-5" />
-                                            ) : (
-                                                <EyeIcon className="w-5 h-5" />
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
 
                             <Button
                                 type="submit"
@@ -463,33 +335,21 @@ const LoginPage: React.FC = () => {
                                 className="w-full"
                                 disabled={isLoading}
                             >
-                                {isLoading ? 'Processando...' : (isLogin ? 'Entrar' : 'Criar Conta')}
+                                {isLoading ? 'Processando...' : 'Entrar'}
                             </Button>
                         </form>
 
                         {/* Footer */}
                         <div className="mt-6">
-                            {isLogin ? (
-                                <div className="flex items-center justify-end">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowForgotPassword(true)}
-                                        className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-                                    >
-                                        🔑 Esqueci a senha
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="text-center">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsLogin(true)}
-                                        className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
-                                    >
-                                        ← Já tenho uma conta
-                                    </button>
-                                </div>
-                            )}
+                            <div className="flex items-center justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowForgotPassword(true)}
+                                    className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                                >
+                                    🔑 Esqueci a senha
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </Card>

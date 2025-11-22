@@ -8,7 +8,6 @@ import { useUser } from '../context/UserContext';
 import { Goal } from '../types';
 import { clearLoginSession } from '../services/databaseService';
 import { Avatar } from './ui/Avatar';
-import { Logo } from './Logo';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -103,16 +102,15 @@ const Header: React.FC<HeaderProps> = ({ onMenuToggle, sidebarOpen = false }) =>
             <MenuIcon className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
           </button>
           
-          {/* Centered logo with video */}
+          {/* Centered title */}
           <div className="flex-shrink-0">
             <a 
               href="#/" 
               className="flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded"
               aria-label="Ir para página inicial"
             >
-              <Logo size="sm" />
               <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight">
-                <span className="text-primary-600 drop-shadow-lg">Nutri</span>
+                <span className="text-primary-600 drop-shadow-lg">FitCoach</span>
                 <span className="text-slate-800 dark:text-slate-200 drop-shadow-lg">.IA</span>
               </h1>
             </a>

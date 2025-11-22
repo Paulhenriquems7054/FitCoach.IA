@@ -256,7 +256,7 @@ const ReportsPage: React.FC = () => {
 
                             <section className="space-y-4">
                                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                                    Análise da Nutri.IA
+                                    Análise do FitCoach.IA
                                 </h3>
                                 <div className="prose prose-slate dark:prose-invert max-w-none">
                                     {report.split('\n').map((line, index) => {

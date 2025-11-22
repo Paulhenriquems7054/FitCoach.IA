@@ -1,7 +1,7 @@
 {
-  "short_name": "Nutri.IA",
-  "name": "Nutri.IA: Agente Nutricional Inteligente",
-  "description": "Seu Coach Nutricional Inteligente com IA",
+  "short_name": "FitCoach.IA",
+  "name": "FitCoach.IA: Agente de Treinamento Inteligente",
+  "description": "Seu Coach de Treino Inteligente com IA",
   "icons": [
     {
       "src": "/icons/icon-192.png",

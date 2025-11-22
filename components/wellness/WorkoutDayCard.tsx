@@ -72,40 +72,40 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
 
     return (
         <Card className={`transition-all ${isCompleted ? 'opacity-75' : ''}`}>
-            <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+            <div className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-4">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white break-words">
                                 {workoutDay.dia_semana}
                             </h3>
                             {workoutDay.intensidade && (
-                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                                     intensityColors[workoutDay.intensidade] || intensityColors.moderada
                                 }`}>
                                     {workoutDay.intensidade.toUpperCase()}
                                 </span>
                             )}
                             {isCompleted && (
-                                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                                <span className="px-2 sm:px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
                                     ✓ CONCLUÍDO
                                 </span>
                             )}
                         </div>
-                        <p className="text-lg font-semibold text-primary-600 dark:text-primary-400">
+                        <p className="text-base sm:text-lg font-semibold text-primary-600 dark:text-primary-400 break-words">
                             {workoutDay.foco_treino}
                         </p>
                         {workoutDay.duracao_estimada && (
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
                                 ⏱️ Duração estimada: {workoutDay.duracao_estimada}
                             </p>
                         )}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         {onEdit && (
                             <button
                                 onClick={() => onEdit(dayIndex)}
-                                className="px-4 py-2 rounded-lg font-semibold text-sm transition bg-primary-500 hover:bg-primary-600 text-white"
+                                className="px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition bg-primary-500 hover:bg-primary-600 text-white w-full sm:w-auto whitespace-nowrap"
                             >
                                 ✏️ Editar Plano
                             </button>
@@ -114,7 +114,7 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                             <button
                                 onClick={() => onComplete(dayIndex)}
                                 disabled={isCompleted}
-                                className={`px-4 py-2 rounded-lg font-semibold text-sm transition ${
+                                className={`px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition w-full sm:w-auto whitespace-nowrap ${
                                     isCompleted
                                         ? 'bg-slate-200 dark:bg-slate-700 text-slate-500 cursor-not-allowed'
                                         : 'bg-emerald-500 hover:bg-emerald-600 text-white'
@@ -134,7 +134,7 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                         </p>
                     </div>
                 ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                         {hasDetailedExercises ? (
                             // Renderizar exercícios detalhados (Exercise[])
                             exercises.map((ex: any, idx: number) => {
@@ -145,18 +145,18 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                                 return (
                                     <div
                                         key={idx}
-                                        className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700"
+                                        className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700"
                                     >
-                                        <div className={`flex items-stretch gap-4 ${isGifExpanded && gifPath ? 'flex-row flex-wrap sm:flex-nowrap' : 'flex-col'}`}>
+                                        <div className={`flex items-stretch gap-3 sm:gap-4 ${isGifExpanded && gifPath ? 'flex-col sm:flex-row sm:flex-nowrap' : 'flex-col'}`}>
                                             <div className={`${isGifExpanded && gifPath ? 'flex-1 min-w-0 sm:min-w-[200px] flex flex-col justify-center' : 'w-full'}`}>
-                                                <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                    <h4 className="font-semibold text-slate-900 dark:text-white">
+                                                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                                                    <h4 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white break-words flex-1 min-w-0">
                                                         {exercise.name}
                                                     </h4>
                                                     {gifPath && (
                                                         <button
                                                             onClick={() => toggleExerciseGif(idx)}
-                                                            className="text-xs px-2 py-1 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/50 transition font-medium"
+                                                            className="text-xs px-2 py-1 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/50 transition font-medium whitespace-nowrap flex-shrink-0"
                                                             type="button"
                                                         >
                                                             {isGifExpanded ? '👁️ Ocultar GIF' : '🎬 Ver GIF'}
@@ -164,37 +164,37 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                                                     )}
                                                 </div>
                                                 
-                                                <div className="flex flex-wrap gap-3 mt-2 text-sm text-slate-600 dark:text-slate-300">
+                                                <div className="flex flex-wrap gap-2 sm:gap-3 mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
                                                     {exercise.reps && (
-                                                        <span className="flex items-center gap-1">
+                                                        <span className="flex items-center gap-1 whitespace-nowrap">
                                                             <span className="font-medium">Repetições:</span> {exercise.reps}
                                                         </span>
                                                     )}
                                                     {exercise.sets && (
-                                                        <span className="flex items-center gap-1">
+                                                        <span className="flex items-center gap-1 whitespace-nowrap">
                                                             <span className="font-medium">Série:</span> {exercise.sets}
                                                         </span>
                                                     )}
                                                     {exercise.rest && (
-                                                        <span className="flex items-center gap-1">
+                                                        <span className="flex items-center gap-1 whitespace-nowrap">
                                                             <span className="font-medium">Descanso:</span> {exercise.rest}
                                                         </span>
                                                     )}
                                                     {exercise.calories && exercise.calories > 0 && (
-                                                        <span className="flex items-center gap-1">
+                                                        <span className="flex items-center gap-1 whitespace-nowrap">
                                                             🔥 ~{exercise.calories} kcal
                                                         </span>
                                                     )}
                                                 </div>
                                                 {exercise.tips && (
-                                                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 italic">
+                                                    <p className="mt-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400 italic break-words">
                                                         💡 {exercise.tips}
                                                     </p>
                                                 )}
                                             </div>
                                             
                                             {gifPath && isGifExpanded && (
-                                                <div className="flex-shrink-0 w-full sm:w-[280px] md:w-[320px] lg:w-[360px] rounded-lg overflow-hidden border-2 border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-900 shadow-lg flex items-center justify-center min-h-[150px] sm:min-h-[180px] md:min-h-[220px] lg:min-h-[250px] max-w-full">
+                                                <div className="flex-shrink-0 w-full sm:w-[280px] md:w-[320px] lg:w-[360px] rounded-lg overflow-hidden border-2 border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-900 shadow-lg flex items-center justify-center min-h-[150px] sm:min-h-[180px] md:min-h-[220px] lg:min-h-[250px] max-w-full mx-auto sm:mx-0">
                                                     <img
                                                         src={gifPath}
                                                         alt={`Demonstração de ${exercise.name}`}
@@ -222,7 +222,7 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                                             key={idx}
                                             className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border-l-4 border-primary-500"
                                         >
-                                            <p className="text-slate-700 dark:text-slate-300">{exercise}</p>
+                                            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 break-words">{exercise}</p>
                                         </div>
                                     );
                                 }
@@ -233,14 +233,14 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                                 return (
                                     <div
                                         key={idx}
-                                        className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700"
+                                        className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700"
                                     >
                                         <div>
-                                            <h4 className="font-semibold text-slate-900 dark:text-white">
+                                            <h4 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white break-words">
                                                 {normalized.name}
                                             </h4>
                                             {normalized.reps && (
-                                                <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+                                                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 break-words">
                                                     {normalized.reps}
                                                 </p>
                                             )}
@@ -253,8 +253,8 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                 )}
 
                 {workoutDay.observacoes && (
-                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <div className="mt-3 sm:mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 break-words">
                             📝 <strong>Observação:</strong> {workoutDay.observacoes}
                         </p>
                     </div>

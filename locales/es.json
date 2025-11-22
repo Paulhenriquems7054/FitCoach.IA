@@ -48,16 +48,16 @@
         "title": "Tu Plan de Comidas",
         "export_pdf": "Exportar PDF",
         "why_this_meal": "¿Por qué esta comida?",
-        "observations_title": "Observaciones de Nutri.IA",
+        "observations_title": "Observaciones de FitCoach.IA",
         "explanation": {
             "title": "Análisis de IA para",
             "error": "No se pudo obtener la explicación de la IA en este momento."
         }
     },
     "chat": {
-        "title": "Chat con Nutri.IA",
-        "subtitle": "Resuelve tus dudas sobre nutrición",
-        "initial_greeting": "¡Hola, {{name}}! Soy Nutri.IA, tu asistente nutricional. Sabiendo que tu objetivo es {{objective}}, ¿cómo puedo ayudarte hoy?",
+        "title": "Chat con FitCoach.IA",
+        "subtitle": "Resuelve tus dudas sobre entrenamientos y ejercicios",
+        "initial_greeting": "¡Hola, {{name}}! Soy FitCoach.IA, tu asistente de entrenamiento. Sabiendo que tu objetivo es {{objective}}, ¿cómo puedo ayudarte hoy?",
         "placeholder": "Escribe tu mensaje...",
         "send": "Enviar",
         "error": "Lo siento, ocurrió un error al comunicarme. Por favor, inténtalo de nuevo.",
@@ -69,7 +69,7 @@
         "subtitle": "Recibe análisis semanales de tu progreso por la IA.",
         "initial": {
             "title": "¿Listo para tu análisis semanal?",
-            "description": "Nutri.IA analizará tu progreso, destacará victorias y sugerirá los próximos pasos para alcanzar tu objetivo.",
+            "description": "FitCoach.IA analizará tu progreso, destacará victorias y sugerirá los próximos pasos para alcanzar tu objetivo.",
             "button": "Generar mi Informe"
         },
         "error": {
@@ -103,7 +103,7 @@
             "description": "Recibe recordatorios y consejos proactivos de la IA.",
             "button": "Activar Notificaciones",
             "grantedTitle": "¡Notificaciones Activadas!",
-            "grantedBody": "Ahora recibirás consejos y recordatorios de Nutri.IA."
+            "grantedBody": "Ahora recibirás consejos y recordatorios de FitCoach.IA."
         },
         "profile_type": {
             "title": "Tipo de Perfil",

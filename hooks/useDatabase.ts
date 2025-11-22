@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { initDatabase, migrateFromLocalStorage } from '../services/databaseService';
+import { initDatabase, migrateFromLocalStorage, initializeDefaultUsers } from '../services/databaseService';
 
 let isInitialized = false;
 
@@ -25,6 +25,7 @@ export function useDatabase() {
             try {
                 await initDatabase();
                 await migrateFromLocalStorage();
+                await initializeDefaultUsers(); // Criar usuários padrão se não existirem
                 isInitialized = true;
                 setIsReady(true);
             } catch (err) {
