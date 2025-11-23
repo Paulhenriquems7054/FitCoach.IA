@@ -3,7 +3,7 @@
  * Permite criar, editar, excluir e gerenciar alunos e treinadores
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
@@ -37,6 +37,8 @@ const StudentManagementPage: React.FC = () => {
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [studentForm, setStudentForm] = useState({
         username: '',
@@ -320,6 +322,176 @@ const StudentManagementPage: React.FC = () => {
         }
     };
 
+    const parseFileContent = async (file: File): Promise<any[]> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    const content = e.target?.result as string;
+                    const fileName = file.name.toLowerCase();
+                    
+                    // Tentar parsear como JSON
+                    if (fileName.endsWith('.json')) {
+                        const data = JSON.parse(content);
+                        resolve(Array.isArray(data) ? data : [data]);
+                        return;
+                    }
+                    
+                    // Tentar parsear como CSV
+                    if (fileName.endsWith('.csv') || fileName.endsWith('.txt')) {
+                        const lines = content.split('\n').filter(line => line.trim());
+                        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                        const data = lines.slice(1).map(line => {
+                            const values = line.split(',').map(v => v.trim());
+                            const obj: any = {};
+                            headers.forEach((header, index) => {
+                                obj[header] = values[index] || '';
+                            });
+                            return obj;
+                        });
+                        resolve(data);
+                        return;
+                    }
+                    
+                    // Para outros tipos de arquivo, tentar parsear como texto estruturado
+                    // Formato esperado: uma linha por aluno, campos separados por vírgula, ponto e vírgula ou tab
+                    const lines = content.split('\n').filter(line => line.trim());
+                    const data = lines.map((line, index) => {
+                        // Tentar diferentes separadores
+                        const separators = [',', ';', '\t', '|'];
+                        let values: string[] = [];
+                        
+                        for (const sep of separators) {
+                            if (line.includes(sep)) {
+                                values = line.split(sep).map(v => v.trim());
+                                break;
+                            }
+                        }
+                        
+                        // Se não encontrou separador, usar a linha inteira como nome
+                        if (values.length === 0) {
+                            values = [line.trim()];
+                        }
+                        
+                        // Mapear para estrutura esperada
+                        return {
+                            nome: values[0] || `Aluno ${index + 1}`,
+                            username: values[1] || values[0]?.toLowerCase().replace(/\s+/g, '') || `aluno${index + 1}`,
+                            password: values[2] || '1234',
+                            idade: parseInt(values[3]) || 30,
+                            genero: values[4]?.toLowerCase().includes('f') ? 'Feminino' : 'Masculino',
+                            peso: parseFloat(values[5]) || 70,
+                            altura: parseFloat(values[6]) || 170,
+                            objetivo: values[7] || Goal.MANTER_PESO,
+                        };
+                    });
+                    
+                    resolve(data);
+                } catch (error) {
+                    reject(new Error('Erro ao processar arquivo. Verifique o formato.'));
+                }
+            };
+            
+            reader.onerror = () => {
+                reject(new Error('Erro ao ler arquivo.'));
+            };
+            
+            // Ler como texto para todos os tipos de arquivo
+            reader.readAsText(file, 'UTF-8');
+        });
+    };
+
+    const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Verificar se é Administrador ou Desenvolvedor padrão
+        const isDefaultAdmin = currentUser.username === 'Administrador' || currentUser.username === 'Desenvolvedor';
+        
+        // Se não tem gymId e não é admin padrão, precisa criar/associar uma academia primeiro
+        if (!currentUser.gymId && !isDefaultAdmin) {
+            showError('Você precisa estar associado a uma academia. Configure a academia primeiro em Configurações da Academia.');
+            return;
+        }
+        
+        // Para admin padrão, usar um gymId padrão ou criar um
+        const gymId = currentUser.gymId || 'default-gym';
+
+        setIsImporting(true);
+        
+        try {
+            const studentsData = await parseFileContent(file);
+            
+            if (!studentsData || studentsData.length === 0) {
+                showError('Nenhum dado encontrado no arquivo.');
+                setIsImporting(false);
+                return;
+            }
+
+            let successCount = 0;
+            let errorCount = 0;
+            const errors: string[] = [];
+
+            // Processar cada aluno
+            for (const studentData of studentsData) {
+                try {
+                    // Validar dados mínimos
+                    const username = studentData.username || studentData.nome?.toLowerCase().replace(/\s+/g, '') || `aluno${Date.now()}`;
+                    const password = studentData.password || '1234';
+                    const nome = studentData.nome || username;
+
+                    // Verificar se o usuário já existe
+                    const existingStudent = students.find(s => s.username === username);
+                    if (existingStudent) {
+                        errorCount++;
+                        errors.push(`${nome} (${username}): Usuário já existe`);
+                        continue;
+                    }
+
+                    // Criar aluno
+                    await createStudent(
+                        username,
+                        password,
+                        {
+                            nome: nome,
+                            idade: studentData.idade || 30,
+                            genero: studentData.genero || 'Masculino',
+                            peso: studentData.peso || 70,
+                            altura: studentData.altura || 170,
+                            objetivo: studentData.objetivo || Goal.MANTER_PESO,
+                        },
+                        gymId
+                    );
+
+                    successCount++;
+                } catch (error: any) {
+                    errorCount++;
+                    errors.push(`${studentData.nome || 'Aluno desconhecido'}: ${error.message || 'Erro ao criar'}`);
+                }
+            }
+
+            // Mostrar resultado
+            if (successCount > 0) {
+                showSuccess(`${successCount} aluno(s) importado(s) com sucesso!`);
+            }
+            
+            if (errorCount > 0) {
+                showError(`${errorCount} aluno(s) não puderam ser importados. ${errors.slice(0, 5).join('; ')}${errors.length > 5 ? '...' : ''}`);
+            }
+
+            // Limpar input e recarregar lista
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+            loadUsers();
+        } catch (error: any) {
+            showError(error.message || 'Erro ao importar arquivo');
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     if (!permissions.canViewStudents) {
         return (
             <div className="container mx-auto px-4 py-8">
@@ -355,29 +527,57 @@ const StudentManagementPage: React.FC = () => {
 
             {/* Botões de ação */}
             {permissions.canCreateStudents && (
-                <div className="mb-6 flex flex-wrap gap-3">
-                    <Button
-                        onClick={() => {
-                            setShowStudentForm(!showStudentForm);
-                            setShowTrainerForm(false);
-                            setEditingUser(null);
-                        }}
-                        variant="primary"
-                    >
-                        {showStudentForm ? '❌ Cancelar' : '➕ Criar Aluno'}
-                    </Button>
-                    {permissions.canCreateTrainers && (
+                <div className="mb-6">
+                    <div className="flex flex-wrap gap-3 mb-4">
                         <Button
                             onClick={() => {
-                                setShowTrainerForm(!showTrainerForm);
-                                setShowStudentForm(false);
+                                setShowStudentForm(!showStudentForm);
+                                setShowTrainerForm(false);
                                 setEditingUser(null);
                             }}
-                            variant="secondary"
+                            variant="primary"
                         >
-                            {showTrainerForm ? '❌ Cancelar' : '👨‍🏫 Criar Treinador'}
+                            {showStudentForm ? '❌ Cancelar' : '➕ Criar Aluno'}
                         </Button>
-                    )}
+                        <Button
+                            onClick={() => fileInputRef.current?.click()}
+                            variant="secondary"
+                            disabled={isImporting}
+                        >
+                            {isImporting ? '⏳ Importando...' : '📥 Importar Alunos'}
+                        </Button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="*/*"
+                            onChange={handleImportFile}
+                            className="hidden"
+                            aria-label="Importar lista de alunos"
+                        />
+                        {permissions.canCreateTrainers && (
+                            <Button
+                                onClick={() => {
+                                    setShowTrainerForm(!showTrainerForm);
+                                    setShowStudentForm(false);
+                                    setEditingUser(null);
+                                }}
+                                variant="secondary"
+                            >
+                                {showTrainerForm ? '❌ Cancelar' : '👨‍🏫 Criar Treinador'}
+                            </Button>
+                        )}
+                    </div>
+                    <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                        <div className="p-4">
+                            <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                                <strong>💡 Dica de Importação:</strong> Você pode importar alunos de qualquer tipo de arquivo (CSV, TXT, JSON, Excel, etc.).
+                            </p>
+                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                                <strong>Formato recomendado:</strong> Nome, Username, Senha, Idade, Gênero, Peso, Altura, Objetivo (separados por vírgula, ponto e vírgula ou tab). 
+                                Campos opcionais serão preenchidos com valores padrão.
+                            </p>
+                        </div>
+                    </Card>
                 </div>
             )}
 

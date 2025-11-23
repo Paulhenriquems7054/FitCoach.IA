@@ -67,14 +67,72 @@
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
     <script>
-      // Aggressive cache busting
-      if ('caches' in window) {
-        caches.keys().then(function(names) {
-          for (let name of names) {
-            caches.delete(name);
+      // AGGRESSIVE Service Worker removal - MUST run before anything else
+      (function() {
+        var isDev = window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' ||
+                    window.location.hostname.includes('localhost');
+        
+        if ('serviceWorker' in navigator) {
+          // Override register FIRST to prevent any new registrations in dev
+          if (isDev) {
+            var originalRegister = navigator.serviceWorker.register;
+            navigator.serviceWorker.register = function() {
+              console.log('[SW] Registration blocked in development');
+              return Promise.reject(new Error('Service workers disabled in development'));
+            };
           }
-        });
-      }
+          
+          // Immediately unregister all service workers
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            if (registrations.length === 0) {
+              return Promise.resolve();
+            }
+            
+            var unregisterPromises = [];
+            for (var i = 0; i < registrations.length; i++) {
+              unregisterPromises.push(
+                registrations[i].unregister().then(function(success) {
+                  if (success) {
+                    console.log('[SW] Service worker unregistered');
+                  }
+                  return success;
+                }).catch(function(err) {
+                  console.warn('Error unregistering service worker:', err);
+                  return false;
+                })
+              );
+            }
+            
+            return Promise.all(unregisterPromises);
+          }).then(function() {
+            // After unregistering, clear all caches
+            if ('caches' in window) {
+              return caches.keys().then(function(names) {
+                var deletePromises = [];
+                for (var i = 0; i < names.length; i++) {
+                  deletePromises.push(
+                    caches.delete(names[i]).then(function(success) {
+                      if (success) {
+                        console.log('[SW] Cache deleted');
+                      }
+                      return success;
+                    }).catch(function(err) {
+                      console.warn('Error deleting cache:', err);
+                      return false;
+                    })
+                  );
+                }
+                return Promise.all(deletePromises);
+              }).catch(function(err) {
+                console.warn('Error getting cache names:', err);
+              });
+            }
+          }).catch(function(err) {
+            console.warn('Error getting service worker registrations:', err);
+          });
+        }
+      })();
       
       // Redirect to presentation page if not already there
       if (window.location.pathname === '/' && !window.location.hash) {

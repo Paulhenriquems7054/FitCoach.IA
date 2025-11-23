@@ -44,20 +44,22 @@ const PresentationPage: React.FC = () => {
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-slate-100 overflow-x-hidden">
       {/* Hero Section with Video Background */}
-      <div className="relative h-[70vh] sm:h-[75vh] md:h-[80vh] lg:h-[85vh] w-full flex flex-col justify-center items-center overflow-hidden">
+      <div className="relative w-full flex flex-col justify-center items-center overflow-hidden">
         {/* Video Background */}
-        <div className="absolute inset-0 w-full h-full overflow-hidden">
+        <div className="relative w-full overflow-hidden">
           {!videoError && (
             <video
               autoPlay
               loop
               muted
               playsInline
-              className="absolute inset-0 w-full h-full object-contain object-center"
+              preload="auto"
+              className="w-full h-auto object-contain object-center"
               style={{
                 zIndex: 0,
                 width: '100%',
-                height: '100%'
+                height: 'auto',
+                display: 'block'
               }}
               onError={(e) => {
                 // Fallback se o vídeo não carregar
@@ -73,6 +75,7 @@ const PresentationPage: React.FC = () => {
               }}
             >
               <source src={videoPath} type="video/mp4" />
+              Seu navegador não suporta vídeos HTML5.
             </video>
           )}
           {/* Overlay muito leve para clarear o vídeo */}
@@ -214,14 +217,68 @@ const PresentationPage: React.FC = () => {
           padding: 0 !important;
           margin: 0 !important;
         }
-        /* Garantir que o vídeo seja exibido completo sem cortes */
+        /* Vídeo responsivo com alturas adaptativas */
         video {
           object-fit: contain !important;
           object-position: center !important;
+          width: 100% !important;
+          height: auto !important;
+          display: block !important;
+          min-height: 50vh !important; /* Mobile: menor altura */
         }
+
+        /* Mobile pequeno (até 375px) */
+        @media (max-width: 375px) {
+          video {
+            min-height: 45vh !important;
+            max-height: 60vh !important;
+          }
+        }
+
+        /* Mobile médio (376px - 640px) */
+        @media (min-width: 376px) and (max-width: 640px) {
+          video {
+            min-height: 50vh !important;
+            max-height: 65vh !important;
+          }
+        }
+
+        /* Tablet (641px - 768px) */
+        @media (min-width: 641px) and (max-width: 768px) {
+          video {
+            min-height: 60vh !important;
+            max-height: 75vh !important;
+          }
+        }
+
+        /* Desktop pequeno (769px - 1024px) */
+        @media (min-width: 769px) and (max-width: 1024px) {
+          video {
+            min-height: 70vh !important;
+            max-height: 80vh !important;
+          }
+        }
+
+        /* Desktop médio (1025px - 1280px) */
+        @media (min-width: 1025px) and (max-width: 1280px) {
+          video {
+            min-height: 75vh !important;
+            max-height: 85vh !important;
+          }
+        }
+
+        /* Desktop grande (1281px+) */
+        @media (min-width: 1281px) {
+          video {
+            min-height: 80vh !important;
+            max-height: 90vh !important;
+          }
+        }
+
         /* Prevenir overflow horizontal */
         * {
           max-width: 100%;
+          box-sizing: border-box;
         }
       `}</style>
     </div>

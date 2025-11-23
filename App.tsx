@@ -57,7 +57,8 @@ const App: React.FC = () => {
     const isAccessingRestrictedRoute = restrictedRoutes.includes(path);
 
     // Se aluno tentar acessar rota administrativa ou restrita, redirecionar para home
-    if (isStudent && (isAccessingAdminRoute || isAccessingRestrictedRoute)) {
+    // (exceto welcome-survey que é permitida)
+    if (isStudent && (isAccessingAdminRoute || isAccessingRestrictedRoute) && path !== '/welcome-survey') {
         window.location.hash = '#/';
         return null;
     }
@@ -65,6 +66,27 @@ const App: React.FC = () => {
     // Verificar se é admin
     const isDefaultAdmin = user.username === 'Administrador' || user.username === 'Desenvolvedor';
     const isAdmin = user.gymRole === 'admin' || isDefaultAdmin;
+
+    // Rotas permitidas para administradores
+    const adminAllowedRoutes = ['/', '/privacy', '/configuracoes', '/perfil', '/student-management', '/gym-admin'];
+    const isAdminAccessingStudentRoute = isAdmin && !adminAllowedRoutes.includes(path) && path !== '/admin-dashboard';
+
+    // Se admin tentar acessar rota de aluno, redirecionar para dashboard
+    if (isAdminAccessingStudentRoute) {
+        window.location.hash = '#/';
+        return null;
+    }
+
+    // Verificar se aluno precisa responder a enquete
+    const SURVEY_STORAGE_FLAG = 'nutriIA_enquete_v2_done';
+    const hasAnsweredSurvey = typeof window !== 'undefined' ? localStorage.getItem(SURVEY_STORAGE_FLAG) : null;
+    const isStudentNeedingSurvey = isStudent && !hasAnsweredSurvey && path !== '/welcome-survey';
+
+    // Se aluno não respondeu a enquete, redirecionar
+    if (isStudentNeedingSurvey) {
+        window.location.hash = '#/welcome-survey';
+        return null;
+    }
 
     const renderPage = () => {
         switch (path) {

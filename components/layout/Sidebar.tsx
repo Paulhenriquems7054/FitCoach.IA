@@ -37,6 +37,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
 
   // Verificar se é aluno
   const isStudent = user.gymRole === 'student';
+  // Verificar se é administrador
+  const isAdmin = user.gymRole === 'admin';
 
   // Áreas permitidas para alunos
   const studentAllowedRoutes = [
@@ -52,6 +54,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     '/perfil'
   ];
 
+  // Rotas permitidas para administradores
+  const adminAllowedRoutes = [
+    '/',
+    '/student-management'
+  ];
+
   const mainNavigation = [
     { name: t('sidebar.home'), href: '#/', icon: HomeIcon },
     { name: 'Meu Plano de Treino', href: '#/wellness', icon: HeartIcon },
@@ -65,19 +73,24 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
   ]
     .filter(item => {
+      // Se é administrador, mostrar apenas Dashboard
+      if (isAdmin) {
+        const route = item.href.replace('#', '');
+        return adminAllowedRoutes.includes(route);
+      }
       // Se é aluno, mostrar apenas rotas permitidas
       if (isStudent) {
         const route = item.href.replace('#', '');
         return studentAllowedRoutes.includes(route);
       }
-      // Para admin/trainer, mostrar todos exceto os que têm show: false
+      // Para trainer, mostrar todos exceto os que têm show: false
       return item.show !== false;
     });
 
   const userNavigation = [
       { name: t('sidebar.myProfile'), href: '#/perfil', icon: UserCircleIcon },
-      { name: t('sidebar.privacy'), href: '#/privacy', icon: ShieldCheckIcon, show: !isStudent },
-      { name: t('sidebar.settings'), href: '#/configuracoes', icon: CogIcon, show: !isStudent },
+      { name: t('sidebar.privacy'), href: '#/privacy', icon: ShieldCheckIcon, show: isAdmin },
+      { name: t('sidebar.settings'), href: '#/configuracoes', icon: CogIcon, show: isAdmin },
   ].filter(item => item.show !== false);
 
   const isCurrent = (href: string) => {

@@ -24,7 +24,6 @@ const PrivacyPage: React.FC = () => {
     const { user, setUser, toggleAnonymization } = useUser();
     const { t } = useI18n();
     const { showSuccess, showError, showWarning } = useToast();
-    const [biometrics, setBiometrics] = useState(user.securitySettings?.biometricEnabled || false);
     const [securityNotifications, setSecurityNotifications] = useState(user.securitySettings?.securityNotifications ?? true);
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
     const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
@@ -58,22 +57,6 @@ const PrivacyPage: React.FC = () => {
             isAnonymized: !user.isAnonymized
         });
         showSuccess(user.isAnonymized ? 'Anonimização desativada' : 'Anonimização ativada');
-    };
-
-    const handleToggleBiometrics = () => {
-        const newValue = !biometrics;
-        setBiometrics(newValue);
-        setUser({
-            ...user,
-            securitySettings: {
-                ...user.securitySettings,
-                biometricEnabled: newValue,
-            },
-        });
-        logActivity('Autenticação biométrica alterada', 'security', {
-            enabled: newValue
-        });
-        showSuccess(newValue ? 'Autenticação biométrica ativada' : 'Autenticação biométrica desativada');
     };
 
     const handleToggleSecurityNotifications = () => {
@@ -288,30 +271,6 @@ const PrivacyPage: React.FC = () => {
 
                 <Card>
                     <div className="p-6 space-y-6">
-                        {/* Autenticação Biométrica */}
-                        <div className="flex items-center justify-between py-4 border-b border-slate-200 dark:border-slate-700">
-                            <div className="flex items-start gap-4 flex-1">
-                                <ShieldCheckIcon className="w-6 h-6 text-slate-400 mt-1 flex-shrink-0" />
-                                <div className="flex-1">
-                                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                                        {t('privacy.biometrics.title')}
-                                    </h3>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                                        {t('privacy.biometrics.description')}
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={handleToggleBiometrics}
-                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${biometrics ? 'bg-primary-600' : 'bg-gray-200 dark:bg-slate-700'}`}
-                                role="switch"
-                                aria-checked={biometrics}
-                            >
-                                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${biometrics ? 'translate-x-5' : 'translate-x-0'}`}></span>
-                            </button>
-                        </div>
-
                         {/* Notificações de Segurança */}
                         <div className="flex items-center justify-between py-4 border-b border-slate-200 dark:border-slate-700">
                             <div className="flex items-start gap-4 flex-1">
