@@ -22,6 +22,7 @@ import {
     blockStudentAccess,
     unblockStudentAccess,
 } from '../services/studentManagementService';
+import { resetPassword } from '../services/databaseService';
 import type { User } from '../types';
 import { Goal } from '../types';
 import { EyeIcon } from '../components/icons/EyeIcon';
@@ -45,6 +46,7 @@ const StudentManagementPage: React.FC = () => {
     const [showTrainerConfirmPassword, setShowTrainerConfirmPassword] = useState(false);
     const [showReceptionistPassword, setShowReceptionistPassword] = useState(false);
     const [showReceptionistConfirmPassword, setShowReceptionistConfirmPassword] = useState(false);
+    const [showStudentPassword, setShowStudentPassword] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [showBlockModal, setShowBlockModal] = useState(false);
@@ -315,7 +317,33 @@ const StudentManagementPage: React.FC = () => {
                 genero: user.genero,
                 // Peso, altura e objetivo não são editáveis aqui (coletados na enquete)
             });
-            setShowStudentForm(true);
+            setShowStudentForm(false);
+            setShowTrainerForm(false);
+            setShowReceptionistForm(false);
+        } else if (user.gymRole === 'trainer') {
+            setTrainerForm({
+                username: user.username || '',
+                password: '',
+                confirmPassword: '',
+                nome: user.nome,
+                idade: user.idade,
+                genero: user.genero,
+            });
+            setShowTrainerForm(true);
+            setShowStudentForm(false);
+            setShowReceptionistForm(false);
+        } else if (user.gymRole === 'receptionist') {
+            setReceptionistForm({
+                username: user.username || '',
+                password: '',
+                confirmPassword: '',
+                nome: user.nome,
+                idade: user.idade,
+                genero: user.genero,
+            });
+            setShowReceptionistForm(true);
+            setShowStudentForm(false);
+            setShowTrainerForm(false);
         }
     };
 
@@ -325,7 +353,10 @@ const StudentManagementPage: React.FC = () => {
         if (!editingUser) return;
 
         try {
-            await updateStudent(editingUser.username || editingUser.nome || '', {
+            const username = editingUser.username || editingUser.nome || '';
+            
+            // Atualizar dados do aluno
+            await updateStudent(username, {
                 nome: studentForm.nome,
                 matricula: studentForm.matricula,
                 idade: studentForm.idade,
@@ -333,12 +364,91 @@ const StudentManagementPage: React.FC = () => {
                 // Peso, altura e objetivo não são editáveis aqui (coletados na enquete)
             });
 
+            // Se a matrícula foi alterada, atualizar a senha também
+            if (studentForm.matricula && studentForm.matricula.trim() !== '') {
+                await resetPassword(username, studentForm.matricula);
+            }
+
             showSuccess('Aluno atualizado com sucesso!');
             setEditingUser(null);
             setShowStudentForm(false);
             loadUsers();
         } catch (error: any) {
             showError(error.message || 'Erro ao atualizar aluno');
+        }
+    };
+
+    const handleUpdateTrainer = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!editingUser) return;
+
+        try {
+            const username = editingUser.username || '';
+            
+            // Atualizar dados do treinador
+            await updateStudent(username, {
+                nome: trainerForm.nome,
+                idade: trainerForm.idade,
+                genero: trainerForm.genero,
+            });
+
+            // Se a senha foi fornecida, atualizar
+            if (trainerForm.password && trainerForm.password.trim() !== '') {
+                if (trainerForm.password !== trainerForm.confirmPassword) {
+                    showError('As senhas não coincidem');
+                    return;
+                }
+                if (trainerForm.password.length < 4) {
+                    showError('A senha deve ter pelo menos 4 caracteres');
+                    return;
+                }
+                await resetPassword(username, trainerForm.password);
+            }
+
+            showSuccess('Treinador atualizado com sucesso!');
+            setEditingUser(null);
+            setShowTrainerForm(false);
+            loadUsers();
+        } catch (error: any) {
+            showError(error.message || 'Erro ao atualizar treinador');
+        }
+    };
+
+    const handleUpdateReceptionist = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!editingUser) return;
+
+        try {
+            const username = editingUser.username || '';
+            
+            // Atualizar dados do recepcionista
+            await updateStudent(username, {
+                nome: receptionistForm.nome,
+                idade: receptionistForm.idade,
+                genero: receptionistForm.genero,
+            });
+
+            // Se a senha foi fornecida, atualizar
+            if (receptionistForm.password && receptionistForm.password.trim() !== '') {
+                if (receptionistForm.password !== receptionistForm.confirmPassword) {
+                    showError('As senhas não coincidem');
+                    return;
+                }
+                if (receptionistForm.password.length < 4) {
+                    showError('A senha deve ter pelo menos 4 caracteres');
+                    return;
+                }
+                await resetPassword(username, receptionistForm.password);
+            }
+
+            showSuccess('Recepcionista atualizado com sucesso!');
+            setEditingUser(null);
+            setShowReceptionistForm(false);
+            loadUsers();
+        } catch (error: any) {
+            showError(error.message || 'Erro ao atualizar recepcionista');
         }
     };
 
@@ -721,14 +831,14 @@ const StudentManagementPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Formulário de criar/editar aluno */}
-            {showStudentForm && permissions.canCreateStudents && (
-                <Card className="mb-6">
+            {/* Formulário de criar aluno (no topo) */}
+            {showStudentForm && permissions.canCreateStudents && !editingUser && (
+                <Card className="mb-6" data-student-form>
                     <div className="p-6">
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                            {editingUser ? 'Editar Aluno' : 'Criar Novo Aluno'}
+                            Criar Novo Aluno
                         </h2>
-                        <form onSubmit={editingUser ? handleUpdateStudent : handleCreateStudent} className="space-y-4">
+                        <form onSubmit={handleCreateStudent} className="space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -749,25 +859,33 @@ const StudentManagementPage: React.FC = () => {
                                         </p>
                                     )}
                                 </div>
-                                {!editingUser && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Matrícula *
-                                        </label>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Matrícula *
+                                    </label>
+                                    <div className="relative">
                                         <input
-                                            type="text"
+                                            type={showStudentPassword ? 'text' : 'password'}
                                             name="matricula"
                                             value={studentForm.matricula}
                                             onChange={handleStudentFormChange}
-                                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                                             required
                                             placeholder="Matrícula do aluno"
                                         />
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                            A matrícula será usada como senha para login
-                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowStudentPassword(!showStudentPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                            aria-label={showStudentPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                        >
+                                            {showStudentPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                        </button>
                                     </div>
-                                )}
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                        A matrícula será usada como senha para login
+                                    </p>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -799,36 +917,22 @@ const StudentManagementPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="flex gap-3">
-                                <Button type="submit" variant="primary">
-                                    {editingUser ? '💾 Salvar Alterações' : '➕ Criar Aluno'}
-                                </Button>
-                                {editingUser && (
-                                    <Button
-                                        type="button"
-                                        onClick={() => {
-                                            setEditingUser(null);
-                                            setShowStudentForm(false);
-                                        }}
-                                        variant="secondary"
-                                    >
-                                        Cancelar
-                                    </Button>
-                                )}
-                            </div>
+                            <Button type="submit" variant="primary">
+                                ➕ Criar Aluno
+                            </Button>
                         </form>
                     </div>
                 </Card>
             )}
 
-            {/* Formulário de criar recepcionista */}
-            {showReceptionistForm && permissions.canCreateTrainers && (
-                <Card className="mb-6">
+            {/* Formulário de criar recepcionista (no topo) */}
+            {showReceptionistForm && permissions.canCreateTrainers && !editingUser && (
+                <Card className="mb-6" data-receptionist-form>
                     <div className="p-6">
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
                             Criar Novo Recepcionista
                         </h2>
-                        <form onSubmit={handleCreateReceptionist} className="space-y-4">
+                        <form onSubmit={editingUser && editingUser.gymRole === 'receptionist' ? handleUpdateReceptionist : handleCreateReceptionist} className="space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -944,9 +1048,9 @@ const StudentManagementPage: React.FC = () => {
                 </Card>
             )}
 
-            {/* Formulário de criar treinador */}
-            {showTrainerForm && permissions.canCreateTrainers && (
-                <Card className="mb-6">
+            {/* Formulário de criar treinador (no topo) */}
+            {showTrainerForm && permissions.canCreateTrainers && !editingUser && (
+                <Card className="mb-6" data-trainer-form>
                     <div className="p-6">
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
                             Criar Novo Treinador
@@ -955,7 +1059,7 @@ const StudentManagementPage: React.FC = () => {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Nome de Usuário *
+                                        Nome de Usuário {editingUser && editingUser.gymRole === 'trainer' ? '' : '*'}
                                     </label>
                                     <input
                                         type="text"
@@ -963,8 +1067,14 @@ const StudentManagementPage: React.FC = () => {
                                         value={trainerForm.username}
                                         onChange={handleTrainerFormChange}
                                         className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                        required
+                                        required={!editingUser || editingUser.gymRole !== 'trainer'}
+                                        disabled={editingUser && editingUser.gymRole === 'trainer'}
                                     />
+                                    {editingUser && editingUser.gymRole === 'trainer' && (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            O nome de usuário não pode ser alterado
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -1162,6 +1272,102 @@ const StudentManagementPage: React.FC = () => {
                             </table>
                         </div>
                     )}
+                    
+                    {/* Formulário de editar aluno (aparece abaixo da tabela) */}
+                    {editingUser && editingUser.gymRole === 'student' && (
+                        <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
+                                Editar Aluno
+                            </h3>
+                            <form onSubmit={handleUpdateStudent} className="space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Nome Completo *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="nome"
+                                            value={studentForm.nome}
+                                            onChange={handleStudentFormChange}
+                                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Nova Matrícula (Senha)
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type={showStudentPassword ? 'text' : 'password'}
+                                                name="matricula"
+                                                value={studentForm.matricula}
+                                                onChange={handleStudentFormChange}
+                                                className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                placeholder="Deixe em branco para manter a senha atual"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowStudentPassword(!showStudentPassword)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                                aria-label={showStudentPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                            >
+                                                {showStudentPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            Digite uma nova matrícula para alterar a senha. Deixe em branco para manter a senha atual.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Idade
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="idade"
+                                            value={studentForm.idade}
+                                            onChange={handleStudentFormChange}
+                                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Gênero
+                                        </label>
+                                        <select
+                                            name="genero"
+                                            value={studentForm.genero}
+                                            onChange={handleStudentFormChange}
+                                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        >
+                                            <option value="Masculino">Masculino</option>
+                                            <option value="Feminino">Feminino</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <Button type="submit" variant="primary">
+                                        💾 Salvar Alterações
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        onClick={() => {
+                                            setEditingUser(null);
+                                        }}
+                                        variant="secondary"
+                                    >
+                                        Cancelar
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
                 </div>
             </Card>
 
@@ -1182,7 +1388,7 @@ const StudentManagementPage: React.FC = () => {
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Nome</th>
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Username</th>
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Idade</th>
-                                            {permissions.canDeleteStudents && (
+                                            {(permissions.canEditStudents || permissions.canDeleteStudents) && (
                                                 <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Ações</th>
                                             )}
                                         </tr>
@@ -1193,22 +1399,171 @@ const StudentManagementPage: React.FC = () => {
                                                 <td className="py-3 px-4 text-sm text-slate-900 dark:text-white">{trainer.nome}</td>
                                                 <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">{trainer.username}</td>
                                                 <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">{trainer.idade}</td>
-                                                {permissions.canDeleteStudents && (
+                                                {(permissions.canEditStudents || permissions.canDeleteStudents) && (
                                                     <td className="py-3 px-4 text-sm text-right">
-                                                        <Button
-                                                            onClick={() => handleDeleteUser(trainer.username || '', 'treinador')}
-                                                            variant="secondary"
-                                                            size="sm"
-                                                            className="text-red-600 hover:text-red-700 dark:text-red-400"
-                                                        >
-                                                            🗑️ Excluir
-                                                        </Button>
+                                                        <div className="flex justify-end gap-2">
+                                                            {permissions.canEditStudents && (
+                                                                <Button
+                                                                    onClick={() => handleEditUser(trainer)}
+                                                                    variant="secondary"
+                                                                    size="sm"
+                                                                >
+                                                                    ✏️ Editar
+                                                                </Button>
+                                                            )}
+                                                            {permissions.canDeleteStudents && (
+                                                                <Button
+                                                                    onClick={() => handleDeleteUser(trainer.username || '', 'treinador')}
+                                                                    variant="secondary"
+                                                                    size="sm"
+                                                                    className="text-red-600 hover:text-red-700 dark:text-red-400"
+                                                                >
+                                                                    🗑️ Excluir
+                                                                </Button>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 )}
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+                        )}
+                        
+                        {/* Formulário de editar treinador (aparece abaixo da tabela) */}
+                        {editingUser && editingUser.gymRole === 'trainer' && (
+                            <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
+                                    Editar Treinador
+                                </h3>
+                                <form onSubmit={handleUpdateTrainer} className="space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Nome de Usuário
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="username"
+                                                value={trainerForm.username}
+                                                onChange={handleTrainerFormChange}
+                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                disabled
+                                            />
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                O nome de usuário não pode ser alterado
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Nome Completo *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="nome"
+                                                value={trainerForm.nome}
+                                                onChange={handleTrainerFormChange}
+                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Nova Senha
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type={showTrainerPassword ? 'text' : 'password'}
+                                                    name="password"
+                                                    value={trainerForm.password}
+                                                    onChange={handleTrainerFormChange}
+                                                    className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                    placeholder="Deixe em branco para manter a senha atual"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowTrainerPassword(!showTrainerPassword)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                                    aria-label={showTrainerPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                                >
+                                                    {showTrainerPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Confirmar Nova Senha
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type={showTrainerConfirmPassword ? 'text' : 'password'}
+                                                    name="confirmPassword"
+                                                    value={trainerForm.confirmPassword}
+                                                    onChange={handleTrainerFormChange}
+                                                    className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                    required={trainerForm.password.trim() !== ''}
+                                                    placeholder="Deixe em branco para manter a senha atual"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowTrainerConfirmPassword(!showTrainerConfirmPassword)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                                    aria-label={showTrainerConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                                >
+                                                    {showTrainerConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Idade
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="idade"
+                                                value={trainerForm.idade}
+                                                onChange={handleTrainerFormChange}
+                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Gênero
+                                            </label>
+                                            <select
+                                                name="genero"
+                                                value={trainerForm.genero}
+                                                onChange={handleTrainerFormChange}
+                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            >
+                                                <option value="Masculino">Masculino</option>
+                                                <option value="Feminino">Feminino</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3">
+                                        <Button type="submit" variant="primary">
+                                            💾 Salvar Alterações
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                setEditingUser(null);
+                                            }}
+                                            variant="secondary"
+                                        >
+                                            Cancelar
+                                        </Button>
+                                    </div>
+                                </form>
                             </div>
                         )}
                     </div>
@@ -1232,7 +1587,7 @@ const StudentManagementPage: React.FC = () => {
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Nome</th>
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Username</th>
                                             <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Idade</th>
-                                            {permissions.canDeleteStudents && (
+                                            {(permissions.canEditStudents || permissions.canDeleteStudents) && (
                                                 <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Ações</th>
                                             )}
                                         </tr>
@@ -1243,22 +1598,171 @@ const StudentManagementPage: React.FC = () => {
                                                 <td className="py-3 px-4 text-sm text-slate-900 dark:text-white">{receptionist.nome}</td>
                                                 <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">{receptionist.username}</td>
                                                 <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">{receptionist.idade}</td>
-                                                {permissions.canDeleteStudents && (
+                                                {(permissions.canEditStudents || permissions.canDeleteStudents) && (
                                                     <td className="py-3 px-4 text-sm text-right">
-                                                        <Button
-                                                            onClick={() => handleDeleteUser(receptionist.username || '', 'recepcionista')}
-                                                            variant="secondary"
-                                                            size="sm"
-                                                            className="text-red-600 hover:text-red-700 dark:text-red-400"
-                                                        >
-                                                            🗑️ Excluir
-                                                        </Button>
+                                                        <div className="flex justify-end gap-2">
+                                                            {permissions.canEditStudents && (
+                                                                <Button
+                                                                    onClick={() => handleEditUser(receptionist)}
+                                                                    variant="secondary"
+                                                                    size="sm"
+                                                                >
+                                                                    ✏️ Editar
+                                                                </Button>
+                                                            )}
+                                                            {permissions.canDeleteStudents && (
+                                                                <Button
+                                                                    onClick={() => handleDeleteUser(receptionist.username || '', 'recepcionista')}
+                                                                    variant="secondary"
+                                                                    size="sm"
+                                                                    className="text-red-600 hover:text-red-700 dark:text-red-400"
+                                                                >
+                                                                    🗑️ Excluir
+                                                                </Button>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 )}
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+                        )}
+                        
+                        {/* Formulário de editar recepcionista (aparece abaixo da tabela) */}
+                        {editingUser && editingUser.gymRole === 'receptionist' && (
+                            <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
+                                    Editar Recepcionista
+                                </h3>
+                                <form onSubmit={handleUpdateReceptionist} className="space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Nome de Usuário
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="username"
+                                                value={receptionistForm.username}
+                                                onChange={handleReceptionistFormChange}
+                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                disabled
+                                            />
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                O nome de usuário não pode ser alterado
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Nome Completo *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="nome"
+                                                value={receptionistForm.nome}
+                                                onChange={handleReceptionistFormChange}
+                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Nova Senha
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type={showReceptionistPassword ? 'text' : 'password'}
+                                                    name="password"
+                                                    value={receptionistForm.password}
+                                                    onChange={handleReceptionistFormChange}
+                                                    className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                    placeholder="Deixe em branco para manter a senha atual"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowReceptionistPassword(!showReceptionistPassword)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                                    aria-label={showReceptionistPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                                >
+                                                    {showReceptionistPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Confirmar Nova Senha
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type={showReceptionistConfirmPassword ? 'text' : 'password'}
+                                                    name="confirmPassword"
+                                                    value={receptionistForm.confirmPassword}
+                                                    onChange={handleReceptionistFormChange}
+                                                    className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                    required={receptionistForm.password.trim() !== ''}
+                                                    placeholder="Deixe em branco para manter a senha atual"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowReceptionistConfirmPassword(!showReceptionistConfirmPassword)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                                    aria-label={showReceptionistConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                                >
+                                                    {showReceptionistConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Idade
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="idade"
+                                                value={receptionistForm.idade}
+                                                onChange={handleReceptionistFormChange}
+                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Gênero
+                                            </label>
+                                            <select
+                                                name="genero"
+                                                value={receptionistForm.genero}
+                                                onChange={handleReceptionistFormChange}
+                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            >
+                                                <option value="Masculino">Masculino</option>
+                                                <option value="Feminino">Feminino</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3">
+                                        <Button type="submit" variant="primary">
+                                            💾 Salvar Alterações
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                setEditingUser(null);
+                                            }}
+                                            variant="secondary"
+                                        >
+                                            Cancelar
+                                        </Button>
+                                    </div>
+                                </form>
                             </div>
                         )}
                     </div>
