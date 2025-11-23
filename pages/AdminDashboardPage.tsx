@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 import { useUser } from '../context/UserContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { getAllStudents, getAllTrainers, getAllUsers } from '../services/studentManagementService';
@@ -329,56 +330,153 @@ const AdminDashboardPage: React.FC = () => {
           Acesso Rápido
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.hash = '#/student-management'}>
-            <div className="p-4 sm:p-6">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="bg-primary-100 dark:bg-primary-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0">
+          {/* Card: Gerenciar Alunos */}
+          <Card className="group relative overflow-hidden hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary-500/50">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="relative p-4 sm:p-6">
+              <div className="flex items-start gap-3 sm:gap-4 mb-4">
+                <div className="bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/50 dark:to-primary-800/50 p-2.5 sm:p-3 rounded-xl flex-shrink-0 shadow-md">
                   <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 dark:text-primary-400" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate mb-1">
                     Gerenciar Alunos
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-2">
                     Criar, editar e gerenciar alunos
                   </p>
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
+                    <span className="font-semibold text-primary-600 dark:text-primary-400">
+                      {stats.totalStudents}
+                    </span>
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {stats.totalStudents === 1 ? 'aluno' : 'alunos'}
+                    </span>
+                  </div>
                 </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  variant="primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.location.hash = '#/student-management';
+                  }}
+                  className="flex-1 text-xs sm:text-sm py-2"
+                >
+                  Ver Todos
+                </Button>
+                {permissions.canCreateStudents && (
+                  <Button
+                    variant="secondary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.hash = '#/student-management?action=create';
+                    }}
+                    className="flex-1 text-xs sm:text-sm py-2"
+                  >
+                    ➕ Novo Aluno
+                  </Button>
+                )}
               </div>
             </div>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.hash = '#/gym-admin'}>
-            <div className="p-4 sm:p-6">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="bg-primary-100 dark:bg-primary-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0">
-                  <CogIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 dark:text-primary-400" />
+          {/* Card: Configurações da Academia */}
+          <Card className="group relative overflow-hidden hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary-500/50">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="relative p-4 sm:p-6">
+              <div className="flex items-start gap-3 sm:gap-4 mb-4">
+                <div className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-800/50 p-2.5 sm:p-3 rounded-xl flex-shrink-0 shadow-md">
+                  <CogIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate mb-1">
                     Configurações da Academia
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-2">
                     Personalizar branding e configurações
                   </p>
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
+                    <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium">
+                      Configurar
+                    </span>
+                  </div>
                 </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  variant="primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.location.hash = '#/gym-admin';
+                  }}
+                  className="flex-1 text-xs sm:text-sm py-2"
+                >
+                  Abrir Configurações
+                </Button>
+                {permissions.canManageGymSettings && (
+                  <Button
+                    variant="secondary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.hash = '#/gym-admin?tab=branding';
+                    }}
+                    className="flex-1 text-xs sm:text-sm py-2"
+                  >
+                    🎨 Branding
+                  </Button>
+                )}
               </div>
             </div>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.hash = '#/reports'}>
-            <div className="p-4 sm:p-6">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="bg-primary-100 dark:bg-primary-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0">
-                  <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 dark:text-primary-400" />
+          {/* Card: Relatórios */}
+          <Card className="group relative overflow-hidden hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary-500/50">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="relative p-4 sm:p-6">
+              <div className="flex items-start gap-3 sm:gap-4 mb-4">
+                <div className="bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900/50 dark:to-emerald-800/50 p-2.5 sm:p-3 rounded-xl flex-shrink-0 shadow-md">
+                  <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate mb-1">
                     Relatórios
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-2">
                     Visualizar relatórios e análises
                   </p>
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      {stats.activeStudents}
+                    </span>
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {stats.activeStudents === 1 ? 'aluno ativo' : 'alunos ativos'}
+                    </span>
+                  </div>
                 </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  variant="primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.location.hash = '#/reports';
+                  }}
+                  className="flex-1 text-xs sm:text-sm py-2"
+                >
+                  Ver Relatórios
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.location.hash = '#/analysis';
+                  }}
+                  className="flex-1 text-xs sm:text-sm py-2"
+                >
+                  📊 Análises
+                </Button>
               </div>
             </div>
           </Card>
