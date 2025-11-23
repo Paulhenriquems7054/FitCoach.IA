@@ -38,7 +38,17 @@ const AdminDashboardPage: React.FC = () => {
 
   useEffect(() => {
     const loadDashboardData = async () => {
-      if (!user.gymId) {
+      // Verificar se é administrador padrão (Administrador ou Desenvolvedor)
+      const isDefaultAdmin = user.username === 'Administrador' || user.username === 'Desenvolvedor';
+      
+      // Determinar o gymId a usar
+      let gymIdToUse = user.gymId;
+      if (!gymIdToUse && isDefaultAdmin) {
+        // Para administradores padrão, usar gymId padrão
+        gymIdToUse = 'default-gym';
+      }
+      
+      if (!gymIdToUse) {
         setError('Você não está associado a uma academia.');
         setIsLoading(false);
         return;
@@ -46,11 +56,45 @@ const AdminDashboardPage: React.FC = () => {
 
       try {
         setIsLoading(true);
+        
+        // Tentar migrar alunos antigos primeiro (apenas uma vez)
+        try {
+          const { migrateOldStudents } = await import('../services/migrationService');
+          const migrated = await migrateOldStudents(gymIdToUse);
+          if (migrated > 0) {
+            console.log(`Migrados ${migrated} alunos antigos`);
+          }
+        } catch (error) {
+          console.warn('Erro ao migrar alunos antigos:', error);
+        }
+        
+        // Debug: verificar dados antes da busca
+        console.log('AdminDashboard - Buscando alunos:', {
+          gymIdToUse,
+          userGymId: user.gymId,
+          username: user.username,
+          isDefaultAdmin: user.username === 'Administrador' || user.username === 'Desenvolvedor'
+        });
+        
         const [students, trainers, allUsers] = await Promise.all([
-          getAllStudents(user.gymId),
-          getAllTrainers(user.gymId),
-          getAllUsers(user.gymId),
+          getAllStudents(gymIdToUse),
+          getAllTrainers(gymIdToUse),
+          getAllUsers(gymIdToUse),
         ]);
+
+        // Debug: verificar resultados
+        console.log('AdminDashboard - Resultados da busca:', {
+          studentsCount: students.length,
+          trainersCount: trainers.length,
+          allUsersCount: allUsers.length,
+          students: students.map(s => ({
+            username: s.username,
+            nome: s.nome,
+            gymId: s.gymId,
+            gymRole: s.gymRole,
+            isGymManaged: s.isGymManaged
+          }))
+        });
 
         // Calcular estatísticas
         const blockedStudents = students.filter(s => s.accessBlocked).length;
@@ -91,7 +135,7 @@ const AdminDashboardPage: React.FC = () => {
     };
 
     loadDashboardData();
-  }, [user.gymId]);
+  }, [user.gymId, user.username]);
 
   // Verificar permissões
   if (!permissions.canViewAllData && !permissions.canManageGymSettings) {

@@ -215,7 +215,7 @@ export async function initDatabase(): Promise<IDBDatabase> {
 /**
  * Obtém instância do banco de dados (inicializa se necessário)
  */
-async function getDB(): Promise<IDBDatabase> {
+export async function getDB(): Promise<IDBDatabase> {
     if (!dbInstance) {
         return await initDatabase();
     }
@@ -567,13 +567,33 @@ export async function registerUser(username: string, password: string, userData:
             peso: userData.peso || 0,
             altura: userData.altura || 0,
             objetivo: (userData.objetivo || Goal.PERDER_PESO) as Goal,
-            points: 0,
-            disciplineScore: 0,
-            completedChallengeIds: [],
-            isAnonymized: false,
-            weightHistory: [],
-            role: 'user',
-            subscription: 'free',
+            points: userData.points || 0,
+            disciplineScore: userData.disciplineScore || 0,
+            completedChallengeIds: userData.completedChallengeIds || [],
+            isAnonymized: userData.isAnonymized || false,
+            weightHistory: userData.weightHistory || [],
+            role: userData.role || 'user',
+            subscription: userData.subscription || 'free',
+            // Campos de multi-tenancy (academia)
+            gymId: userData.gymId,
+            gymRole: userData.gymRole,
+            isGymManaged: userData.isGymManaged,
+            // Permissões de dados
+            dataPermissions: userData.dataPermissions,
+            // Configurações de segurança
+            securitySettings: userData.securitySettings,
+            // Limites de uso
+            usageLimits: userData.usageLimits,
+            // Controle de acesso
+            accessBlocked: userData.accessBlocked,
+            blockedAt: userData.blockedAt,
+            blockedBy: userData.blockedBy,
+            blockedReason: userData.blockedReason,
+            // Sincronização
+            lastSyncAt: userData.lastSyncAt,
+            gymServerUrl: userData.gymServerUrl,
+            // Foto de perfil
+            photoUrl: userData.photoUrl,
             updatedAt: new Date().toISOString(),
         };
 
@@ -729,12 +749,20 @@ export async function getUsersByGymId(gymId: string): Promise<User[]> {
         const transaction = db.transaction(['users'], 'readonly');
         const store = transaction.objectStore('users');
         
+        // Debug: verificar busca por gymId
+        console.log('getUsersByGymId - Buscando usuários com gymId:', gymId);
+        
         // Tentar usar índice se disponível
         if (store.indexNames.contains('gymId')) {
             const index = store.index('gymId');
             const request = index.getAll(gymId);
             request.onsuccess = () => {
                 const dbUsers = request.result as DBUser[];
+                console.log('getUsersByGymId - Usuários encontrados pelo índice:', {
+                    gymId,
+                    count: dbUsers.length,
+                    usuarios: dbUsers.map(u => ({ username: u.username, gymId: u.gymId, gymRole: u.gymRole }))
+                });
                 const users = dbUsers.map(({ id, updatedAt, password: _, ...user }) => user as User);
                 resolve(users);
             };
@@ -744,7 +772,16 @@ export async function getUsersByGymId(gymId: string): Promise<User[]> {
             const getAllRequest = store.getAll();
             getAllRequest.onsuccess = () => {
                 const allUsers = getAllRequest.result as DBUser[];
+                console.log('getUsersByGymId - Todos os usuários (fallback):', {
+                    total: allUsers.length,
+                    gymIdBuscado: gymId,
+                    usuarios: allUsers.map(u => ({ username: u.username, gymId: u.gymId, gymRole: u.gymRole }))
+                });
                 const filteredUsers = allUsers.filter((u: DBUser) => u.gymId === gymId);
+                console.log('getUsersByGymId - Usuários filtrados:', {
+                    count: filteredUsers.length,
+                    usuarios: filteredUsers.map(u => ({ username: u.username, gymId: u.gymId, gymRole: u.gymRole }))
+                });
                 const users = filteredUsers.map(({ id, updatedAt, password: _, ...user }) => user as User);
                 resolve(users);
             };
@@ -767,9 +804,39 @@ export async function getUsersByGymRole(gymId: string, gymRole: 'student' | 'adm
         const getAllRequest = store.getAll();
         getAllRequest.onsuccess = () => {
             const allUsers = getAllRequest.result as DBUser[];
+            
+            // Debug: verificar todos os usuários antes do filtro
+            console.log('getUsersByGymRole - Todos os usuários no banco:', {
+                total: allUsers.length,
+                gymIdBuscado: gymId,
+                gymRoleBuscado: gymRole,
+                usuarios: allUsers.map(u => ({
+                    username: u.username,
+                    nome: u.nome,
+                    gymId: u.gymId,
+                    gymRole: u.gymRole,
+                    isGymManaged: u.isGymManaged
+                }))
+            });
+            
             const filteredUsers = allUsers.filter(
-                (u: DBUser) => u.gymId === gymId && u.gymRole === gymRole
+                (u: DBUser) => {
+                    const matchesGymId = u.gymId === gymId;
+                    const matchesGymRole = u.gymRole === gymRole;
+                    return matchesGymId && matchesGymRole;
+                }
             );
+            
+            console.log('getUsersByGymRole - Usuários filtrados:', {
+                filtrados: filteredUsers.length,
+                usuarios: filteredUsers.map(u => ({
+                    username: u.username,
+                    nome: u.nome,
+                    gymId: u.gymId,
+                    gymRole: u.gymRole
+                }))
+            });
+            
             const users = filteredUsers.map(({ id, updatedAt, password: _, ...user }) => user as User);
             resolve(users);
         };

@@ -49,13 +49,15 @@ const App: React.FC = () => {
     const { user } = useUser();
     const permissions = usePermissions();
 
-    // Verificar se é aluno tentando acessar rotas administrativas
+    // Verificar se é aluno tentando acessar rotas administrativas ou restritas
     const isStudent = user.gymRole === 'student';
     const adminRoutes = ['/gym-admin', '/student-management', '/professional'];
+    const restrictedRoutes = ['/privacy', '/configuracoes'];
     const isAccessingAdminRoute = adminRoutes.includes(path);
+    const isAccessingRestrictedRoute = restrictedRoutes.includes(path);
 
-    // Se aluno tentar acessar rota administrativa, redirecionar para home
-    if (isStudent && isAccessingAdminRoute) {
+    // Se aluno tentar acessar rota administrativa ou restrita, redirecionar para home
+    if (isStudent && (isAccessingAdminRoute || isAccessingRestrictedRoute)) {
         window.location.hash = '#/';
         return null;
     }

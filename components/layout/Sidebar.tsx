@@ -49,9 +49,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     '/generator',
     '/smart-meal',
     '/analyzer',
-    '/perfil',
-    '/privacy',
-    '/configuracoes'
+    '/perfil'
   ];
 
   const mainNavigation = [
@@ -78,9 +76,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
 
   const userNavigation = [
       { name: t('sidebar.myProfile'), href: '#/perfil', icon: UserCircleIcon },
-      { name: t('sidebar.privacy'), href: '#/privacy', icon: ShieldCheckIcon },
-      { name: t('sidebar.settings'), href: '#/configuracoes', icon: CogIcon },
-  ];
+      { name: t('sidebar.privacy'), href: '#/privacy', icon: ShieldCheckIcon, show: !isStudent },
+      { name: t('sidebar.settings'), href: '#/configuracoes', icon: CogIcon, show: !isStudent },
+  ].filter(item => item.show !== false);
 
   const isCurrent = (href: string) => {
     const cleanHref = href.substring(2);
