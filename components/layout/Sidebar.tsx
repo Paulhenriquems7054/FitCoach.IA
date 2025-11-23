@@ -112,8 +112,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
           </h1>
         </div>
         <div className="mt-8 flex-1 overflow-y-auto">
-          <div className="flex flex-col h-full px-2 pb-6 space-y-6">
-            <nav className="space-y-1" aria-label="Navegação principal">
+          <div className="flex flex-col h-full px-3 pb-6 space-y-8">
+            <nav className="space-y-2" aria-label="Navegação principal">
             {mainNavigation.map((item, index) => (
                 <a
                 key={item.name}
@@ -130,7 +130,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
                     isCurrent(item.href)
                     ? 'bg-slate-100 dark:bg-slate-800 text-primary-600 dark:text-primary-400'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50',
-                    'group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+                    'group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
                 )}
                 aria-current={isCurrent(item.href) ? 'page' : undefined}
                 role="menuitem"
@@ -149,7 +149,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
                 </a>
             ))}
             </nav>
-            <nav className="space-y-1" aria-label="Navegação do usuário">
+            <nav className="space-y-2" aria-label="Navegação do usuário">
             {userNavigation.map((item) => (
                 <a
                 key={item.name}
@@ -166,7 +166,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
                     isCurrent(item.href)
                     ? 'bg-slate-100 dark:bg-slate-800 text-primary-600 dark:text-primary-400'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50',
-                    'group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+                    'group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
                 )}
                 aria-current={isCurrent(item.href) ? 'page' : undefined}
                 role="menuitem"
