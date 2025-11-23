@@ -138,21 +138,29 @@ export async function blockStudentAccess(
     reason?: string
 ): Promise<User> {
     try {
+        if (!studentUsername || studentUsername.trim() === '') {
+            throw new Error('Nome de usuário do aluno é obrigatório');
+        }
+
         const student = await getUserByUsername(studentUsername);
         if (!student) {
-            throw new Error('Aluno não encontrado');
+            throw new Error(`Aluno não encontrado: ${studentUsername}`);
         }
 
         if (student.gymRole !== 'student') {
             throw new Error('Apenas alunos podem ter acesso bloqueado');
         }
 
-        const updatedUser = await updateStudent(studentUsername, {
+        // Atualizar diretamente usando saveUser para garantir que todos os campos sejam preservados
+        const updatedUser: User = {
+            ...student,
             accessBlocked: true,
             blockedAt: new Date().toISOString(),
             blockedBy,
             blockedReason: reason || 'Acesso bloqueado pela administração',
-        });
+        };
+
+        await saveUser(updatedUser);
 
         logger.info(`Acesso do aluno ${studentUsername} bloqueado por ${blockedBy}`, 'studentManagementService');
         return updatedUser;
@@ -170,17 +178,25 @@ export async function unblockStudentAccess(
     unblockedBy: string
 ): Promise<User> {
     try {
-        const student = await getUserByUsername(studentUsername);
-        if (!student) {
-            throw new Error('Aluno não encontrado');
+        if (!studentUsername || studentUsername.trim() === '') {
+            throw new Error('Nome de usuário do aluno é obrigatório');
         }
 
-        const updatedUser = await updateStudent(studentUsername, {
+        const student = await getUserByUsername(studentUsername);
+        if (!student) {
+            throw new Error(`Aluno não encontrado: ${studentUsername}`);
+        }
+
+        // Atualizar diretamente usando saveUser para garantir que todos os campos sejam preservados
+        const updatedUser: User = {
+            ...student,
             accessBlocked: false,
             blockedAt: undefined,
             blockedBy: undefined,
             blockedReason: undefined,
-        });
+        };
+
+        await saveUser(updatedUser);
 
         logger.info(`Acesso do aluno ${studentUsername} desbloqueado por ${unblockedBy}`, 'studentManagementService');
         return updatedUser;

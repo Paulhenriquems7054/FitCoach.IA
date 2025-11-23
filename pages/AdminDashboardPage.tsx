@@ -15,6 +15,7 @@ import { useToast } from '../components/ui/Toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import type { User } from '../types';
 import { Goal } from '../types';
+import jsPDF from 'jspdf';
 
 interface DashboardStats {
   totalStudents: number;
@@ -651,48 +652,179 @@ const AdminDashboardPage: React.FC = () => {
                       const isDefaultAdmin = user.username === 'Administrador' || user.username === 'Desenvolvedor';
                       const gymIdToUse = user.gymId || (isDefaultAdmin ? 'default-gym' : '');
                       if (!gymIdToUse) {
-                        alert('Não foi possível exportar: academia não configurada');
+                        showError('Não foi possível exportar: academia não configurada');
                         return;
                       }
                       const students = await getAllStudents(gymIdToUse);
                       const trainers = await getAllTrainers(gymIdToUse);
                       
-                      const data = {
-                        alunos: students.map(s => ({
-                          nome: s.nome,
-                          username: s.username,
-                          idade: s.idade,
-                          genero: s.genero,
-                          peso: s.peso,
-                          altura: s.altura,
-                          objetivo: s.objetivo,
-                          status: s.accessBlocked ? 'Bloqueado' : 'Ativo'
-                        })),
-                        treinadores: trainers.map(t => ({
-                          nome: t.nome,
-                          username: t.username,
-                          idade: t.idade,
-                          genero: t.genero
-                        })),
-                        exportadoEm: new Date().toISOString()
-                      };
+                      // Criar PDF
+                      const doc = new jsPDF();
+                      const pageWidth = doc.internal.pageSize.getWidth();
+                      const pageHeight = doc.internal.pageSize.getHeight();
+                      let yPosition = 20;
+                      const margin = 15;
+                      const lineHeight = 7;
                       
-                      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `fitcoach-dados-${new Date().toISOString().split('T')[0]}.json`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
+                      // Cabeçalho
+                      doc.setFontSize(18);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('Relatório de Dados - FitCoach.IA', margin, yPosition);
+                      yPosition += 10;
+                      
+                      doc.setFontSize(10);
+                      doc.setFont('helvetica', 'normal');
+                      const exportDate = new Date().toLocaleString('pt-BR');
+                      doc.text(`Exportado em: ${exportDate}`, margin, yPosition);
+                      yPosition += 10;
+                      
+                      // Estatísticas gerais
+                      doc.setFontSize(14);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('Estatísticas Gerais', margin, yPosition);
+                      yPosition += 8;
+                      
+                      doc.setFontSize(10);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text(`Total de Alunos: ${students.length}`, margin, yPosition);
+                      yPosition += lineHeight;
+                      doc.text(`Alunos Ativos: ${students.filter(s => !s.accessBlocked).length}`, margin, yPosition);
+                      yPosition += lineHeight;
+                      doc.text(`Alunos Bloqueados: ${students.filter(s => s.accessBlocked).length}`, margin, yPosition);
+                      yPosition += lineHeight;
+                      doc.text(`Total de Treinadores: ${trainers.length}`, margin, yPosition);
+                      yPosition += 10;
+                      
+                      // Lista de Alunos
+                      if (students.length > 0) {
+                        // Verificar se precisa de nova página
+                        if (yPosition > pageHeight - 60) {
+                          doc.addPage();
+                          yPosition = 20;
+                        }
+                        
+                        doc.setFontSize(14);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('Lista de Alunos', margin, yPosition);
+                        yPosition += 8;
+                        
+                        doc.setFontSize(9);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('Nome', margin, yPosition);
+                        doc.text('Idade', margin + 50, yPosition);
+                        doc.text('Gênero', margin + 70, yPosition);
+                        doc.text('Peso', margin + 95, yPosition);
+                        doc.text('Altura', margin + 115, yPosition);
+                        doc.text('Status', margin + 140, yPosition);
+                        yPosition += lineHeight;
+                        
+                        doc.setFont('helvetica', 'normal');
+                        doc.setDrawColor(200, 200, 200);
+                        doc.line(margin, yPosition - 2, pageWidth - margin, yPosition - 2);
+                        
+                        students.forEach((student, index) => {
+                          // Verificar se precisa de nova página
+                          if (yPosition > pageHeight - 20) {
+                            doc.addPage();
+                            yPosition = 20;
+                            // Reimprimir cabeçalho da tabela
+                            doc.setFontSize(9);
+                            doc.setFont('helvetica', 'bold');
+                            doc.text('Nome', margin, yPosition);
+                            doc.text('Idade', margin + 50, yPosition);
+                            doc.text('Gênero', margin + 70, yPosition);
+                            doc.text('Peso', margin + 95, yPosition);
+                            doc.text('Altura', margin + 115, yPosition);
+                            doc.text('Status', margin + 140, yPosition);
+                            yPosition += lineHeight;
+                            doc.line(margin, yPosition - 2, pageWidth - margin, yPosition - 2);
+                          }
+                          
+                          doc.setFontSize(8);
+                          doc.setFont('helvetica', 'normal');
+                          const nome = student.nome || 'N/A';
+                          const idade = student.idade?.toString() || 'N/A';
+                          const genero = student.genero || 'N/A';
+                          const peso = student.peso ? `${student.peso}kg` : 'N/A';
+                          const altura = student.altura ? `${student.altura}cm` : 'N/A';
+                          const status = student.accessBlocked ? 'Bloqueado' : 'Ativo';
+                          
+                          // Truncar nome se muito longo
+                          const maxNomeWidth = 45;
+                          const truncatedNome = doc.getTextWidth(nome) > maxNomeWidth 
+                            ? doc.splitTextToSize(nome, maxNomeWidth)[0] 
+                            : nome;
+                          
+                          doc.text(truncatedNome, margin, yPosition);
+                          doc.text(idade, margin + 50, yPosition);
+                          doc.text(genero.substring(0, 1), margin + 70, yPosition);
+                          doc.text(peso, margin + 95, yPosition);
+                          doc.text(altura, margin + 115, yPosition);
+                          doc.text(status, margin + 140, yPosition);
+                          yPosition += lineHeight;
+                        });
+                        yPosition += 5;
+                      }
+                      
+                      // Lista de Treinadores
+                      if (trainers.length > 0) {
+                        // Verificar se precisa de nova página
+                        if (yPosition > pageHeight - 40) {
+                          doc.addPage();
+                          yPosition = 20;
+                        }
+                        
+                        doc.setFontSize(14);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('Lista de Treinadores', margin, yPosition);
+                        yPosition += 8;
+                        
+                        doc.setFontSize(9);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('Nome', margin, yPosition);
+                        doc.text('Idade', margin + 50, yPosition);
+                        doc.text('Gênero', margin + 70, yPosition);
+                        yPosition += lineHeight;
+                        
+                        doc.setFont('helvetica', 'normal');
+                        doc.setDrawColor(200, 200, 200);
+                        doc.line(margin, yPosition - 2, pageWidth - margin, yPosition - 2);
+                        
+                        trainers.forEach((trainer) => {
+                          // Verificar se precisa de nova página
+                          if (yPosition > pageHeight - 20) {
+                            doc.addPage();
+                            yPosition = 20;
+                            // Reimprimir cabeçalho da tabela
+                            doc.setFontSize(9);
+                            doc.setFont('helvetica', 'bold');
+                            doc.text('Nome', margin, yPosition);
+                            doc.text('Idade', margin + 50, yPosition);
+                            doc.text('Gênero', margin + 70, yPosition);
+                            yPosition += lineHeight;
+                            doc.line(margin, yPosition - 2, pageWidth - margin, yPosition - 2);
+                          }
+                          
+                          doc.setFontSize(8);
+                          doc.setFont('helvetica', 'normal');
+                          doc.text(trainer.nome || 'N/A', margin, yPosition);
+                          doc.text(trainer.idade?.toString() || 'N/A', margin + 50, yPosition);
+                          doc.text(trainer.genero || 'N/A', margin + 70, yPosition);
+                          yPosition += lineHeight;
+                        });
+                      }
+                      
+                      // Salvar PDF
+                      const fileName = `fitcoach-relatorio-${new Date().toISOString().split('T')[0]}.pdf`;
+                      doc.save(fileName);
+                      showSuccess('Relatório exportado com sucesso!');
                     } catch (error) {
                       console.error('Erro ao exportar dados:', error);
-                      alert('Erro ao exportar dados');
+                      showError('Erro ao exportar dados');
                     }
                   }}
                   className="flex-1 text-xs sm:text-sm py-2"
-                  title="Exportar dados em JSON"
+                  title="Exportar dados em PDF"
                 >
                   💾 Exportar
                 </Button>
