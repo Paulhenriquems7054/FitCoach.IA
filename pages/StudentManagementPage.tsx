@@ -39,6 +39,9 @@ const StudentManagementPage: React.FC = () => {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [showBlockModal, setShowBlockModal] = useState(false);
+    const [studentToBlock, setStudentToBlock] = useState<User | null>(null);
+    const [blockReason, setBlockReason] = useState('');
 
     const [studentForm, setStudentForm] = useState({
         username: '',
@@ -286,38 +289,65 @@ const StudentManagementPage: React.FC = () => {
         }
     };
 
-    const handleBlockStudent = async (student: User) => {
-        if (!window.confirm(`Tem certeza que deseja bloquear o acesso do aluno ${student.nome}?`)) {
+    const handleBlockStudent = (student: User) => {
+        if (!student.username) {
+            showError('Nome de usuário do aluno não encontrado');
+            return;
+        }
+        setStudentToBlock(student);
+        setBlockReason('');
+        setShowBlockModal(true);
+    };
+
+    const confirmBlockStudent = async () => {
+        if (!studentToBlock || !studentToBlock.username) {
             return;
         }
 
         try {
-            const reason = prompt('Motivo do bloqueio (opcional):') || undefined;
+            const blockedBy = currentUser.username || 'Admin';
+            
             await blockStudentAccess(
-                student.username || '',
-                currentUser.username || 'Admin',
-                reason
+                studentToBlock.username,
+                blockedBy,
+                blockReason.trim() || undefined
             );
-            showSuccess(`Acesso do aluno ${student.nome} bloqueado com sucesso!`);
-            loadUsers();
+            
+            showSuccess(`Acesso do aluno ${studentToBlock.nome} bloqueado com sucesso!`);
+            setShowBlockModal(false);
+            setStudentToBlock(null);
+            setBlockReason('');
+            await loadUsers();
         } catch (error: any) {
+            console.error('Erro ao bloquear aluno:', error);
             showError(error.message || 'Erro ao bloquear acesso do aluno');
         }
     };
 
     const handleUnblockStudent = async (student: User) => {
-        if (!window.confirm(`Tem certeza que deseja desbloquear o acesso do aluno ${student.nome}?`)) {
+        if (!student.username) {
+            showError('Nome de usuário do aluno não encontrado');
+            return;
+        }
+
+        // Usar confirm apenas para desbloquear (mais simples)
+        const confirmed = window.confirm(`Tem certeza que deseja desbloquear o acesso do aluno ${student.nome}?`);
+        if (!confirmed) {
             return;
         }
 
         try {
+            const unblockedBy = currentUser.username || 'Admin';
+            
             await unblockStudentAccess(
-                student.username || '',
-                currentUser.username || 'Admin'
+                student.username,
+                unblockedBy
             );
+            
             showSuccess(`Acesso do aluno ${student.nome} desbloqueado com sucesso!`);
-            loadUsers();
+            await loadUsers();
         } catch (error: any) {
+            console.error('Erro ao desbloquear aluno:', error);
             showError(error.message || 'Erro ao desbloquear acesso do aluno');
         }
     };
@@ -1010,6 +1040,53 @@ const StudentManagementPage: React.FC = () => {
                         )}
                     </div>
                 </Card>
+            )}
+
+            {/* Modal de Bloqueio */}
+            {showBlockModal && studentToBlock && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <Card className="w-full max-w-md">
+                        <div className="p-6">
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+                                Bloquear Acesso do Aluno
+                            </h2>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                                Tem certeza que deseja bloquear o acesso do aluno <strong>{studentToBlock.nome}</strong>?
+                            </p>
+                            <div className="mb-4">
+                                <label htmlFor="block-reason" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    Motivo do bloqueio (opcional)
+                                </label>
+                                <textarea
+                                    id="block-reason"
+                                    value={blockReason}
+                                    onChange={(e) => setBlockReason(e.target.value)}
+                                    placeholder="Digite o motivo do bloqueio..."
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    rows={3}
+                                />
+                            </div>
+                            <div className="flex gap-3 justify-end">
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => {
+                                        setShowBlockModal(false);
+                                        setStudentToBlock(null);
+                                        setBlockReason('');
+                                    }}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    onClick={confirmBlockStudent}
+                                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                                >
+                                    🔒 Bloquear
+                                </Button>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
             )}
         </div>
     );
