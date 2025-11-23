@@ -19,6 +19,7 @@ import { WandIcon } from '../icons/WandIcon';
 import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
 import { StarIcon } from '../icons/StarIcon';
 import { UsersIcon } from '../icons/UsersIcon';
+import { KeyIcon } from '../icons/KeyIcon';
 
 interface SidebarProps {
   open: boolean;
@@ -88,9 +89,10 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     });
 
   const userNavigation = [
-      { name: t('sidebar.myProfile'), href: '#/perfil', icon: UserCircleIcon },
+      { name: 'Perfil', href: '#/perfil', icon: UserCircleIcon },
       { name: t('sidebar.privacy'), href: '#/privacy', icon: ShieldCheckIcon, show: isAdmin },
       { name: t('sidebar.settings'), href: '#/configuracoes', icon: CogIcon, show: isAdmin },
+      { name: 'Gerenciar Permissões', href: '#/permissions', icon: KeyIcon, show: isAdmin },
   ].filter(item => item.show !== false);
 
   const isCurrent = (href: string) => {

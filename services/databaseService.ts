@@ -608,6 +608,7 @@ export async function registerUser(username: string, password: string, userData:
 
 /**
  * Autentica um usuário com username e senha
+ * Para alunos, também permite login por nome (username será o nome)
  */
 export async function loginUser(credentials: LoginCredentials): Promise<User | null> {
     const db = await getDB();
@@ -619,49 +620,37 @@ export async function loginUser(credentials: LoginCredentials): Promise<User | n
         const transaction = db.transaction(['users'], 'readonly');
         const store = transaction.objectStore('users');
         
-        // Tentar usar índice se disponível, senão buscar em todos
-        if (store.indexNames.contains('username')) {
-            const index = store.index('username');
-            const request = index.get(credentials.username);
-            request.onsuccess = () => {
-                const dbUser = request.result;
-                if (!dbUser) {
-                    resolve(null); // Username não encontrado
-                    return;
-                }
+        // Buscar todos os usuários para permitir login por nome para alunos
+        const request = store.getAll();
+        request.onsuccess = () => {
+            const users = request.result;
+            
+            // Primeiro, tentar encontrar por username exato
+            let dbUser = users.find((u: DBUser) => u.username === credentials.username);
+            
+            // Se não encontrou por username e é aluno, tentar por nome
+            if (!dbUser) {
+                dbUser = users.find((u: DBUser) => 
+                    u.gymRole === 'student' && 
+                    u.nome === credentials.username
+                );
+            }
+            
+            if (!dbUser) {
+                resolve(null); // Usuário não encontrado
+                return;
+            }
 
-                // Verificar senha
-                if (dbUser.password === hashedPassword) {
-                    // Remover campos internos e senha
-                    const { id, updatedAt, password: _, ...user } = dbUser;
-                    resolve(user as User);
-                } else {
-                    resolve(null); // Senha incorreta
-                }
-            };
-            request.onerror = () => reject(request.error);
-        } else {
-            // Fallback: buscar todos e filtrar
-            const request = store.getAll();
-            request.onsuccess = () => {
-                const users = request.result;
-                const dbUser = users.find((u: DBUser) => u.username === credentials.username);
-                if (!dbUser) {
-                    resolve(null); // Username não encontrado
-                    return;
-                }
-
-                // Verificar senha
-                if (dbUser.password === hashedPassword) {
-                    // Remover campos internos e senha
-                    const { id, updatedAt, password: _, ...user } = dbUser;
-                    resolve(user as User);
-                } else {
-                    resolve(null); // Senha incorreta
-                }
-            };
-            request.onerror = () => reject(request.error);
-        }
+            // Verificar senha
+            if (dbUser.password === hashedPassword) {
+                // Remover campos internos e senha
+                const { id, updatedAt, password: _, ...user } = dbUser;
+                resolve(user as User);
+            } else {
+                resolve(null); // Senha incorreta
+            }
+        };
+        request.onerror = () => reject(request.error);
     });
 }
 
@@ -793,7 +782,7 @@ export async function getUsersByGymId(gymId: string): Promise<User[]> {
 /**
  * Busca usuários por gymRole em uma academia
  */
-export async function getUsersByGymRole(gymId: string, gymRole: 'student' | 'admin' | 'trainer'): Promise<User[]> {
+export async function getUsersByGymRole(gymId: string, gymRole: 'student' | 'admin' | 'trainer' | 'receptionist'): Promise<User[]> {
     const db = await getDB();
     
     return new Promise((resolve, reject) => {
@@ -856,6 +845,13 @@ export async function getStudentsByGymId(gymId: string): Promise<User[]> {
  */
 export async function getTrainersByGymId(gymId: string): Promise<User[]> {
     return getUsersByGymRole(gymId, 'trainer');
+}
+
+/**
+ * Busca todos os recepcionistas (receptionists) de uma academia
+ */
+export async function getReceptionistsByGymId(gymId: string): Promise<User[]> {
+    return getUsersByGymRole(gymId, 'receptionist');
 }
 
 /**

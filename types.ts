@@ -24,7 +24,7 @@ export interface User {
   subscription: 'free' | 'premium';
   // Multi-tenancy: campos para academias
   gymId?: string; // ID da academia (se o usuário pertence a uma)
-  gymRole?: 'student' | 'admin' | 'trainer'; // Papel na academia
+  gymRole?: 'student' | 'admin' | 'trainer' | 'receptionist'; // Papel na academia
   isGymManaged?: boolean; // Se o usuário foi criado/gerenciado por uma academia
   usageLimits?: {
     reportsGeneratedThisWeek?: number;
@@ -52,6 +52,8 @@ export interface User {
   // Sincronização com servidor da academia
   lastSyncAt?: string; // Última sincronização com servidor
   gymServerUrl?: string; // URL do servidor da academia (opcional)
+  // Matrícula do aluno na academia (usada como senha)
+  matricula?: string; // Matrícula do aluno na academia
 }
 
 /**
@@ -68,6 +70,14 @@ export interface Gym {
   contactEmail?: string; // Email de contato
   contactPhone?: string; // Telefone de contato
   website?: string; // Website
+  cnpj?: string; // CNPJ da academia
+  address?: string; // Endereço (rua, avenida, etc.)
+  addressNumber?: string; // Número do endereço
+  addressComplement?: string; // Complemento (apto, bloco, etc.)
+  neighborhood?: string; // Bairro
+  city?: string; // Cidade
+  state?: string; // Estado
+  zipCode?: string; // CEP
   qrCode?: string; // QR code para distribuição (base64 ou URL)
   createdAt: string; // Data de criação
   updatedAt: string; // Data de última atualização

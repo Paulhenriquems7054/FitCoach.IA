@@ -179,6 +179,7 @@ const AdminDashboardPage: React.FC = () => {
           }
           
           // Para outros tipos de arquivo, tentar parsear como texto estruturado
+          // Formato esperado: nome, matricula, idade, genero, peso, altura, objetivo
           const lines = content.split('\n').filter(line => line.trim());
           const data = lines.map((line, index) => {
             const separators = [',', ';', '\t', '|'];
@@ -195,15 +196,19 @@ const AdminDashboardPage: React.FC = () => {
               values = [line.trim()];
             }
             
+            const nome = values[0] || `Aluno ${index + 1}`;
+            const matricula = values[1] || values[2] || `MAT${index + 1}`;
+            
             return {
-              nome: values[0] || `Aluno ${index + 1}`,
-              username: values[1] || values[0]?.toLowerCase().replace(/\s+/g, '') || `aluno${index + 1}`,
-              password: values[2] || '1234',
-              idade: parseInt(values[3]) || 30,
-              genero: values[4]?.toLowerCase().includes('f') ? 'Feminino' : 'Masculino',
-              peso: parseFloat(values[5]) || 70,
-              altura: parseFloat(values[6]) || 170,
-              objetivo: values[7] || Goal.MANTER_PESO,
+              nome: nome,
+              matricula: matricula,
+              username: nome, // Username será o nome do aluno
+              password: matricula, // Senha será a matrícula
+              idade: parseInt(values[2] || values[3]) || 30,
+              genero: (values[3] || values[4])?.toLowerCase().includes('f') ? 'Feminino' : 'Masculino',
+              peso: parseFloat(values[4] || values[5]) || 70,
+              altura: parseFloat(values[5] || values[6]) || 170,
+              objetivo: values[6] || values[7] || Goal.MANTER_PESO,
             };
           });
           
@@ -250,16 +255,23 @@ const AdminDashboardPage: React.FC = () => {
 
       for (const studentData of studentsData) {
         try {
-          const username = studentData.username || studentData.nome?.toLowerCase().replace(/\s+/g, '') || `aluno${Date.now()}`;
-          const password = studentData.password || '1234';
-          const nome = studentData.nome || username;
+          // Validar dados mínimos
+          const nome = studentData.nome || `Aluno ${Date.now()}`;
+          const matricula = studentData.matricula || studentData.password || `MAT${Date.now()}`;
+          // Para alunos, username será o nome (para login por nome)
+          const username = nome;
+          const password = matricula; // Senha será a matrícula
 
-          // Verificar se o usuário já existe
+          // Verificar se o usuário já existe (por nome ou matrícula)
           const existingStudents = await getAllStudents(gymId);
-          const existingStudent = existingStudents.find(s => s.username === username);
+          const existingStudent = existingStudents.find(s => 
+            s.username === username || 
+            s.nome === nome || 
+            (s.matricula && s.matricula === matricula)
+          );
           if (existingStudent) {
             errorCount++;
-            errors.push(`${nome} (${username}): Usuário já existe`);
+            errors.push(`${nome} (Matrícula: ${matricula}): Aluno já existe`);
             continue;
           }
 
@@ -268,6 +280,7 @@ const AdminDashboardPage: React.FC = () => {
             password,
             {
               nome: nome,
+              matricula: matricula,
               idade: studentData.idade || 30,
               genero: studentData.genero || 'Masculino',
               peso: studentData.peso || 70,

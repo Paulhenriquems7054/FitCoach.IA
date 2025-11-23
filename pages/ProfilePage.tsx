@@ -5,44 +5,30 @@ import { Goal } from '../types';
 import { Button } from '../components/ui/Button';
 import { PhotoUploader } from '../components/ui/PhotoUploader';
 import { useToast } from '../components/ui/Toast';
-import { loadGymConfig, saveGymConfig, getAppName } from '../services/gymConfigService';
-import type { Gym } from '../types';
+import { saveUser, resetPassword, getUserByUsername } from '../services/databaseService';
 
 const ProfilePage: React.FC = () => {
     const { user, setUser } = useUser();
     const { showSuccess, showError } = useToast();
     const isAdmin = user.gymRole === 'admin' || user.username === 'Administrador' || user.username === 'Desenvolvedor';
+    const isDefaultUser = user.username === 'Administrador' || user.username === 'Desenvolvedor';
     
     // Estado para perfil pessoal (alunos/treinadores)
     const [isEditing, setIsEditing] = React.useState(false);
     const [formData, setFormData] = React.useState(user);
-    
-    // Estado para perfil da academia (administradores)
-    const [gym, setGym] = React.useState<Gym | null>(null);
-    const [isEditingGym, setIsEditingGym] = React.useState(false);
-    const [gymFormData, setGymFormData] = React.useState({
-        name: '',
-        appName: '',
-        contactEmail: '',
-        contactPhone: '',
-        website: '',
+
+    // Estado para alteração de credenciais (usuários padrão)
+    const [isEditingCredentials, setIsEditingCredentials] = React.useState(false);
+    const [credentialsData, setCredentialsData] = React.useState({
+        nome: user.nome || '',
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
     });
+    const [showPassword, setShowPassword] = React.useState(false);
 
     React.useEffect(() => {
-        if (isAdmin) {
-            // Carregar dados da academia
-            const loadedGym = loadGymConfig();
-            if (loadedGym) {
-                setGym(loadedGym);
-                setGymFormData({
-                    name: loadedGym.name,
-                    appName: loadedGym.appName || getAppName(),
-                    contactEmail: loadedGym.contactEmail || '',
-                    contactPhone: loadedGym.contactPhone || '',
-                    website: loadedGym.website || '',
-                });
-            }
-        } else {
+        if (!isAdmin) {
             setFormData(user);
         }
     }, [user, isAdmin]);
@@ -70,170 +56,199 @@ const ProfilePage: React.FC = () => {
         setIsEditing(false);
     };
 
-    const handleGymInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+    const handleCredentialsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setGymFormData(prev => ({ ...prev, [name]: value }));
+        setCredentialsData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleGymSave = () => {
-        if (!gym) {
-            showError('Academia não encontrada');
+    const handleCredentialsSave = async () => {
+        if (!user.username) {
+            showError('Nome de usuário não encontrado');
             return;
         }
 
-        const updatedGym: Gym = {
-            ...gym,
-            name: gymFormData.name,
-            appName: gymFormData.appName,
-            contactEmail: gymFormData.contactEmail,
-            contactPhone: gymFormData.contactPhone,
-            website: gymFormData.website,
-            updatedAt: new Date().toISOString(),
-        };
-
-        saveGymConfig(updatedGym);
-        setGym(updatedGym);
-        setIsEditingGym(false);
-        showSuccess('Informações da academia atualizadas com sucesso!');
-    };
-
-    const handleGymCancel = () => {
-        if (gym) {
-            setGymFormData({
-                name: gym.name,
-                appName: gym.appName || getAppName(),
-                contactEmail: gym.contactEmail || '',
-                contactPhone: gym.contactPhone || '',
-                website: gym.website || '',
-            });
+        // Validar senha se fornecida
+        if (credentialsData.newPassword) {
+            if (credentialsData.newPassword.length < 6) {
+                showError('A nova senha deve ter pelo menos 6 caracteres');
+                return;
+            }
+            if (credentialsData.newPassword !== credentialsData.confirmPassword) {
+                showError('As senhas não coincidem');
+                return;
+            }
         }
-        setIsEditingGym(false);
+
+        try {
+            // Atualizar nome
+            if (credentialsData.nome !== user.nome) {
+                const updatedUser = {
+                    ...user,
+                    nome: credentialsData.nome,
+                };
+                await saveUser(updatedUser);
+                setUser(updatedUser);
+            }
+
+            // Atualizar senha se fornecida
+            if (credentialsData.newPassword) {
+                // Verificar senha atual (simplificado - em produção, validar hash)
+                const currentUser = await getUserByUsername(user.username);
+                if (!currentUser) {
+                    showError('Usuário não encontrado');
+                    return;
+                }
+
+                // Atualizar senha
+                await resetPassword(user.username, credentialsData.newPassword);
+            }
+
+            showSuccess('Credenciais atualizadas com sucesso!');
+            setIsEditingCredentials(false);
+            setCredentialsData({
+                nome: credentialsData.nome,
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: '',
+            });
+        } catch (error: any) {
+            console.error('Erro ao atualizar credenciais:', error);
+            showError(error.message || 'Erro ao atualizar credenciais');
+        }
     };
 
-    // Se for administrador, mostrar perfil da academia
+    const handleCredentialsCancel = () => {
+        setCredentialsData({
+            nome: user.nome || '',
+            currentPassword: '',
+            newPassword: '',
+            confirmPassword: '',
+        });
+        setIsEditingCredentials(false);
+    };
+
+    // Se for administrador, mostrar apenas credenciais (se for usuário padrão)
     if (isAdmin) {
         return (
-            <div className="max-w-2xl mx-auto px-2 sm:px-4">
+            <div className="max-w-2xl mx-auto px-2 sm:px-4 space-y-6">
                 <div className="text-center mb-6 sm:mb-8">
-                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Perfil da Academia</h1>
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Perfil</h1>
                     <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">
-                        Gerencie as informações e configurações da sua academia.
+                        Gerencie suas credenciais de acesso.
                     </p>
                 </div>
 
-                <Card>
-                    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-                        {!gym ? (
-                            <div className="text-center py-8">
-                                <p className="text-slate-600 dark:text-slate-400 mb-4">
-                                    Nenhuma academia configurada ainda.
-                                </p>
-                                <Button onClick={() => window.location.hash = '#/gym-admin'}>
-                                    Configurar Academia
-                                </Button>
+                {/* Seção de Credenciais para usuários padrão (Administrador/Desenvolvedor) */}
+                {isDefaultUser && (
+                    <Card>
+                        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+                            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Minhas Credenciais</h2>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                        Altere seu nome e senha de acesso
+                                    </p>
+                                </div>
+                                {!isEditingCredentials && (
+                                    <Button onClick={() => setIsEditingCredentials(true)}>
+                                        Editar
+                                    </Button>
+                                )}
                             </div>
-                        ) : (
-                            <>
+
+                            {isEditingCredentials ? (
                                 <div className="space-y-4">
                                     <div>
-                                        <label htmlFor="gym-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Nome da Academia
+                                        <label htmlFor="credentials-nome" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Nome
                                         </label>
                                         <input
                                             type="text"
-                                            name="name"
-                                            id="gym-name"
-                                            value={gymFormData.name}
-                                            onChange={handleGymInputChange}
-                                            disabled={!isEditingGym}
-                                            className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed"
+                                            name="nome"
+                                            id="credentials-nome"
+                                            value={credentialsData.nome}
+                                            onChange={handleCredentialsChange}
+                                            className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                                         />
                                     </div>
 
                                     <div>
-                                        <label htmlFor="gym-appName" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Nome do App
+                                        <label htmlFor="credentials-new-password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Nova Senha (deixe em branco para não alterar)
                                         </label>
-                                        <input
-                                            type="text"
-                                            name="appName"
-                                            id="gym-appName"
-                                            value={gymFormData.appName}
-                                            onChange={handleGymInputChange}
-                                            disabled={!isEditingGym}
-                                            placeholder="Ex: Academia XYZ - FitCoach.IA"
-                                            className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed"
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <label htmlFor="gym-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                                Email de Contato
-                                            </label>
+                                        <div className="relative">
                                             <input
-                                                type="email"
-                                                name="contactEmail"
-                                                id="gym-email"
-                                                value={gymFormData.contactEmail}
-                                                onChange={handleGymInputChange}
-                                                disabled={!isEditingGym}
-                                                className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed"
+                                                type={showPassword ? "text" : "password"}
+                                                name="newPassword"
+                                                id="credentials-new-password"
+                                                value={credentialsData.newPassword}
+                                                onChange={handleCredentialsChange}
+                                                className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                                             />
-                                        </div>
-                                        <div>
-                                            <label htmlFor="gym-phone" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                                Telefone de Contato
-                                            </label>
-                                            <input
-                                                type="tel"
-                                                name="contactPhone"
-                                                id="gym-phone"
-                                                value={gymFormData.contactPhone}
-                                                onChange={handleGymInputChange}
-                                                disabled={!isEditingGym}
-                                                className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed"
-                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-2 top-3 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                            >
+                                                {showPassword ? '👁️' : '👁️‍🗨️'}
+                                            </button>
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <label htmlFor="gym-website" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Website
-                                        </label>
-                                        <input
-                                            type="url"
-                                            name="website"
-                                            id="gym-website"
-                                            value={gymFormData.website}
-                                            onChange={handleGymInputChange}
-                                            disabled={!isEditingGym}
-                                            placeholder="https://exemplo.com"
-                                            className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-end gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                    {isEditingGym ? (
-                                        <>
-                                            <Button variant="secondary" onClick={handleGymCancel}>
-                                                Cancelar
-                                            </Button>
-                                            <Button onClick={handleGymSave}>
-                                                Salvar Alterações
-                                            </Button>
-                                        </>
-                                    ) : (
-                                        <Button onClick={() => setIsEditingGym(true)}>
-                                            Editar Informações
-                                        </Button>
+                                    {credentialsData.newPassword && (
+                                        <div>
+                                            <label htmlFor="credentials-confirm-password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Confirmar Nova Senha
+                                            </label>
+                                            <input
+                                                type={showPassword ? "text" : "password"}
+                                                name="confirmPassword"
+                                                id="credentials-confirm-password"
+                                                value={credentialsData.confirmPassword}
+                                                onChange={handleCredentialsChange}
+                                                className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                            />
+                                        </div>
                                     )}
+
+                                    <div className="flex justify-end gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                        <Button variant="secondary" onClick={handleCredentialsCancel}>
+                                            Cancelar
+                                        </Button>
+                                        <Button onClick={handleCredentialsSave}>
+                                            Salvar Alterações
+                                        </Button>
+                                    </div>
                                 </div>
-                            </>
-                        )}
-                    </div>
-                </Card>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div>
+                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Nome:</span>
+                                        <p className="text-sm text-slate-900 dark:text-white">{user.nome || 'Não informado'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Usuário:</span>
+                                        <p className="text-sm text-slate-900 dark:text-white">{user.username || 'Não informado'}</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                )}
+
+                {!isDefaultUser && (
+                    <Card>
+                        <div className="p-4 sm:p-6 text-center py-8">
+                            <p className="text-slate-600 dark:text-slate-400 mb-4">
+                                Para configurar a academia, acesse a página de Configurações.
+                            </p>
+                            <Button onClick={() => window.location.hash = '#/configuracoes'}>
+                                Ir para Configurações
+                            </Button>
+                        </div>
+                    </Card>
+                )}
             </div>
         );
     }

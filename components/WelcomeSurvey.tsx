@@ -79,8 +79,15 @@ type AnswerValue =
 
 const SURVEY_VERSION = 'v2'; // Atualizado para v2 com nova estrutura
 const LEGACY_STORAGE_KEYS = ['nutriIA_enquete', 'enqueteRespondida', 'nutriIA_enquete_v1'];
-const STORAGE_KEY = `nutriIA_enquete_${SURVEY_VERSION}`;
-const STORAGE_FLAG = `nutriIA_enquete_${SURVEY_VERSION}_done`;
+// Função para obter a chave de storage específica do usuário
+const getStorageKey = (username?: string) => {
+  const userSuffix = username ? `_${username}` : '';
+  return `nutriIA_enquete_${SURVEY_VERSION}${userSuffix}`;
+};
+const getStorageFlag = (username?: string) => {
+  const userSuffix = username ? `_${username}` : '';
+  return `nutriIA_enquete_${SURVEY_VERSION}_done${userSuffix}`;
+};
 
 // Estrutura completa da enquete conforme especificação
 const questions: Question[] = [
@@ -347,12 +354,16 @@ type WelcomeSurveyProps = {
 };
 
 const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = true, onCompleted }) => {
-  const { setUser } = useUser();
+  const { setUser, user } = useUser();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>(baseAnswers);
   const [showSurvey, setShowSurvey] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  // Obter chaves de storage específicas do usuário
+  const STORAGE_KEY = getStorageKey(user?.username);
+  const STORAGE_FLAG = getStorageFlag(user?.username);
 
   useEffect(() => {
     setMounted(true);
@@ -361,15 +372,17 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
 
   useEffect(() => {
     try {
-      // Limpar versões antigas
-      LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+      // Limpar versões antigas apenas se não houver username (compatibilidade)
+      if (!user?.username) {
+        LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+      }
       const hasAnswered = localStorage.getItem(STORAGE_FLAG);
       setShowSurvey(!hasAnswered);
     } catch (error) {
       logger.warn('Não foi possível acessar o localStorage', 'WelcomeSurvey', error);
       setShowSurvey(true);
     }
-  }, []);
+  }, [user?.username, STORAGE_FLAG]);
 
   // Lógica condicional: algumas perguntas só aparecem se outras foram respondidas
   const shouldShowQuestion = (question: Question): boolean => {
