@@ -119,18 +119,16 @@ body {
 
 /* FIX CRÍTICO: Garantir que o botão CTA da página de apresentação exiba texto completo */
 #presentation-cta-button {
-  min-width: 350px !important;
-  width: auto !important;
-  max-width: none !important;
+  min-width: 280px !important;
+  width: 100% !important;
+  max-width: 100% !important;
   white-space: nowrap !important;
   overflow: visible !important;
   text-overflow: clip !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 0.875rem 2.5rem !important;
-  padding-left: 2.5rem !important;
-  padding-right: 2.5rem !important;
+  padding: 0.75rem 1.5rem !important;
   box-sizing: border-box !important;
   position: relative !important;
   margin-left: 0 !important;
@@ -138,8 +136,13 @@ body {
   text-indent: 0 !important;
 }
 
-#presentation-cta-button {
-  white-space: nowrap !important;
+@media (min-width: 640px) {
+  #presentation-cta-button {
+    min-width: 350px !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 0.875rem 2.5rem !important;
+  }
 }
 
 #presentation-cta-container {

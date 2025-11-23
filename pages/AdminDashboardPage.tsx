@@ -127,78 +127,78 @@ const AdminDashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 px-4 py-6">
+    <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 px-2 sm:px-4 py-4 sm:py-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
           Dashboard Administrativo
         </h1>
-        <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">
+        <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400">
           Bem-vindo, {user.nome}! Gerencie sua academia de forma eficiente.
         </p>
       </div>
 
       {/* Estatísticas Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Total de Alunos</p>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">Total de Alunos</p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1 sm:mt-2">
                   {stats.totalStudents}
                 </p>
               </div>
-              <div className="bg-emerald-100 dark:bg-emerald-900/50 p-3 rounded-lg">
-                <UsersIcon className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+              <div className="bg-emerald-100 dark:bg-emerald-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                <UsersIcon className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
           </div>
         </Card>
 
         <Card>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Alunos Ativos</p>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">Alunos Ativos</p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1 sm:mt-2">
                   {stats.activeStudents}
                 </p>
               </div>
-              <div className="bg-blue-100 dark:bg-blue-900/50 p-3 rounded-lg">
-                <UsersIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              <div className="bg-blue-100 dark:bg-blue-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                <UsersIcon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </div>
         </Card>
 
         <Card>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Alunos Bloqueados</p>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">Alunos Bloqueados</p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1 sm:mt-2">
                   {stats.blockedStudents}
                 </p>
               </div>
-              <div className="bg-red-100 dark:bg-red-900/50 p-3 rounded-lg">
-                <ShieldCheckIcon className="w-8 h-8 text-red-600 dark:text-red-400" />
+              <div className="bg-red-100 dark:bg-red-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                <ShieldCheckIcon className="w-6 h-6 sm:w-8 sm:h-8 text-red-600 dark:text-red-400" />
               </div>
             </div>
           </div>
         </Card>
 
         <Card>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Treinadores</p>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">Treinadores</p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1 sm:mt-2">
                   {stats.totalTrainers}
                 </p>
               </div>
-              <div className="bg-purple-100 dark:bg-purple-900/50 p-3 rounded-lg">
-                <UsersIcon className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+              <div className="bg-purple-100 dark:bg-purple-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                <UsersIcon className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
           </div>
@@ -206,16 +206,16 @@ const AdminDashboardPage: React.FC = () => {
       </div>
 
       {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Gráfico de Alunos por Objetivo */}
         {stats.studentsByGoal.length > 0 && (
           <Card>
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+            <div className="p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-3 sm:mb-4">
                 Alunos por Objetivo
               </h3>
-              <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
+              <div className="w-full h-[250px] sm:h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={stats.studentsByGoal}
@@ -223,7 +223,7 @@ const AdminDashboardPage: React.FC = () => {
                       cy="50%"
                       labelLine={false}
                       label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius="70%"
                       fill="#8884d8"
                       dataKey="value"
                     >
@@ -242,25 +242,33 @@ const AdminDashboardPage: React.FC = () => {
         {/* Gráfico de Atividade */}
         {stats.recentActivity.length > 0 && (
           <Card>
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+            <div className="p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-3 sm:mb-4">
                 Atividade Recente
               </h3>
-              <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
-                  <BarChart data={stats.recentActivity}>
+              <div className="w-full h-[250px] sm:h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.recentActivity} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.2)" />
-                    <XAxis dataKey="name" stroke="rgb(100 116 139)" />
-                    <YAxis stroke="rgb(100 116 139)" />
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="rgb(100 116 139)" 
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis 
+                      stroke="rgb(100 116 139)" 
+                      tick={{ fontSize: 12 }}
+                    />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: 'rgba(30, 41, 59, 0.9)',
                         borderColor: 'rgb(51 65 85)',
                         color: '#fff',
                         borderRadius: '0.5rem',
+                        fontSize: '12px',
                       }}
                     />
-                    <Legend />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
                     <Bar dataKey="students" fill="#10b981" name="Alunos" />
                     <Bar dataKey="trainers" fill="#3b82f6" name="Treinadores" />
                   </BarChart>
@@ -273,21 +281,21 @@ const AdminDashboardPage: React.FC = () => {
 
       {/* Acesso Rápido */}
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3 sm:mb-4">
           Acesso Rápido
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.hash = '#/student-management'}>
-            <div className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-primary-100 dark:bg-primary-900/50 p-3 rounded-lg">
-                  <UsersIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="bg-primary-100 dark:bg-primary-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0">
+                  <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 dark:text-primary-400" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate">
                     Gerenciar Alunos
                   </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
                     Criar, editar e gerenciar alunos
                   </p>
                 </div>
@@ -296,16 +304,16 @@ const AdminDashboardPage: React.FC = () => {
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.hash = '#/gym-admin'}>
-            <div className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-primary-100 dark:bg-primary-900/50 p-3 rounded-lg">
-                  <CogIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="bg-primary-100 dark:bg-primary-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0">
+                  <CogIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 dark:text-primary-400" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate">
                     Configurações da Academia
                   </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
                     Personalizar branding e configurações
                   </p>
                 </div>
@@ -314,16 +322,16 @@ const AdminDashboardPage: React.FC = () => {
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.hash = '#/reports'}>
-            <div className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-primary-100 dark:bg-primary-900/50 p-3 rounded-lg">
-                  <ChartBarIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="bg-primary-100 dark:bg-primary-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0">
+                  <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 dark:text-primary-400" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate">
                     Relatórios
                   </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
                     Visualizar relatórios e análises
                   </p>
                 </div>

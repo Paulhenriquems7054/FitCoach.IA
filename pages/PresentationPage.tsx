@@ -146,37 +146,9 @@ const PresentationPage: React.FC = () => {
                 <button
                   id="presentation-cta-button"
                   onClick={() => (window.location.hash = '/login')}
+                  className="px-4 sm:px-6 md:px-10 py-3 sm:py-3.5 text-sm sm:text-base md:text-lg font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg border-none cursor-pointer inline-flex items-center justify-center w-full sm:w-auto min-w-[280px] sm:min-w-[350px] shadow-lg shadow-emerald-500/30 transition-all duration-200 hover:scale-105 hover:from-emerald-400 hover:to-emerald-500"
                   style={{ 
-                    padding: '0.875rem 2.5rem',
-                    fontSize: '1.125rem',
-                    fontWeight: '600',
-                    color: '#ffffff',
-                    background: 'linear-gradient(to right, rgb(16 185 129), rgb(5 150 105))',
-                    borderRadius: '0.75rem',
-                    border: 'none',
-                    cursor: 'pointer',
-                    minWidth: '350px',
-                    width: 'auto',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'visible',
-                    textOverflow: 'clip',
-                    whiteSpace: 'nowrap',
-                    maxWidth: 'none',
                     boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3), 0 4px 6px -2px rgba(16, 185, 129, 0.2)',
-                    transition: 'all 0.2s ease-in-out',
-                    lineHeight: '1.5',
-                    position: 'relative',
-                    boxSizing: 'border-box'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, rgb(52, 211, 153), rgb(16, 185, 129))';
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, rgb(16 185 129), rgb(5 150 105))';
-                    e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
                   {t('presentation.cta_button')}

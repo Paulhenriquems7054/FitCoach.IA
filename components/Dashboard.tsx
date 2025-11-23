@@ -123,10 +123,10 @@ const Dashboard: React.FC<DashboardProps> = memo(({ summary }) => {
   }, []);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+    <div className="space-y-4 sm:space-y-6">
       
       {/* Estatísticas de Treino */}
-      <Card className="lg:col-span-3">
+      <Card>
         <div className="p-4 sm:p-6">
           <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-4">📊 Estatísticas de Treino</h3>
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4 text-center">
@@ -157,60 +157,81 @@ const Dashboard: React.FC<DashboardProps> = memo(({ summary }) => {
           </div>
         </div>
       </Card>
-      
-      <Card>
-        <div className="p-6 space-y-6 text-center">
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white">💪 Seu Progresso</h3>
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Progresso Semanal</p>
-              <div className="flex items-center justify-center">
-                <CircularProgress progress={workoutStats.progressoPercentual} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <Card>
+          <div className="p-6 space-y-6 text-center">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">💪 Seu Progresso</h3>
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Progresso Semanal</p>
+                <div className="flex items-center justify-center">
+                  <CircularProgress progress={workoutStats.progressoPercentual} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Disciplina</p>
+                <p className="text-4xl font-bold text-primary-600 dark:text-primary-400">{user.disciplineScore}%</p>
               </div>
             </div>
-            <div className="space-y-2">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Disciplina</p>
-              <p className="text-4xl font-bold text-primary-600 dark:text-primary-400">{user.disciplineScore}%</p>
-            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
 
-      <Card className="lg:col-span-2">
-          <div className="p-6">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">📅 Progresso Semanal de Treinos</h3>
+        <Card className="lg:col-span-2">
+          <div className="p-4 sm:p-6">
+            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-3 sm:mb-4">📅 Progresso Semanal de Treinos</h3>
             {weeklyData.length > 0 ? (
-              <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
-                  <BarChart data={weeklyData}>
+              <div className="w-full h-[300px] sm:h-[350px] md:h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={weeklyData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.2)" />
-                    <XAxis dataKey="name" stroke="rgb(100 116 139)" />
-                    <YAxis stroke="rgb(100 116 139)" domain={[0, 1]} />
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="rgb(100 116 139)" 
+                      tick={{ fill: 'rgb(100 116 139)', fontSize: 12 }}
+                    />
+                    <YAxis 
+                      stroke="rgb(100 116 139)" 
+                      domain={[0, 1]} 
+                      tick={{ fill: 'rgb(100 116 139)', fontSize: 12 }}
+                    />
                     <Tooltip
                       contentStyle={{ 
                         backgroundColor: 'rgba(30, 41, 59, 0.9)', 
                         borderColor: 'rgb(51 65 85)',
                         color: '#fff',
-                        borderRadius: '0.5rem'
+                        borderRadius: '0.5rem',
+                        padding: '8px',
+                        fontSize: '12px'
                       }} 
                       cursor={{fill: 'rgba(100, 116, 139, 0.1)'}}
                       formatter={(value: number) => value === 1 ? 'Completo ✓' : 'Pendente'}
                     />
-                    <Legend />
-                    <Bar dataKey="completos" fill="rgb(34 197 94)" name="Treinos Completos" />
+                    <Legend 
+                      wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }}
+                      iconType="rect"
+                    />
+                    <Bar 
+                      dataKey="completos" 
+                      fill="rgb(34 197 94)" 
+                      name="Treinos Completos"
+                      radius={[6, 6, 0, 0]}
+                      barSize={40}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-[300px] text-slate-500 dark:text-slate-400">
-                <div className="text-center">
-                  <p className="text-lg mb-2">📋 Nenhum plano de treino ainda</p>
-                  <p className="text-sm">Gere um plano de treino para ver seu progresso aqui!</p>
+              <div className="flex items-center justify-center h-[300px] sm:h-[350px] md:h-[400px] text-slate-500 dark:text-slate-400">
+                <div className="text-center px-4">
+                  <p className="text-base sm:text-lg mb-2">📋 Nenhum plano de treino ainda</p>
+                  <p className="text-xs sm:text-sm">Gere um plano de treino para ver seu progresso aqui!</p>
                 </div>
               </div>
             )}
           </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }, (prevProps, nextProps) => {
