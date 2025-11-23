@@ -1110,20 +1110,19 @@ const SettingsPage: React.FC = () => {
                                             placeholder="Insira a chave gratuita ou de testes"
                                             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                                         />
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                Padrão:{' '}
-                                                <span className="font-medium text-primary-600 dark:text-primary-400">{DEFAULT_FREE_API_KEY}</span>
-                                            </p>
-                                            <Button
-                                                type="button"
-                                                variant="secondary"
-                                                size="sm"
-                                                onClick={handleUseDefaultFreeKey}
-                                            >
-                                                Usar Demo
-                                            </Button>
-                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={handleUseDefaultFreeKey}
+                                            className="whitespace-nowrap"
+                                        >
+                                            Usar Demo
+                                        </Button>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            Padrão:{' '}
+                                            <span className="font-medium text-primary-600 dark:text-primary-400">{DEFAULT_FREE_API_KEY}</span>
+                                        </p>
                                     </div>
                             </div>
                         </div>

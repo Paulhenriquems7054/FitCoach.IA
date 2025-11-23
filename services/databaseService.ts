@@ -363,6 +363,7 @@ export async function saveUser(user: User): Promise<void> {
 
 /**
  * Carrega dados do usuário pelo username
+ * Sempre usa getAll() para garantir que encontre o usuário mesmo após atualização de username
  */
 export async function getUserByUsername(username: string): Promise<User | null> {
     const db = await getDB();
@@ -370,37 +371,24 @@ export async function getUserByUsername(username: string): Promise<User | null> 
         const transaction = db.transaction(['users'], 'readonly');
         const store = transaction.objectStore('users');
         
-        // Tentar usar índice se disponível, senão buscar em todos
-        if (store.indexNames.contains('username')) {
-            const index = store.index('username');
-            const request = index.get(username);
-            request.onsuccess = () => {
-                const dbUser = request.result;
-                if (dbUser) {
-                    // Remover campos internos do banco
-                    const { id, updatedAt, password: _, ...user } = dbUser;
-                    resolve(user as User);
-                } else {
-                    resolve(null);
-                }
-            };
-            request.onerror = () => reject(request.error);
-        } else {
-            // Fallback: buscar todos e filtrar
-            const request = store.getAll();
-            request.onsuccess = () => {
-                const users = request.result;
-                const dbUser = users.find((u: DBUser) => u.username === username);
-                if (dbUser) {
-                    // Remover campos internos do banco
-                    const { id, updatedAt, password: _, ...user } = dbUser;
-                    resolve(user as User);
-                } else {
-                    resolve(null);
-                }
-            };
-            request.onerror = () => reject(request.error);
-        }
+        // Sempre usar getAll() para garantir que encontre o usuário mesmo após atualização de username
+        // Isso evita problemas com índices que podem não estar atualizados imediatamente
+        const request = store.getAll();
+        request.onsuccess = () => {
+            const users = request.result;
+            const dbUser = users.find((u: DBUser) => u.username === username);
+            if (dbUser) {
+                // Remover campos internos do banco
+                const { id, updatedAt, password: _, ...user } = dbUser;
+                resolve(user as User);
+            } else {
+                resolve(null);
+            }
+        };
+        request.onerror = () => {
+            logger.error(`Erro ao buscar usuário por username: ${username}`, 'databaseService', request.error);
+            reject(request.error);
+        };
     });
 }
 
@@ -625,6 +613,10 @@ export async function loginUser(credentials: LoginCredentials): Promise<User | n
         request.onsuccess = () => {
             const users = request.result;
             
+            // Debug: listar todos os usernames disponíveis
+            const allUsernames = users.map((u: DBUser) => u.username);
+            logger.debug(`Tentativa de login com username: ${credentials.username}. Usernames disponíveis: ${allUsernames.join(', ')}`, 'databaseService');
+            
             // Primeiro, tentar encontrar por username exato
             let dbUser = users.find((u: DBUser) => u.username === credentials.username);
             
@@ -637,20 +629,26 @@ export async function loginUser(credentials: LoginCredentials): Promise<User | n
             }
             
             if (!dbUser) {
+                logger.warn(`Usuário não encontrado: ${credentials.username}`, 'databaseService');
                 resolve(null); // Usuário não encontrado
                 return;
             }
 
             // Verificar senha
             if (dbUser.password === hashedPassword) {
+                logger.info(`Login bem-sucedido para usuário: ${credentials.username}`, 'databaseService');
                 // Remover campos internos e senha
                 const { id, updatedAt, password: _, ...user } = dbUser;
                 resolve(user as User);
             } else {
+                logger.warn(`Senha incorreta para usuário: ${credentials.username}`, 'databaseService');
                 resolve(null); // Senha incorreta
             }
         };
-        request.onerror = () => reject(request.error);
+        request.onerror = () => {
+            logger.error('Erro ao buscar usuários para login', 'databaseService', request.error);
+            reject(request.error);
+        };
     });
 }
 
@@ -874,24 +872,78 @@ export async function resetPassword(username: string, newPassword: string): Prom
         const transaction = db.transaction(['users'], 'readwrite');
         const store = transaction.objectStore('users');
         
+        // Sempre usar getAll() para garantir que encontre o usuário mesmo após atualização de username
+        // Isso evita problemas com índices que podem não estar atualizados imediatamente
+        const request = store.getAll();
+        request.onsuccess = () => {
+            const users = request.result;
+            const dbUser = users.find((u: DBUser) => u.username === username);
+            if (!dbUser) {
+                logger.warn(`Usuário não encontrado para reset de senha: ${username}`, 'databaseService');
+                resolve(false); // Username não encontrado
+                return;
+            }
+
+            // Atualizar senha
+            dbUser.password = hashedPassword;
+            dbUser.updatedAt = new Date().toISOString();
+            
+            const updateRequest = store.put(dbUser);
+            updateRequest.onsuccess = () => {
+                logger.info(`Senha redefinida com sucesso para usuário: ${username}`, 'databaseService');
+                resolve(true);
+            };
+            updateRequest.onerror = () => {
+                logger.error('Erro ao atualizar senha no banco', 'databaseService', updateRequest.error);
+                reject(updateRequest.error);
+            };
+        };
+        request.onerror = () => {
+            logger.error('Erro ao buscar usuários para reset de senha', 'databaseService', request.error);
+            reject(request.error);
+        };
+    });
+}
+
+/**
+ * Atualiza o username de um usuário
+ */
+export async function updateUsername(oldUsername: string, newUsername: string): Promise<boolean> {
+    const db = await getDB();
+
+    // Se o username não mudou, não fazer nada
+    if (oldUsername === newUsername) {
+        return true;
+    }
+
+    // Verificar se o novo username já existe (e não é o mesmo usuário)
+    const existingUser = await getUserByUsername(newUsername);
+    if (existingUser && existingUser.username !== oldUsername) {
+        throw new Error('Nome de usuário já está em uso');
+    }
+
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['users'], 'readwrite');
+        const store = transaction.objectStore('users');
+        
         // Tentar usar índice se disponível, senão buscar em todos
         if (store.indexNames.contains('username')) {
             const index = store.index('username');
-            const request = index.get(username);
+            const request = index.get(oldUsername);
             request.onsuccess = () => {
                 const dbUser = request.result;
                 if (!dbUser) {
-                    resolve(false); // Username não encontrado
+                    reject(new Error('Usuário não encontrado'));
                     return;
                 }
 
-                // Atualizar senha
-                dbUser.password = hashedPassword;
+                // Atualizar username
+                dbUser.username = newUsername;
                 dbUser.updatedAt = new Date().toISOString();
                 
                 const updateRequest = store.put(dbUser);
                 updateRequest.onsuccess = () => {
-                    logger.info('Senha redefinida com sucesso', 'databaseService');
+                    logger.info(`Username atualizado de ${oldUsername} para ${newUsername}`, 'databaseService');
                     resolve(true);
                 };
                 updateRequest.onerror = () => reject(updateRequest.error);
@@ -902,19 +954,19 @@ export async function resetPassword(username: string, newPassword: string): Prom
             const request = store.getAll();
             request.onsuccess = () => {
                 const users = request.result;
-                const dbUser = users.find((u: DBUser) => u.username === username);
+                const dbUser = users.find((u: DBUser) => u.username === oldUsername);
                 if (!dbUser) {
-                    resolve(false); // Username não encontrado
+                    reject(new Error('Usuário não encontrado'));
                     return;
                 }
 
-                // Atualizar senha
-                dbUser.password = hashedPassword;
+                // Atualizar username
+                dbUser.username = newUsername;
                 dbUser.updatedAt = new Date().toISOString();
                 
                 const updateRequest = store.put(dbUser);
                 updateRequest.onsuccess = () => {
-                    logger.info('Senha redefinida com sucesso', 'databaseService');
+                    logger.info(`Username atualizado de ${oldUsername} para ${newUsername}`, 'databaseService');
                     resolve(true);
                 };
                 updateRequest.onerror = () => reject(updateRequest.error);
