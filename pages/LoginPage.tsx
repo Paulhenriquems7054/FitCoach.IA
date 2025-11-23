@@ -203,14 +203,23 @@ const LoginPage: React.FC = () => {
                 setSuccess(successMsg);
                 showSuccess(successMsg);
                 
+                // Verificar se é aluno e se já respondeu a enquete
+                const SURVEY_STORAGE_FLAG = 'nutriIA_enquete_v2_done';
+                const hasAnsweredSurvey = localStorage.getItem(SURVEY_STORAGE_FLAG);
+                
                 // Redirecionar baseado no role
                 let redirectPath = '#/';
                 if (user.gymRole === 'admin') {
-                    redirectPath = '#/student-management';
+                    redirectPath = '#/';
                 } else if (user.gymRole === 'trainer') {
                     redirectPath = '#/';
                 } else if (user.gymRole === 'student') {
-                    redirectPath = '#/';
+                    // Se aluno não respondeu a enquete, redirecionar para ela
+                    if (!hasAnsweredSurvey) {
+                        redirectPath = '#/welcome-survey';
+                    } else {
+                        redirectPath = '#/';
+                    }
                 }
                 
                 // Redirecionar após 1 segundo

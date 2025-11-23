@@ -26,6 +26,7 @@ const GymAdminPage: React.FC = () => {
   const [gym, setGym] = useState<Gym | null>(null);
   const [branding, setBranding] = useState<GymBranding | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'config' | 'qrcode'>('config');
   const [formData, setFormData] = useState({
     name: '',
     appName: '',
@@ -44,6 +45,14 @@ const GymAdminPage: React.FC = () => {
   );
 
   useEffect(() => {
+    // Verificar parâmetro tab na URL
+    const hash = window.location.hash;
+    const urlParams = new URLSearchParams(hash.split('?')[1] || '');
+    const tabParam = urlParams.get('tab');
+    if (tabParam === 'qrcode') {
+      setActiveTab('qrcode');
+    }
+
     const loadedGym = loadGymConfig();
     const loadedBranding = loadGymBranding();
 
@@ -183,9 +192,38 @@ const GymAdminPage: React.FC = () => {
         </p>
       </div>
 
+      {/* Tabs */}
+      <div className="mb-4 sm:mb-6 border-b border-slate-200 dark:border-slate-700">
+        <nav className="flex space-x-4" aria-label="Tabs">
+          <button
+            onClick={() => setActiveTab('config')}
+            className={`py-2 px-4 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'config'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'
+            }`}
+          >
+            ⚙️ Configuração
+          </button>
+          {gym && (
+            <button
+              onClick={() => setActiveTab('qrcode')}
+              className={`py-2 px-4 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'qrcode'
+                  ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'
+              }`}
+            >
+              📱 QR Code
+            </button>
+          )}
+        </nav>
+      </div>
+
       <div className="space-y-4 sm:space-y-6">
-        {/* Configuração da Academia */}
-        <Card>
+        {/* Tab: Configuração */}
+        {activeTab === 'config' && (
+          <Card>
           <div className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
               <h2 className="text-lg sm:text-xl font-semibold">Configuração da Academia</h2>
@@ -351,9 +389,10 @@ const GymAdminPage: React.FC = () => {
             )}
           </div>
         </Card>
+        )}
 
-        {/* QR Code para Distribuição */}
-        {gym && (
+        {/* Tab: QR Code para Distribuição */}
+        {activeTab === 'qrcode' && gym && (
           <Card>
             <div className="p-4 sm:p-6">
               <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">QR Code para Distribuição</h2>

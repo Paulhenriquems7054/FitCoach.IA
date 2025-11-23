@@ -1,3 +1,48 @@
+// Check if we're in development mode
+const isDevelopment = self.location.hostname === 'localhost' || 
+                      self.location.hostname === '127.0.0.1' ||
+                      self.location.hostname.includes('localhost');
+
+// If in development, immediately unregister and do nothing
+if (isDevelopment) {
+  self.addEventListener('install', event => {
+    // Immediately skip waiting and unregister
+    self.skipWaiting();
+    event.waitUntil(
+      self.registration.unregister().then(() => {
+        console.log('[SW] Service worker unregistered in development mode');
+        return self.clients.matchAll().then(clients => {
+          clients.forEach(client => {
+            client.postMessage({ type: 'SW_UNREGISTERED' });
+          });
+        });
+      })
+    );
+  });
+
+  self.addEventListener('activate', event => {
+    event.waitUntil(
+      self.registration.unregister().then(() => {
+        return self.clients.matchAll().then(clients => {
+          clients.forEach(client => {
+            client.postMessage({ type: 'SW_UNREGISTERED' });
+          });
+        });
+      })
+    );
+  });
+
+  // Don't intercept any fetch events in development
+  self.addEventListener('fetch', event => {
+    // CRITICAL: Don't call event.respondWith() in development
+    // This allows the browser to handle all requests normally
+    // Simply return without doing anything
+    return;
+  });
+
+  // Exit early - don't run production code
+  // (The code below will never execute in dev mode)
+}
 
 const CACHE_NAME = 'nutri-ia-cache-v2';
 const urlsToCache = [
@@ -14,7 +59,7 @@ const urlsToCache = [
   // as they are cross-origin. You need to configure caching for them separately if needed.
 ];
 
-// Force update on install
+// Force update on install (PRODUCTION ONLY)
 self.addEventListener('install', event => {
   self.skipWaiting(); // Force activation of new service worker
   event.waitUntil(
@@ -31,8 +76,19 @@ self.addEventListener('install', event => {
   );
 });
 
-// Network-first strategy: always try network first, fallback to cache
+// Network-first strategy: always try network first, fallback to cache (PRODUCTION ONLY)
+// Double-check we're not in development (safety check)
 self.addEventListener('fetch', event => {
+  // Safety check: if somehow we're in dev mode, don't intercept
+  const isDev = self.location.hostname === 'localhost' || 
+                self.location.hostname === '127.0.0.1' ||
+                self.location.hostname.includes('localhost');
+  
+  if (isDev) {
+    // Don't intercept - let browser handle it
+    return;
+  }
+
   if (event.request.method !== 'GET') {
     return;
   }
@@ -42,8 +98,22 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Don't intercept module scripts, let them load directly from network
+  const acceptHeader = event.request.headers.get('accept') || '';
+  const isModuleScript = acceptHeader.includes('application/javascript') || 
+                         acceptHeader.includes('text/javascript') ||
+                         requestUrl.includes('.js') ||
+                         requestUrl.includes('.mjs') ||
+                         requestUrl.includes('.ts') ||
+                         requestUrl.includes('.tsx');
+  
+  // Don't intercept Vite HMR or module requests
+  if (isModuleScript || requestUrl.includes('?t=') || requestUrl.includes('&t=')) {
+    return; // Let browser handle it directly
+  }
+
   // For HTML files, always try network first to get latest version
-  if (event.request.headers.get('accept')?.includes('text/html')) {
+  if (acceptHeader.includes('text/html')) {
     event.respondWith(
       fetch(event.request)
         .then(response => {
@@ -61,12 +131,22 @@ self.addEventListener('fetch', event => {
         .catch(error => {
           // Network failed, try cache
           return caches.match(event.request).then(cachedResponse => {
-            return cachedResponse || caches.match('/index.html');
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            // If no cache, try index.html
+            return caches.match('/index.html').then(indexResponse => {
+              return indexResponse || new Response('Page not available', { 
+                status: 404, 
+                statusText: 'Not Found',
+                headers: { 'Content-Type': 'text/html' }
+              });
+            });
           });
         })
     );
   } else {
-    // For other assets, try cache first, then network
+    // For other assets (images, CSS, etc.), try cache first, then network
     event.respondWith(
       caches.match(event.request).then(cachedResponse => {
         if (cachedResponse) {
@@ -98,8 +178,21 @@ self.addEventListener('fetch', event => {
             return response;
           })
           .catch(() => {
-            // Network failed, try index.html
-            return caches.match('/index.html');
+            // Network failed - only return index.html for navigation requests
+            if (acceptHeader.includes('text/html')) {
+              return caches.match('/index.html').then(indexResponse => {
+                return indexResponse || new Response('Page not available', { 
+                  status: 404, 
+                  statusText: 'Not Found',
+                  headers: { 'Content-Type': 'text/html' }
+                });
+              });
+            }
+            // For other assets, return a failed response
+            return new Response('Resource not available', { 
+              status: 404,
+              statusText: 'Not Found'
+            });
           });
       })
     );

@@ -1,16 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useUser } from '../context/UserContext';
 import { usePermissions } from '../hooks/usePermissions';
-import { getAllStudents, getAllTrainers, getAllUsers } from '../services/studentManagementService';
+import { getAllStudents, getAllTrainers, getAllUsers, createStudent } from '../services/studentManagementService';
 import { UsersIcon } from '../components/icons/UsersIcon';
 import { ShieldCheckIcon } from '../components/icons/ShieldCheckIcon';
 import { ChartBarIcon } from '../components/icons/ChartBarIcon';
 import { CogIcon } from '../components/icons/CogIcon';
+import { DownloadIcon } from '../components/icons/DownloadIcon';
+import { KeyIcon } from '../components/icons/KeyIcon';
 import { Alert } from '../components/ui/Alert';
+import { useToast } from '../components/ui/Toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import type { User } from '../types';
+import { Goal } from '../types';
 
 interface DashboardStats {
   totalStudents: number;
@@ -26,6 +30,9 @@ const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
 const AdminDashboardPage: React.FC = () => {
   const { user } = useUser();
   const permissions = usePermissions();
+  const { showSuccess, showError } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
     totalStudents: 0,
     totalTrainers: 0,
@@ -137,6 +144,164 @@ const AdminDashboardPage: React.FC = () => {
 
     loadDashboardData();
   }, [user.gymId, user.username]);
+
+  const parseFileContent = async (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const fileName = file.name.toLowerCase();
+          
+          // Tentar parsear como JSON
+          if (fileName.endsWith('.json')) {
+            const data = JSON.parse(content);
+            resolve(Array.isArray(data) ? data : [data]);
+            return;
+          }
+          
+          // Tentar parsear como CSV
+          if (fileName.endsWith('.csv') || fileName.endsWith('.txt')) {
+            const lines = content.split('\n').filter(line => line.trim());
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const data = lines.slice(1).map(line => {
+              const values = line.split(',').map(v => v.trim());
+              const obj: any = {};
+              headers.forEach((header, index) => {
+                obj[header] = values[index] || '';
+              });
+              return obj;
+            });
+            resolve(data);
+            return;
+          }
+          
+          // Para outros tipos de arquivo, tentar parsear como texto estruturado
+          const lines = content.split('\n').filter(line => line.trim());
+          const data = lines.map((line, index) => {
+            const separators = [',', ';', '\t', '|'];
+            let values: string[] = [];
+            
+            for (const sep of separators) {
+              if (line.includes(sep)) {
+                values = line.split(sep).map(v => v.trim());
+                break;
+              }
+            }
+            
+            if (values.length === 0) {
+              values = [line.trim()];
+            }
+            
+            return {
+              nome: values[0] || `Aluno ${index + 1}`,
+              username: values[1] || values[0]?.toLowerCase().replace(/\s+/g, '') || `aluno${index + 1}`,
+              password: values[2] || '1234',
+              idade: parseInt(values[3]) || 30,
+              genero: values[4]?.toLowerCase().includes('f') ? 'Feminino' : 'Masculino',
+              peso: parseFloat(values[5]) || 70,
+              altura: parseFloat(values[6]) || 170,
+              objetivo: values[7] || Goal.MANTER_PESO,
+            };
+          });
+          
+          resolve(data);
+        } catch (error) {
+          reject(new Error('Erro ao processar arquivo. Verifique o formato.'));
+        }
+      };
+      
+      reader.onerror = () => {
+        reject(new Error('Erro ao ler arquivo.'));
+      };
+      
+      reader.readAsText(file, 'UTF-8');
+    });
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const isDefaultAdmin = user.username === 'Administrador' || user.username === 'Desenvolvedor';
+    const gymId = user.gymId || (isDefaultAdmin ? 'default-gym' : '');
+
+    if (!gymId) {
+      showError('Você precisa estar associado a uma academia. Configure a academia primeiro em Configurações da Academia.');
+      return;
+    }
+
+    setIsImporting(true);
+    
+    try {
+      const studentsData = await parseFileContent(file);
+      
+      if (!studentsData || studentsData.length === 0) {
+        showError('Nenhum dado encontrado no arquivo.');
+        setIsImporting(false);
+        return;
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
+      for (const studentData of studentsData) {
+        try {
+          const username = studentData.username || studentData.nome?.toLowerCase().replace(/\s+/g, '') || `aluno${Date.now()}`;
+          const password = studentData.password || '1234';
+          const nome = studentData.nome || username;
+
+          // Verificar se o usuário já existe
+          const existingStudents = await getAllStudents(gymId);
+          const existingStudent = existingStudents.find(s => s.username === username);
+          if (existingStudent) {
+            errorCount++;
+            errors.push(`${nome} (${username}): Usuário já existe`);
+            continue;
+          }
+
+          await createStudent(
+            username,
+            password,
+            {
+              nome: nome,
+              idade: studentData.idade || 30,
+              genero: studentData.genero || 'Masculino',
+              peso: studentData.peso || 70,
+              altura: studentData.altura || 170,
+              objetivo: studentData.objetivo || Goal.MANTER_PESO,
+            },
+            gymId
+          );
+
+          successCount++;
+        } catch (error: any) {
+          errorCount++;
+          errors.push(`${studentData.nome || 'Aluno desconhecido'}: ${error.message || 'Erro ao criar'}`);
+        }
+      }
+
+      if (successCount > 0) {
+        showSuccess(`${successCount} aluno(s) importado(s) com sucesso!`);
+        // Recarregar dados do dashboard
+        window.location.reload();
+      }
+      
+      if (errorCount > 0) {
+        showError(`${errorCount} aluno(s) não puderam ser importados. ${errors.slice(0, 5).join('; ')}${errors.length > 5 ? '...' : ''}`);
+      }
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error: any) {
+      showError(error.message || 'Erro ao importar arquivo');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   // Verificar permissões
   if (!permissions.canViewAllData && !permissions.canManageGymSettings) {
@@ -371,14 +536,26 @@ const AdminDashboardPage: React.FC = () => {
                     variant="secondary"
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.location.hash = '#/student-management?action=create';
+                      fileInputRef.current?.click();
                     }}
                     className="flex-1 text-xs sm:text-sm py-2"
+                    disabled={isImporting}
+                    title="Importar lista de alunos"
                   >
-                    ➕ Novo Aluno
+                    {isImporting ? '⏳ Importando...' : '📥 Importar'}
                   </Button>
                 )}
               </div>
+              {permissions.canCreateStudents && (
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="*/*"
+                  onChange={handleImportFile}
+                  className="hidden"
+                  aria-label="Importar lista de alunos"
+                />
+              )}
             </div>
           </Card>
 
@@ -409,24 +586,12 @@ const AdminDashboardPage: React.FC = () => {
                   variant="primary"
                   onClick={(e) => {
                     e.stopPropagation();
-                    window.location.hash = '#/gym-admin';
+                    window.location.hash = '#/configuracoes';
                   }}
                   className="flex-1 text-xs sm:text-sm py-2"
                 >
-                  Abrir Configurações
+                  ⚙️ Configurações
                 </Button>
-                {permissions.canManageGymSettings && (
-                  <Button
-                    variant="secondary"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      window.location.hash = '#/gym-admin?tab=branding';
-                    }}
-                    className="flex-1 text-xs sm:text-sm py-2"
-                  >
-                    🎨 Branding
-                  </Button>
-                )}
               </div>
             </div>
           </Card>
@@ -465,7 +630,7 @@ const AdminDashboardPage: React.FC = () => {
                   }}
                   className="flex-1 text-xs sm:text-sm py-2"
                 >
-                  Ver Relatórios
+                  📄 Relatórios
                 </Button>
                 <Button
                   variant="secondary"
@@ -476,6 +641,60 @@ const AdminDashboardPage: React.FC = () => {
                   className="flex-1 text-xs sm:text-sm py-2"
                 >
                   📊 Análises
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      // Exportar dados dos alunos
+                      const isDefaultAdmin = user.username === 'Administrador' || user.username === 'Desenvolvedor';
+                      const gymIdToUse = user.gymId || (isDefaultAdmin ? 'default-gym' : '');
+                      if (!gymIdToUse) {
+                        alert('Não foi possível exportar: academia não configurada');
+                        return;
+                      }
+                      const students = await getAllStudents(gymIdToUse);
+                      const trainers = await getAllTrainers(gymIdToUse);
+                      
+                      const data = {
+                        alunos: students.map(s => ({
+                          nome: s.nome,
+                          username: s.username,
+                          idade: s.idade,
+                          genero: s.genero,
+                          peso: s.peso,
+                          altura: s.altura,
+                          objetivo: s.objetivo,
+                          status: s.accessBlocked ? 'Bloqueado' : 'Ativo'
+                        })),
+                        treinadores: trainers.map(t => ({
+                          nome: t.nome,
+                          username: t.username,
+                          idade: t.idade,
+                          genero: t.genero
+                        })),
+                        exportadoEm: new Date().toISOString()
+                      };
+                      
+                      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `fitcoach-dados-${new Date().toISOString().split('T')[0]}.json`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    } catch (error) {
+                      console.error('Erro ao exportar dados:', error);
+                      alert('Erro ao exportar dados');
+                    }
+                  }}
+                  className="flex-1 text-xs sm:text-sm py-2"
+                  title="Exportar dados em JSON"
+                >
+                  💾 Exportar
                 </Button>
               </div>
             </div>

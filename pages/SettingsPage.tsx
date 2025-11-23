@@ -1,10 +1,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Card } from '../components/ui/Card';
-import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
-import { SunIcon } from '../components/icons/SunIcon';
-import { MoonIcon } from '../components/icons/MoonIcon';
 import { useI18n } from '../context/I18nContext';
 import { Button } from '../components/ui/Button';
 import {
@@ -21,11 +18,19 @@ import { setUseLocalAI, shouldUseLocalAI } from '../services/iaController';
 import { testLocalIA } from '../services/localAIService';
 import { configureGymServer, getGymServerUrlConfig, checkServerAvailability } from '../services/syncService';
 import { useToast } from '../components/ui/Toast';
+import { saveGymBranding, loadGymBranding } from '../services/gymConfigService';
+import type { GymBranding } from '../types';
 
 const SettingsPage: React.FC = () => {
-    const { themeSetting, setThemeSetting } = useTheme();
-    const { user, toggleRole } = useUser();
+    const { user } = useUser();
     const { t, language, setLanguage } = useI18n();
+    
+    // Estados para personalização
+    const [logoPreview, setLogoPreview] = useState<string>('');
+    const [primaryColor, setPrimaryColor] = useState<string>('#10b981');
+    const [secondaryColor, setSecondaryColor] = useState<string>('#059669');
+    const [accentColor, setAccentColor] = useState<string>('#34d399');
+    const [brandingDirty, setBrandingDirty] = useState(false);
     const [apiMode, setApiModeState] = useState<'paid' | 'free'>('free');
     const [paidApiKey, setPaidApiKeyState] = useState<string>('');
     const [freeApiKey, setFreeApiKeyState] = useState<string>(DEFAULT_FREE_API_KEY);
@@ -59,6 +64,15 @@ const SettingsPage: React.FC = () => {
                 // Carregar preferência de IA Local
                 const savedUseLocalAI = shouldUseLocalAI();
                 setUseLocalAIState(savedUseLocalAI);
+
+                // Carregar branding personalizado
+                const savedBranding = loadGymBranding();
+                if (savedBranding) {
+                    setLogoPreview(savedBranding.logo || '');
+                    setPrimaryColor(savedBranding.colors.primary || '#10b981');
+                    setSecondaryColor(savedBranding.colors.secondary || '#059669');
+                    setAccentColor(savedBranding.colors.accent || '#34d399');
+                }
             } catch (error) {
                 console.error('Erro ao carregar configurações:', error);
                 // Fallback para localStorage
@@ -142,6 +156,98 @@ const SettingsPage: React.FC = () => {
         setPaidApiKey('');
     };
 
+    // Funções de personalização
+    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 2 * 1024 * 1024) {
+            showError('Logo deve ter no máximo 2MB');
+            return;
+        }
+
+        if (!file.type.startsWith('image/')) {
+            showError('Por favor, selecione um arquivo de imagem');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const result = event.target?.result as string;
+            setLogoPreview(result);
+            setBrandingDirty(true);
+        };
+        reader.onerror = () => {
+            showError('Erro ao ler o arquivo');
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveLogo = () => {
+        setLogoPreview('');
+        setBrandingDirty(true);
+    };
+
+    const handleSaveBranding = () => {
+        try {
+            const gymId = user.gymId || 'default-gym';
+            const branding: GymBranding = {
+                gymId: gymId,
+                appName: 'FitCoach.IA',
+                logo: logoPreview || undefined,
+                colors: {
+                    primary: primaryColor,
+                    secondary: secondaryColor,
+                    accent: accentColor,
+                },
+            };
+
+            saveGymBranding(branding);
+            setBrandingDirty(false);
+            showSuccess('Personalização salva com sucesso! A página será recarregada para aplicar as mudanças.');
+            
+            // Recarregar após um breve delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } catch (error) {
+            showError('Erro ao salvar personalização');
+            console.error(error);
+        }
+    };
+
+    const handleResetBranding = () => {
+        if (!window.confirm('Tem certeza que deseja restaurar as cores padrão? Isso removerá sua personalização.')) {
+            return;
+        }
+
+        setLogoPreview('');
+        setPrimaryColor('#10b981');
+        setSecondaryColor('#059669');
+        setAccentColor('#34d399');
+        setBrandingDirty(true);
+    };
+
+    // Observar mudanças nas cores (apenas após o carregamento inicial)
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+    useEffect(() => {
+        if (isInitialLoad) {
+            setIsInitialLoad(false);
+            return;
+        }
+        // Verificar se houve mudança real em relação aos valores padrão ou salvos
+        const savedBranding = loadGymBranding();
+        const hasChanges = 
+            primaryColor !== (savedBranding?.colors.primary || '#10b981') ||
+            secondaryColor !== (savedBranding?.colors.secondary || '#059669') ||
+            accentColor !== (savedBranding?.colors.accent || '#34d399') ||
+            logoPreview !== (savedBranding?.logo || '');
+        
+        if (hasChanges) {
+            setBrandingDirty(true);
+        }
+    }, [primaryColor, secondaryColor, accentColor, logoPreview, isInitialLoad]);
+
     const handleSaveSettings = async () => {
         try {
             // Salvar no banco de dados
@@ -203,31 +309,6 @@ const SettingsPage: React.FC = () => {
 
             <Card>
                 <div className="p-4 sm:p-6 divide-y divide-slate-200 dark:divide-slate-700">
-                    <div className="pb-4 sm:pb-6">
-                        <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">{t('settings.appearance.title')}</h2>
-                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">{t('settings.appearance.description')}</p>
-                        
-                        <fieldset className="mt-3 sm:mt-4">
-                            <legend className="sr-only">{t('settings.appearance.legend')}</legend>
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
-                                <button onClick={() => setThemeSetting('light')} className={`flex-1 p-3 sm:p-4 rounded-lg border-2 transition-colors text-sm sm:text-base ${themeSetting === 'light' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-primary-400'}`}>
-                                    <SunIcon className="w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-2 text-slate-600 dark:text-slate-300" />
-                                    <span className="font-medium text-slate-700 dark:text-slate-200">{t('settings.appearance.light')}</span>
-                                </button>
-                                <button onClick={() => setThemeSetting('dark')} className={`flex-1 p-3 sm:p-4 rounded-lg border-2 transition-colors text-sm sm:text-base ${themeSetting === 'dark' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-primary-400'}`}>
-                                    <MoonIcon className="w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-2 text-slate-600 dark:text-slate-300" />
-                                    <span className="font-medium text-slate-700 dark:text-slate-200">{t('settings.appearance.dark')}</span>
-                                </button>
-                                <button onClick={() => setThemeSetting('system')} className={`flex-1 p-3 sm:p-4 rounded-lg border-2 transition-colors text-sm sm:text-base ${themeSetting === 'system' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-primary-400'}`}>
-                                    <div className="w-6 h-6 mx-auto mb-2 text-slate-600 dark:text-slate-300 flex items-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z" /></svg>
-                                    </div>
-                                    <span className="font-medium text-slate-700 dark:text-slate-200">{t('settings.appearance.system')}</span>
-                                </button>
-                            </div>
-                        </fieldset>
-                    </div>
-
                     <div className="py-6">
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t('settings.language.title')}</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{t('settings.language.description')}</p>
@@ -248,28 +329,281 @@ const SettingsPage: React.FC = () => {
                         <Button onClick={handleNotifications} className="mt-4">{t('settings.notifications.button')}</Button>
                     </div>
 
+                    {/* Personalização do Sistema */}
                     <div className="py-6">
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Integração com APIs de IA</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                            Configure seus acessos a modelos pagos ou gratuitos e defina facilmente o endpoint do provedor escolhido.
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                            🎨 Personalização do Sistema
+                        </h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                            Personalize a aparência do sistema com suas cores e logo.
                         </p>
 
-                        <div className="mt-6 space-y-6">
-                            <fieldset className="space-y-4">
-                                <legend className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                    Modo de utilização
-                                </legend>
+                        <div className="space-y-6">
+                            {/* Upload de Logo */}
+                            <div className="space-y-3">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    Logo da Academia
+                                </label>
+                                <div className="flex items-center gap-4 flex-wrap">
+                                    <div className="flex-shrink-0">
+                                        {logoPreview ? (
+                                            <img
+                                                src={logoPreview}
+                                                alt="Logo preview"
+                                                className="w-24 h-24 object-contain border-2 border-slate-300 dark:border-slate-600 rounded-lg p-2 bg-white dark:bg-slate-800"
+                                            />
+                                        ) : (
+                                            <div className="w-24 h-24 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg flex items-center justify-center bg-slate-50 dark:bg-slate-800">
+                                                <span className="text-xs text-slate-400">Sem logo</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-[200px]">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleLogoUpload}
+                                            className="hidden"
+                                            id="logo-upload"
+                                        />
+                                        <label
+                                            htmlFor="logo-upload"
+                                            className="inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition-colors"
+                                        >
+                                            📤 {logoPreview ? 'Alterar Logo' : 'Enviar Logo'}
+                                        </label>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                                            Formatos aceitos: PNG, JPG, SVG (máx. 2MB)
+                                        </p>
+                                    </div>
+                                    {logoPreview && (
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={handleRemoveLogo}
+                                        >
+                                            🗑️ Remover
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Cores Personalizadas */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                    Cores do Sistema
+                                </h3>
+                                
+                                {/* Cor Primária */}
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                        Cor Primária
+                                    </label>
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        <input
+                                            type="color"
+                                            value={primaryColor}
+                                            onChange={(e) => setPrimaryColor(e.target.value)}
+                                            className="w-16 h-10 rounded border border-slate-300 dark:border-slate-600 cursor-pointer"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={primaryColor}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (/^#[0-9A-Fa-f]{0,6}$/.test(value) || value === '') {
+                                                    setPrimaryColor(value);
+                                                }
+                                            }}
+                                            className="flex-1 min-w-[120px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            placeholder="#10b981"
+                                            maxLength={7}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => setPrimaryColor('#10b981')}
+                                        >
+                                            🔄 Padrão
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Cor Secundária */}
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                        Cor Secundária
+                                    </label>
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        <input
+                                            type="color"
+                                            value={secondaryColor}
+                                            onChange={(e) => setSecondaryColor(e.target.value)}
+                                            className="w-16 h-10 rounded border border-slate-300 dark:border-slate-600 cursor-pointer"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={secondaryColor}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (/^#[0-9A-Fa-f]{0,6}$/.test(value) || value === '') {
+                                                    setSecondaryColor(value);
+                                                }
+                                            }}
+                                            className="flex-1 min-w-[120px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            placeholder="#059669"
+                                            maxLength={7}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => setSecondaryColor('#059669')}
+                                        >
+                                            🔄 Padrão
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Cor de Destaque */}
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                        Cor de Destaque
+                                    </label>
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        <input
+                                            type="color"
+                                            value={accentColor}
+                                            onChange={(e) => setAccentColor(e.target.value)}
+                                            className="w-16 h-10 rounded border border-slate-300 dark:border-slate-600 cursor-pointer"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={accentColor}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (/^#[0-9A-Fa-f]{0,6}$/.test(value) || value === '') {
+                                                    setAccentColor(value);
+                                                }
+                                            }}
+                                            className="flex-1 min-w-[120px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            placeholder="#34d399"
+                                            maxLength={7}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => setAccentColor('#34d399')}
+                                        >
+                                            🔄 Padrão
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Preview */}
+                            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                                    Preview
+                                </h4>
+                                <div className="space-y-2">
+                                    <div
+                                        className="px-4 py-2 rounded text-white text-sm font-medium text-center"
+                                        style={{ backgroundColor: primaryColor }}
+                                    >
+                                        Botão Primário
+                                    </div>
+                                    <div
+                                        className="px-4 py-2 rounded text-white text-sm font-medium text-center"
+                                        style={{ backgroundColor: secondaryColor }}
+                                    >
+                                        Botão Secundário
+                                    </div>
+                                    <div
+                                        className="px-4 py-2 rounded text-sm font-medium text-center border-2"
+                                        style={{ 
+                                            borderColor: accentColor,
+                                            color: accentColor
+                                        }}
+                                    >
+                                        Destaque
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Botões de Ação */}
+                            <div className="flex gap-3 flex-wrap">
+                                <Button
+                                    type="button"
+                                    variant="primary"
+                                    onClick={handleSaveBranding}
+                                    disabled={!brandingDirty}
+                                >
+                                    💾 Salvar Personalização
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={handleResetBranding}
+                                >
+                                    🔄 Restaurar Padrão
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="py-6">
+                        <div className="mb-6">
+                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Integração com APIs de IA</h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                Configure seus acessos a modelos pagos ou gratuitos e defina facilmente o endpoint do provedor escolhido.
+                            </p>
+                        </div>
+
+                        <div className="space-y-6">
+                            {/* Status Atual */}
+                            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <div className="flex items-center justify-between flex-wrap gap-3">
+                                    <div>
+                                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Modo Atual</span>
+                                        <p className="text-base font-semibold text-slate-900 dark:text-white mt-1">
+                                            {apiMode === 'paid' ? (
+                                                <span className="text-emerald-600 dark:text-emerald-400">API Paga</span>
+                                            ) : (
+                                                <span className="text-primary-600 dark:text-primary-400">API Gratuita</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleActivateFreeApi}
+                                    >
+                                        Alternar para Gratuita
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Modo de Utilização */}
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                                    Modo de Utilização
+                                </h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <button
                                         type="button"
                                         onClick={() => setApiMode('free')}
-                                        className={`rounded-lg border px-4 py-4 text-left transition ${
+                                        className={`rounded-lg border-2 px-4 py-4 text-left transition-all ${
                                             apiMode === 'free'
-                                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/10 text-primary-700'
-                                                : 'border-slate-300 dark:border-slate-600 hover:border-primary-400 text-slate-600 dark:text-slate-300'
+                                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 shadow-sm'
+                                                : 'border-slate-300 dark:border-slate-600 hover:border-primary-400 dark:hover:border-primary-500 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'
                                         }`}
                                     >
-                                        <span className="block font-semibold text-base">API Gratuita</span>
+                                        <span className="block font-semibold text-base mb-1">API Gratuita</span>
                                         <span className="block text-sm text-slate-500 dark:text-slate-400">
                                             Ideal para testes e integrações com limites menores.
                                         </span>
@@ -277,103 +611,95 @@ const SettingsPage: React.FC = () => {
                                     <button
                                         type="button"
                                         onClick={() => setApiMode('paid')}
-                                        className={`rounded-lg border px-4 py-4 text-left transition ${
+                                        className={`rounded-lg border-2 px-4 py-4 text-left transition-all ${
                                             apiMode === 'paid'
-                                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-700'
-                                                : 'border-slate-300 dark:border-slate-600 hover:border-emerald-400 text-slate-600 dark:text-slate-300'
+                                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 shadow-sm'
+                                                : 'border-slate-300 dark:border-slate-600 hover:border-emerald-400 dark:hover:border-emerald-500 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'
                                         }`}
                                     >
-                                        <span className="block font-semibold text-base">API Paga</span>
+                                        <span className="block font-semibold text-base mb-1">API Paga</span>
                                         <span className="block text-sm text-slate-500 dark:text-slate-400">
                                             Utilize modelos avançados com performance corporativa.
                                         </span>
                                     </button>
                                 </div>
-                            </fieldset>
+                            </div>
 
-                            <div className="space-y-2">
-                                <label className="space-y-1 block">
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        Página do modelo / endpoint do provedor
-                                    </span>
+                            {/* Endpoint do Provedor */}
+                            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
+                                        Endpoint do Provedor
+                                    </label>
                                     <input
                                         type="url"
                                         value={providerLink}
                                         onChange={(event) => setProviderLink(event.target.value)}
                                         placeholder={DEFAULT_PROVIDER_LINK}
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                                     />
-                                </label>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    Use o link oficial do provedor escolhido. Padrão de demonstração:{' '}
-                                    <span className="font-medium text-primary-600 dark:text-primary-400">{DEFAULT_PROVIDER_LINK}</span>
-                                </p>
+                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                        Use o link oficial do provedor escolhido. Padrão:{' '}
+                                        <span className="font-medium text-primary-600 dark:text-primary-400">{DEFAULT_PROVIDER_LINK}</span>
+                                    </p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    disabled={!providerLink}
+                                    onClick={handleOpenProviderLink}
+                                >
+                                    Abrir Página do Modelo
+                                </Button>
                             </div>
 
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <label className="space-y-1 block">
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        Chave para API Paga
-                                    </span>
-                                    <input
-                                        type="text"
-                                        value={paidApiKey}
-                                        onChange={(event) => setPaidApiKey(event.target.value)}
-                                        placeholder="Insira sua chave premium aqui"
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                                    />
-                                </label>
+                            {/* Chaves de API */}
+                            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                                    Chaves de API
+                                </h3>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                            Chave para API Paga
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={paidApiKey}
+                                            onChange={(event) => setPaidApiKey(event.target.value)}
+                                            placeholder="Insira sua chave premium aqui"
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                        />
+                                    </div>
 
-                                <div className="space-y-2">
-                                    <label className="space-y-1 block">
-                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
                                             Chave para API Gratuita
-                                        </span>
+                                        </label>
                                         <input
                                             type="text"
                                             value={freeApiKey}
                                             onChange={(event) => setFreeApiKey(event.target.value)}
                                             placeholder="Insira a chave gratuita ou de testes"
-                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                                         />
-                                        <span className="block text-xs text-slate-500 dark:text-slate-400">
-                                            Padrão para demonstração:{' '}
-                                            <span className="font-medium text-primary-600 dark:text-primary-400">{DEFAULT_FREE_API_KEY}</span>
-                                        </span>
-                                    </label>
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={handleUseDefaultFreeKey}
-                                    >
-                                        Usar chave demo padrão
-                                    </Button>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                Padrão:{' '}
+                                                <span className="font-medium text-primary-600 dark:text-primary-400">{DEFAULT_FREE_API_KEY}</span>
+                                            </p>
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={handleUseDefaultFreeKey}
+                                            >
+                                                Usar Demo
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-3 justify-between">
-                                <span className="text-sm text-slate-500 dark:text-slate-400">
-                                    Atualmente selecionado:{' '}
-                                    <strong className="text-primary-600 dark:text-primary-400">
-                                        {apiMode === 'paid' ? 'API Paga' : 'API Gratuita'}
-                                    </strong>
-                                </span>
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    disabled={!providerLink}
-                                    onClick={handleOpenProviderLink}
-                                >
-                                    Abrir Página Modelo IA
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={handleActivateFreeApi}
-                                >
-                                    Ativar API Gratuita
-                                </Button>
                             </div>
                         </div>
                     </div>
@@ -500,15 +826,6 @@ const SettingsPage: React.FC = () => {
                             </div>
                         </div>
                     )}
-
-                     <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t('settings.profile_type.title')}</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{t('settings.profile_type.description')}</p>
-                         <div className="mt-4">
-                            <p className="text-sm">{t('settings.profile_type.current')}: <span className="font-semibold text-primary-600">{user.role === 'user' ? t('settings.profile_type.user') : t('settings.profile_type.professional')}</span></p>
-                            <Button onClick={toggleRole} variant="secondary" className="mt-2">{t('settings.profile_type.button')}</Button>
-                         </div>
-                    </div>
 
                     <div className="pt-6 flex flex-wrap items-center justify-end gap-3">
                         {isDirty && (

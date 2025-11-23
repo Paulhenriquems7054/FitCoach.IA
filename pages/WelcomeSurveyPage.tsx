@@ -14,12 +14,12 @@ const WelcomeSurveyPage: React.FC = () => {
         <div className="flex items-center justify-center gap-3 mb-2">
           <Logo size="lg" />
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight">
-            <span className="text-emerald-400 drop-shadow-lg">Nutri</span>
+            <span className="text-emerald-400 drop-shadow-lg">FitCoach</span>
             <span className="text-white drop-shadow-lg">.IA</span>
           </h1>
         </div>
         <p className="text-emerald-200 text-sm md:text-base mt-2">
-          Seu Coach Nutricional Inteligente
+          Seu Coach de Treino Inteligente
         </p>
       </div>
       <WelcomeSurvey onCompleted={handleSurveyCompleted} />
