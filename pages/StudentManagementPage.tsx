@@ -56,9 +56,6 @@ const StudentManagementPage: React.FC = () => {
         matricula: '',
         idade: 30,
         genero: 'Masculino' as 'Masculino' | 'Feminino',
-        peso: 70,
-        altura: 170,
-        objetivo: Goal.MANTER_PESO,
     });
 
     const [trainerForm, setTrainerForm] = useState({
@@ -128,7 +125,7 @@ const StudentManagementPage: React.FC = () => {
         const { name, value } = e.target;
         setStudentForm((prev) => ({
             ...prev,
-            [name]: name === 'idade' || name === 'peso' || name === 'altura' ? Number(value) || 0 : value,
+            [name]: name === 'idade' ? Number(value) || 0 : value,
         }));
     };
 
@@ -183,9 +180,7 @@ const StudentManagementPage: React.FC = () => {
                     matricula: studentForm.matricula,
                     idade: studentForm.idade,
                     genero: studentForm.genero,
-                    peso: studentForm.peso,
-                    altura: studentForm.altura,
-                    objetivo: studentForm.objetivo,
+                    // Peso, altura e objetivo serão coletados na enquete
                 },
                 gymId
             );
@@ -197,9 +192,6 @@ const StudentManagementPage: React.FC = () => {
                 matricula: '',
                 idade: 30,
                 genero: 'Masculino',
-                peso: 70,
-                altura: 170,
-                objetivo: Goal.MANTER_PESO,
             });
             loadUsers();
         } catch (error: any) {
@@ -321,9 +313,7 @@ const StudentManagementPage: React.FC = () => {
                 matricula: user.matricula || '',
                 idade: user.idade,
                 genero: user.genero,
-                peso: user.peso,
-                altura: user.altura,
-                objetivo: user.objetivo,
+                // Peso, altura e objetivo não são editáveis aqui (coletados na enquete)
             });
             setShowStudentForm(true);
         }
@@ -340,9 +330,7 @@ const StudentManagementPage: React.FC = () => {
                 matricula: studentForm.matricula,
                 idade: studentForm.idade,
                 genero: studentForm.genero,
-                peso: studentForm.peso,
-                altura: studentForm.altura,
-                objetivo: studentForm.objetivo,
+                // Peso, altura e objetivo não são editáveis aqui (coletados na enquete)
             });
 
             showSuccess('Aluno atualizado com sucesso!');
@@ -508,20 +496,18 @@ const StudentManagementPage: React.FC = () => {
                         }
                         
                         // Mapear para estrutura esperada
-                        // Formato esperado: nome, matricula, idade, genero, peso, altura, objetivo
+                        // Formato esperado: nome, matricula, idade, genero
                         const nome = values[0] || `Aluno ${index + 1}`;
-                        const matricula = values[1] || values[2] || `MAT${index + 1}`;
+                        const matricula = values[1] || `MAT${index + 1}`;
                         
                         return {
                             nome: nome,
                             matricula: matricula,
                             username: nome, // Username será o nome do aluno
                             password: matricula, // Senha será a matrícula
-                            idade: parseInt(values[2] || values[3]) || 30,
-                            genero: (values[3] || values[4])?.toLowerCase().includes('f') ? 'Feminino' : 'Masculino',
-                            peso: parseFloat(values[4] || values[5]) || 70,
-                            altura: parseFloat(values[5] || values[6]) || 170,
-                            objetivo: values[6] || values[7] || Goal.MANTER_PESO,
+                            idade: parseInt(values[2]) || 30,
+                            genero: values[3]?.toLowerCase().includes('f') ? 'Feminino' : 'Masculino',
+                            // Peso, altura e objetivo serão coletados na enquete
                         };
                     });
                     
@@ -595,9 +581,7 @@ const StudentManagementPage: React.FC = () => {
                             nome: nome,
                             idade: studentData.idade || 30,
                             genero: studentData.genero || 'Masculino',
-                            peso: studentData.peso || 70,
-                            altura: studentData.altura || 170,
-                            objetivo: studentData.objetivo || Goal.MANTER_PESO,
+                            // Peso, altura e objetivo serão coletados na enquete
                         },
                         gymId
                     );
@@ -726,11 +710,11 @@ const StudentManagementPage: React.FC = () => {
                                 <strong>💡 Dica de Importação:</strong> Você pode importar alunos de qualquer tipo de arquivo (CSV, TXT, JSON, Excel, etc.).
                             </p>
                             <p className="text-xs text-blue-700 dark:text-blue-300">
-                                <strong>Formato recomendado:</strong> Nome, Matrícula, Idade, Gênero, Peso, Altura, Objetivo (separados por vírgula, ponto e vírgula ou tab). 
+                                <strong>Formato recomendado:</strong> Nome, Matrícula, Idade, Gênero (separados por vírgula, ponto e vírgula ou tab). 
                                 <br />
                                 <strong>Login:</strong> O aluno fará login usando o <strong>Nome</strong> como usuário e a <strong>Matrícula</strong> como senha.
                                 <br />
-                                Campos opcionais serão preenchidos com valores padrão.
+                                <strong>Dados adicionais:</strong> Peso, altura e objetivo serão coletados na enquete após o primeiro login.
                             </p>
                         </div>
                     </Card>
@@ -811,48 +795,6 @@ const StudentManagementPage: React.FC = () => {
                                     >
                                         <option value="Masculino">Masculino</option>
                                         <option value="Feminino">Feminino</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Peso (kg)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        name="peso"
-                                        value={studentForm.peso}
-                                        onChange={handleStudentFormChange}
-                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Altura (cm)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        name="altura"
-                                        value={studentForm.altura}
-                                        onChange={handleStudentFormChange}
-                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Objetivo
-                                    </label>
-                                    <select
-                                        name="objetivo"
-                                        value={studentForm.objetivo}
-                                        onChange={handleStudentFormChange}
-                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    >
-                                        <option value={Goal.PERDER_PESO}>Perder Peso</option>
-                                        <option value={Goal.MANTER_PESO}>Manter Peso</option>
-                                        <option value={Goal.GANHAR_MASSA}>Ganhar Massa</option>
                                     </select>
                                 </div>
                             </div>
