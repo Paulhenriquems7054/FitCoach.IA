@@ -14,6 +14,7 @@ import {
     getUsersByGymId,
     getStudentsByGymId,
     getTrainersByGymId,
+    getReceptionistsByGymId,
 } from './databaseService';
 import { logger } from '../utils/logger';
 
@@ -34,8 +35,10 @@ export async function createStudent(
         }
 
         // Criar aluno com gymRole e gymId
+        // Para alunos, garantir que username seja o nome
         const student = await registerUser(username, password, {
             ...userData,
+            username: userData.nome || username, // Username será o nome do aluno
             gymId,
             gymRole: 'student',
             isGymManaged: true,
@@ -95,6 +98,47 @@ export async function createTrainer(
         return trainer;
     } catch (error) {
         logger.error('Erro ao criar treinador', 'studentManagementService', error);
+        throw error;
+    }
+}
+
+/**
+ * Cria um novo recepcionista
+ */
+export async function createReceptionist(
+    username: string,
+    password: string,
+    userData: Partial<User>,
+    gymId: string
+): Promise<User> {
+    try {
+        // Verificar se username já existe
+        const exists = await usernameExists(username);
+        if (exists) {
+            throw new Error('Nome de usuário já está em uso');
+        }
+
+        // Criar recepcionista com gymRole e gymId
+        const receptionist = await registerUser(username, password, {
+            ...userData,
+            gymId,
+            gymRole: 'receptionist',
+            isGymManaged: true,
+            role: 'user',
+            subscription: 'free',
+            dataPermissions: {
+                allowWeightHistory: false,
+                allowMealPlans: false,
+                allowPhotoAnalysis: false,
+                allowWorkoutData: false,
+                allowChatHistory: false,
+            },
+        });
+
+        logger.info(`Recepcionista criado: ${username}`, 'studentManagementService');
+        return receptionist;
+    } catch (error) {
+        logger.error('Erro ao criar recepcionista', 'studentManagementService', error);
         throw error;
     }
 }
@@ -242,6 +286,18 @@ export async function getAllTrainers(gymId: string): Promise<User[]> {
         return await getTrainersByGymId(gymId);
     } catch (error) {
         logger.error('Erro ao buscar treinadores', 'studentManagementService', error);
+        throw error;
+    }
+}
+
+/**
+ * Lista todos os recepcionistas de uma academia
+ */
+export async function getAllReceptionists(gymId: string): Promise<User[]> {
+    try {
+        return await getReceptionistsByGymId(gymId);
+    } catch (error) {
+        logger.error('Erro ao buscar recepcionistas', 'studentManagementService', error);
         throw error;
     }
 }

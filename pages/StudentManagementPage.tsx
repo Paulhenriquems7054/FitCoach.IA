@@ -13,10 +13,12 @@ import { usePermissions } from '../hooks/usePermissions';
 import {
     createStudent,
     createTrainer,
+    createReceptionist,
     updateStudent,
     deleteStudent,
     getAllStudents,
     getAllTrainers,
+    getAllReceptionists,
     blockStudentAccess,
     unblockStudentAccess,
 } from '../services/studentManagementService';
@@ -31,12 +33,18 @@ const StudentManagementPage: React.FC = () => {
     const permissions = usePermissions();
     const [students, setStudents] = useState<User[]>([]);
     const [trainers, setTrainers] = useState<User[]>([]);
+    const [receptionists, setReceptionists] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showStudentForm, setShowStudentForm] = useState(false);
     const [showTrainerForm, setShowTrainerForm] = useState(false);
+    const [showReceptionistForm, setShowReceptionistForm] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [showTrainerPassword, setShowTrainerPassword] = useState(false);
+    const [showTrainerConfirmPassword, setShowTrainerConfirmPassword] = useState(false);
+    const [showReceptionistPassword, setShowReceptionistPassword] = useState(false);
+    const [showReceptionistConfirmPassword, setShowReceptionistConfirmPassword] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [showBlockModal, setShowBlockModal] = useState(false);
@@ -44,10 +52,8 @@ const StudentManagementPage: React.FC = () => {
     const [blockReason, setBlockReason] = useState('');
 
     const [studentForm, setStudentForm] = useState({
-        username: '',
-        password: '',
-        confirmPassword: '',
         nome: '',
+        matricula: '',
         idade: 30,
         genero: 'Masculino' as 'Masculino' | 'Feminino',
         peso: 70,
@@ -56,6 +62,15 @@ const StudentManagementPage: React.FC = () => {
     });
 
     const [trainerForm, setTrainerForm] = useState({
+        username: '',
+        password: '',
+        confirmPassword: '',
+        nome: '',
+        idade: 30,
+        genero: 'Masculino' as 'Masculino' | 'Feminino',
+    });
+
+    const [receptionistForm, setReceptionistForm] = useState({
         username: '',
         password: '',
         confirmPassword: '',
@@ -83,19 +98,23 @@ const StudentManagementPage: React.FC = () => {
             if (isDefaultAdmin) {
                 // Para Administrador/Desenvolvedor padrão, usar gymId padrão
                 const defaultGymId = 'default-gym';
-                const [studentsData, trainersData] = await Promise.all([
+                const [studentsData, trainersData, receptionistsData] = await Promise.all([
                     getAllStudents(defaultGymId),
                     getAllTrainers(defaultGymId),
+                    getAllReceptionists(defaultGymId),
                 ]);
                 setStudents(studentsData);
                 setTrainers(trainersData);
+                setReceptionists(receptionistsData);
             } else {
-                const [studentsData, trainersData] = await Promise.all([
+                const [studentsData, trainersData, receptionistsData] = await Promise.all([
                     getAllStudents(currentUser.gymId!),
                     getAllTrainers(currentUser.gymId!),
+                    getAllReceptionists(currentUser.gymId!),
                 ]);
                 setStudents(studentsData);
                 setTrainers(trainersData);
+                setReceptionists(receptionistsData);
             }
         } catch (error) {
             showError('Erro ao carregar usuários');
@@ -121,6 +140,14 @@ const StudentManagementPage: React.FC = () => {
         }));
     };
 
+    const handleReceptionistFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setReceptionistForm((prev) => ({
+            ...prev,
+            [name]: name === 'idade' ? Number(value) || 0 : value,
+        }));
+    };
+
     const handleCreateStudent = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -136,22 +163,24 @@ const StudentManagementPage: React.FC = () => {
         // Para admin padrão, usar um gymId padrão ou criar um
         const gymId = currentUser.gymId || 'default-gym';
 
-        if (studentForm.password !== studentForm.confirmPassword) {
-            showError('As senhas não coincidem');
+        if (!studentForm.nome.trim()) {
+            showError('O nome do aluno é obrigatório');
             return;
         }
 
-        if (studentForm.password.length < 4) {
-            showError('A senha deve ter pelo menos 4 caracteres');
+        if (!studentForm.matricula.trim()) {
+            showError('A matrícula do aluno é obrigatória');
             return;
         }
 
         try {
+            // Para alunos, username será o nome e senha será a matrícula
             await createStudent(
-                studentForm.username,
-                studentForm.password,
+                studentForm.nome, // username = nome
+                studentForm.matricula, // password = matrícula
                 {
                     nome: studentForm.nome,
+                    matricula: studentForm.matricula,
                     idade: studentForm.idade,
                     genero: studentForm.genero,
                     peso: studentForm.peso,
@@ -164,10 +193,8 @@ const StudentManagementPage: React.FC = () => {
             showSuccess('Aluno criado com sucesso!');
             setShowStudentForm(false);
             setStudentForm({
-                username: '',
-                password: '',
-                confirmPassword: '',
                 nome: '',
+                matricula: '',
                 idade: 30,
                 genero: 'Masculino',
                 peso: 70,
@@ -233,14 +260,65 @@ const StudentManagementPage: React.FC = () => {
         }
     };
 
+    const handleCreateReceptionist = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        // Verificar se é Administrador ou Desenvolvedor padrão
+        const isDefaultAdmin = currentUser.username === 'Administrador' || currentUser.username === 'Desenvolvedor';
+        
+        // Se não tem gymId e não é admin padrão, precisa criar/associar uma academia primeiro
+        if (!currentUser.gymId && !isDefaultAdmin) {
+            showError('Você precisa estar associado a uma academia. Configure a academia primeiro em Configurações da Academia.');
+            return;
+        }
+        
+        // Para admin padrão, usar um gymId padrão ou criar um
+        const gymId = currentUser.gymId || 'default-gym';
+
+        if (receptionistForm.password !== receptionistForm.confirmPassword) {
+            showError('As senhas não coincidem');
+            return;
+        }
+
+        if (receptionistForm.password.length < 4) {
+            showError('A senha deve ter pelo menos 4 caracteres');
+            return;
+        }
+
+        try {
+            await createReceptionist(
+                receptionistForm.username,
+                receptionistForm.password,
+                {
+                    nome: receptionistForm.nome,
+                    idade: receptionistForm.idade,
+                    genero: receptionistForm.genero,
+                },
+                gymId
+            );
+
+            showSuccess('Recepcionista criado com sucesso!');
+            setShowReceptionistForm(false);
+            setReceptionistForm({
+                username: '',
+                password: '',
+                confirmPassword: '',
+                nome: '',
+                idade: 30,
+                genero: 'Masculino',
+            });
+            loadUsers();
+        } catch (error: any) {
+            showError(error.message || 'Erro ao criar recepcionista');
+        }
+    };
+
     const handleEditUser = (user: User) => {
         setEditingUser(user);
         if (user.gymRole === 'student') {
             setStudentForm({
-                username: user.username || '',
-                password: '',
-                confirmPassword: '',
                 nome: user.nome,
+                matricula: user.matricula || '',
                 idade: user.idade,
                 genero: user.genero,
                 peso: user.peso,
@@ -257,8 +335,9 @@ const StudentManagementPage: React.FC = () => {
         if (!editingUser) return;
 
         try {
-            await updateStudent(editingUser.username || '', {
+            await updateStudent(editingUser.username || editingUser.nome || '', {
                 nome: studentForm.nome,
+                matricula: studentForm.matricula,
                 idade: studentForm.idade,
                 genero: studentForm.genero,
                 peso: studentForm.peso,
@@ -364,7 +443,20 @@ const StudentManagementPage: React.FC = () => {
                     // Tentar parsear como JSON
                     if (fileName.endsWith('.json')) {
                         const data = JSON.parse(content);
-                        resolve(Array.isArray(data) ? data : [data]);
+                        const arrayData = Array.isArray(data) ? data : [data];
+                        // Garantir que nome e matrícula estejam mapeados corretamente
+                        const processedData = arrayData.map((item: any, index: number) => {
+                            const nome = item.nome || item.name || `Aluno ${index + 1}`;
+                            const matricula = item.matricula || item.password || `MAT${index + 1}`;
+                            return {
+                                ...item,
+                                nome: nome,
+                                matricula: matricula,
+                                username: nome, // Username será o nome
+                                password: matricula, // Senha será a matrícula
+                            };
+                        });
+                        resolve(processedData);
                         return;
                     }
                     
@@ -372,13 +464,24 @@ const StudentManagementPage: React.FC = () => {
                     if (fileName.endsWith('.csv') || fileName.endsWith('.txt')) {
                         const lines = content.split('\n').filter(line => line.trim());
                         const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-                        const data = lines.slice(1).map(line => {
+                        const data = lines.slice(1).map((line, index) => {
                             const values = line.split(',').map(v => v.trim());
                             const obj: any = {};
                             headers.forEach((header, index) => {
                                 obj[header] = values[index] || '';
                             });
-                            return obj;
+                            
+                            // Garantir que nome e matrícula estejam mapeados corretamente
+                            const nome = obj.nome || obj.name || `Aluno ${index + 1}`;
+                            const matricula = obj.matricula || obj.matricula || obj.password || `MAT${index + 1}`;
+                            
+                            return {
+                                ...obj,
+                                nome: nome,
+                                matricula: matricula,
+                                username: nome, // Username será o nome
+                                password: matricula, // Senha será a matrícula
+                            };
                         });
                         resolve(data);
                         return;
@@ -405,15 +508,20 @@ const StudentManagementPage: React.FC = () => {
                         }
                         
                         // Mapear para estrutura esperada
+                        // Formato esperado: nome, matricula, idade, genero, peso, altura, objetivo
+                        const nome = values[0] || `Aluno ${index + 1}`;
+                        const matricula = values[1] || values[2] || `MAT${index + 1}`;
+                        
                         return {
-                            nome: values[0] || `Aluno ${index + 1}`,
-                            username: values[1] || values[0]?.toLowerCase().replace(/\s+/g, '') || `aluno${index + 1}`,
-                            password: values[2] || '1234',
-                            idade: parseInt(values[3]) || 30,
-                            genero: values[4]?.toLowerCase().includes('f') ? 'Feminino' : 'Masculino',
-                            peso: parseFloat(values[5]) || 70,
-                            altura: parseFloat(values[6]) || 170,
-                            objetivo: values[7] || Goal.MANTER_PESO,
+                            nome: nome,
+                            matricula: matricula,
+                            username: nome, // Username será o nome do aluno
+                            password: matricula, // Senha será a matrícula
+                            idade: parseInt(values[2] || values[3]) || 30,
+                            genero: (values[3] || values[4])?.toLowerCase().includes('f') ? 'Feminino' : 'Masculino',
+                            peso: parseFloat(values[4] || values[5]) || 70,
+                            altura: parseFloat(values[5] || values[6]) || 170,
+                            objetivo: values[6] || values[7] || Goal.MANTER_PESO,
                         };
                     });
                     
@@ -563,6 +671,7 @@ const StudentManagementPage: React.FC = () => {
                             onClick={() => {
                                 setShowStudentForm(!showStudentForm);
                                 setShowTrainerForm(false);
+                                setShowReceptionistForm(false);
                                 setEditingUser(null);
                             }}
                             variant="primary"
@@ -589,11 +698,25 @@ const StudentManagementPage: React.FC = () => {
                                 onClick={() => {
                                     setShowTrainerForm(!showTrainerForm);
                                     setShowStudentForm(false);
+                                    setShowReceptionistForm(false);
                                     setEditingUser(null);
                                 }}
                                 variant="secondary"
                             >
                                 {showTrainerForm ? '❌ Cancelar' : '👨‍🏫 Criar Treinador'}
+                            </Button>
+                        )}
+                        {permissions.canCreateTrainers && (
+                            <Button
+                                onClick={() => {
+                                    setShowReceptionistForm(!showReceptionistForm);
+                                    setShowStudentForm(false);
+                                    setShowTrainerForm(false);
+                                    setEditingUser(null);
+                                }}
+                                variant="secondary"
+                            >
+                                {showReceptionistForm ? '❌ Cancelar' : '👤 Criar Recepcionista'}
                             </Button>
                         )}
                     </div>
@@ -603,7 +726,10 @@ const StudentManagementPage: React.FC = () => {
                                 <strong>💡 Dica de Importação:</strong> Você pode importar alunos de qualquer tipo de arquivo (CSV, TXT, JSON, Excel, etc.).
                             </p>
                             <p className="text-xs text-blue-700 dark:text-blue-300">
-                                <strong>Formato recomendado:</strong> Nome, Username, Senha, Idade, Gênero, Peso, Altura, Objetivo (separados por vírgula, ponto e vírgula ou tab). 
+                                <strong>Formato recomendado:</strong> Nome, Matrícula, Idade, Gênero, Peso, Altura, Objetivo (separados por vírgula, ponto e vírgula ou tab). 
+                                <br />
+                                <strong>Login:</strong> O aluno fará login usando o <strong>Nome</strong> como usuário e a <strong>Matrícula</strong> como senha.
+                                <br />
                                 Campos opcionais serão preenchidos com valores padrão.
                             </p>
                         </div>
@@ -622,20 +748,6 @@ const StudentManagementPage: React.FC = () => {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Nome de Usuário *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="username"
-                                        value={studentForm.username}
-                                        onChange={handleStudentFormChange}
-                                        disabled={!!editingUser}
-                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-slate-100 dark:disabled:bg-slate-700"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                         Nome Completo *
                                     </label>
                                     <input
@@ -645,58 +757,34 @@ const StudentManagementPage: React.FC = () => {
                                         onChange={handleStudentFormChange}
                                         className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         required
+                                        placeholder="Nome do aluno (será usado para login)"
                                     />
+                                    {!editingUser && (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            O nome será usado como usuário para login
+                                        </p>
+                                    )}
                                 </div>
+                                {!editingUser && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Matrícula *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="matricula"
+                                            value={studentForm.matricula}
+                                            onChange={handleStudentFormChange}
+                                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            required
+                                            placeholder="Matrícula do aluno"
+                                        />
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            A matrícula será usada como senha para login
+                                        </p>
+                                    </div>
+                                )}
                             </div>
-
-                            {!editingUser && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Senha *
-                                        </label>
-                                        <div className="relative">
-                                            <input
-                                                type={showPassword ? 'text' : 'password'}
-                                                name="password"
-                                                value={studentForm.password}
-                                                onChange={handleStudentFormChange}
-                                                className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                                required
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-2 top-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                                            >
-                                                {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Confirmar Senha *
-                                        </label>
-                                        <div className="relative">
-                                            <input
-                                                type={showConfirmPassword ? 'text' : 'password'}
-                                                name="confirmPassword"
-                                                value={studentForm.confirmPassword}
-                                                onChange={handleStudentFormChange}
-                                                className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                                required
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                className="absolute right-2 top-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                                            >
-                                                {showConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
@@ -791,6 +879,129 @@ const StudentManagementPage: React.FC = () => {
                 </Card>
             )}
 
+            {/* Formulário de criar recepcionista */}
+            {showReceptionistForm && permissions.canCreateTrainers && (
+                <Card className="mb-6">
+                    <div className="p-6">
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+                            Criar Novo Recepcionista
+                        </h2>
+                        <form onSubmit={handleCreateReceptionist} className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Nome de Usuário *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="username"
+                                        value={receptionistForm.username}
+                                        onChange={handleReceptionistFormChange}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Nome Completo *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="nome"
+                                        value={receptionistForm.nome}
+                                        onChange={handleReceptionistFormChange}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Senha *
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type={showReceptionistPassword ? 'text' : 'password'}
+                                            name="password"
+                                            value={receptionistForm.password}
+                                            onChange={handleReceptionistFormChange}
+                                            className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowReceptionistPassword(!showReceptionistPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                            aria-label={showReceptionistPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                        >
+                                            {showReceptionistPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Confirmar Senha *
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type={showReceptionistConfirmPassword ? 'text' : 'password'}
+                                            name="confirmPassword"
+                                            value={receptionistForm.confirmPassword}
+                                            onChange={handleReceptionistFormChange}
+                                            className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowReceptionistConfirmPassword(!showReceptionistConfirmPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                            aria-label={showReceptionistConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                        >
+                                            {showReceptionistConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Idade
+                                    </label>
+                                    <input
+                                        type="number"
+                                        name="idade"
+                                        value={receptionistForm.idade}
+                                        onChange={handleReceptionistFormChange}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Gênero
+                                    </label>
+                                    <select
+                                        name="genero"
+                                        value={receptionistForm.genero}
+                                        onChange={handleReceptionistFormChange}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    >
+                                        <option value="Masculino">Masculino</option>
+                                        <option value="Feminino">Feminino</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <Button type="submit" variant="primary">
+                                ➕ Criar Recepcionista
+                            </Button>
+                        </form>
+                    </div>
+                </Card>
+            )}
+
             {/* Formulário de criar treinador */}
             {showTrainerForm && permissions.canCreateTrainers && (
                 <Card className="mb-6">
@@ -833,27 +1044,47 @@ const StudentManagementPage: React.FC = () => {
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                         Senha *
                                     </label>
-                                    <input
-                                        type="password"
-                                        name="password"
-                                        value={trainerForm.password}
-                                        onChange={handleTrainerFormChange}
-                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                        required
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            type={showTrainerPassword ? 'text' : 'password'}
+                                            name="password"
+                                            value={trainerForm.password}
+                                            onChange={handleTrainerFormChange}
+                                            className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTrainerPassword(!showTrainerPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                            aria-label={showTrainerPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                        >
+                                            {showTrainerPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                         Confirmar Senha *
                                     </label>
-                                    <input
-                                        type="password"
-                                        name="confirmPassword"
-                                        value={trainerForm.confirmPassword}
-                                        onChange={handleTrainerFormChange}
-                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                        required
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            type={showTrainerConfirmPassword ? 'text' : 'password'}
+                                            name="confirmPassword"
+                                            value={trainerForm.confirmPassword}
+                                            onChange={handleTrainerFormChange}
+                                            className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTrainerConfirmPassword(!showTrainerConfirmPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                            aria-label={showTrainerConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                        >
+                                            {showTrainerConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -994,7 +1225,7 @@ const StudentManagementPage: React.FC = () => {
 
             {/* Lista de Treinadores */}
             {permissions.canCreateTrainers && (
-                <Card>
+                <Card className="mb-6">
                     <div className="p-6">
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
                             Treinadores ({trainers.length})
@@ -1024,6 +1255,56 @@ const StudentManagementPage: React.FC = () => {
                                                     <td className="py-3 px-4 text-sm text-right">
                                                         <Button
                                                             onClick={() => handleDeleteUser(trainer.username || '', 'treinador')}
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            className="text-red-600 hover:text-red-700 dark:text-red-400"
+                                                        >
+                                                            🗑️ Excluir
+                                                        </Button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </Card>
+            )}
+
+            {/* Lista de Recepcionistas */}
+            {permissions.canCreateTrainers && (
+                <Card>
+                    <div className="p-6">
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+                            Recepcionistas ({receptionists.length})
+                        </h2>
+                        {receptionists.length === 0 ? (
+                            <p className="text-slate-600 dark:text-slate-400">Nenhum recepcionista cadastrado ainda.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-slate-200 dark:border-slate-700">
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Nome</th>
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Username</th>
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Idade</th>
+                                            {permissions.canDeleteStudents && (
+                                                <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Ações</th>
+                                            )}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {receptionists.map((receptionist) => (
+                                            <tr key={receptionist.username} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                                <td className="py-3 px-4 text-sm text-slate-900 dark:text-white">{receptionist.nome}</td>
+                                                <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">{receptionist.username}</td>
+                                                <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">{receptionist.idade}</td>
+                                                {permissions.canDeleteStudents && (
+                                                    <td className="py-3 px-4 text-sm text-right">
+                                                        <Button
+                                                            onClick={() => handleDeleteUser(receptionist.username || '', 'recepcionista')}
                                                             variant="secondary"
                                                             size="sm"
                                                             className="text-red-600 hover:text-red-700 dark:text-red-400"

@@ -204,8 +204,17 @@ const LoginPage: React.FC = () => {
                 showSuccess(successMsg);
                 
                 // Verificar se é aluno e se já respondeu a enquete
-                const SURVEY_STORAGE_FLAG = 'nutriIA_enquete_v2_done';
+                // O flag da enquete é específico por usuário (username)
+                const usernameForSurvey = user.username || sanitizedUsername;
+                const SURVEY_STORAGE_FLAG = `nutriIA_enquete_v2_done_${usernameForSurvey}`;
                 const hasAnsweredSurvey = localStorage.getItem(SURVEY_STORAGE_FLAG);
+                
+                console.log('LoginPage - Verificação de enquete:', {
+                    username: usernameForSurvey,
+                    gymRole: user.gymRole,
+                    flag: SURVEY_STORAGE_FLAG,
+                    hasAnswered: hasAnsweredSurvey
+                });
                 
                 // Redirecionar baseado no role
                 let redirectPath = '#/';
@@ -214,10 +223,12 @@ const LoginPage: React.FC = () => {
                 } else if (user.gymRole === 'trainer') {
                     redirectPath = '#/';
                 } else if (user.gymRole === 'student') {
-                    // Se aluno não respondeu a enquete, redirecionar para ela
+                    // Se aluno não respondeu a enquete, redirecionar para ela (primeiro acesso)
                     if (!hasAnsweredSurvey) {
+                        console.log('LoginPage - Aluno não respondeu enquete, redirecionando para /welcome-survey');
                         redirectPath = '#/welcome-survey';
                     } else {
+                        console.log('LoginPage - Aluno já respondeu enquete, redirecionando para home');
                         redirectPath = '#/';
                     }
                 }

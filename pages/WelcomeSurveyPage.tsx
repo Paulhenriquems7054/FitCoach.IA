@@ -4,6 +4,7 @@ import { Logo } from '../components/Logo';
 
 const WelcomeSurveyPage: React.FC = () => {
   const handleSurveyCompleted = () => {
+    // Após completar a enquete, redirecionar para a home
     window.location.hash = '#/';
   };
 

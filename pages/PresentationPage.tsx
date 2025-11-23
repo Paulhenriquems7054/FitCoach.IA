@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useI18n } from '../context/I18nContext';
 
 const features = [
@@ -36,58 +36,9 @@ const features = [
 
 const PresentationPage: React.FC = () => {
   const { t } = useI18n();
-  const [videoError, setVideoError] = useState(false);
-
-  // Caminho do vídeo - usando encodeURI para lidar com espaços e caracteres especiais
-  const videoPath = encodeURI("/icons/grok-video-d45d92f1-5d9b-4760-a5c1-40b9eebeb978 (2).mp4");
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-slate-100 overflow-x-hidden">
-      {/* Hero Section with Video Background */}
-      <div className="relative w-full flex flex-col justify-center items-center overflow-hidden">
-        {/* Video Background */}
-        <div className="relative w-full overflow-hidden">
-          {!videoError && (
-            <video
-              autoPlay
-              loop
-              muted
-              playsInline
-              preload="auto"
-              className="w-full h-auto object-contain object-center"
-              style={{
-                zIndex: 0,
-                width: '100%',
-                height: 'auto',
-                display: 'block'
-              }}
-              onError={(e) => {
-                // Fallback se o vídeo não carregar
-                console.warn('Erro ao carregar vídeo de apresentação:', e);
-                setVideoError(true);
-                const target = e.target as HTMLVideoElement;
-                if (target) {
-                  target.style.display = 'none';
-                }
-              }}
-              onLoadedData={() => {
-                console.log('Vídeo de apresentação carregado com sucesso');
-              }}
-            >
-              <source src={videoPath} type="video/mp4" />
-              Seu navegador não suporta vídeos HTML5.
-            </video>
-          )}
-          {/* Overlay muito leve para clarear o vídeo */}
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/10 via-slate-950/20 to-slate-900/40 z-[1]" />
-          {/* Animated Background Effects */}
-          <div className="absolute inset-0 z-[1] overflow-hidden pointer-events-none">
-            <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 via-sky-500/20 to-blue-600/20 blur-3xl animate-pulse will-change-transform" style={{ transform: 'translateZ(0)' }} />
-            <div className="absolute top-1/4 left-1/4 w-32 h-32 xs:w-48 xs:h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse will-change-transform" style={{ animationDelay: '1s', transform: 'translateZ(0)' }} />
-            <div className="absolute bottom-1/4 right-1/4 w-32 h-32 xs:w-48 xs:h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse will-change-transform" style={{ animationDelay: '2s', transform: 'translateZ(0)' }} />
-          </div>
-        </div>
-      </div>
 
       {/* Features Section */}
       <div className="relative w-full py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-gradient-to-b from-slate-950/50 to-slate-900 overflow-x-hidden">
@@ -151,7 +102,7 @@ const PresentationPage: React.FC = () => {
                     boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3), 0 4px 6px -2px rgba(16, 185, 129, 0.2)',
                   }}
                 >
-                  {t('presentation.cta_button')}
+                  Comece Agora
                 </button>
               </div>
             </div>
@@ -225,6 +176,7 @@ const PresentationPage: React.FC = () => {
           height: auto !important;
           display: block !important;
           min-height: 50vh !important; /* Mobile: menor altura */
+          filter: brightness(1.2) contrast(1.1) saturate(1.1) !important;
         }
 
         /* Mobile pequeno (até 375px) */

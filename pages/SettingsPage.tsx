@@ -18,8 +18,8 @@ import { setUseLocalAI, shouldUseLocalAI } from '../services/iaController';
 import { testLocalIA } from '../services/localAIService';
 import { configureGymServer, getGymServerUrlConfig, checkServerAvailability } from '../services/syncService';
 import { useToast } from '../components/ui/Toast';
-import { saveGymBranding, loadGymBranding } from '../services/gymConfigService';
-import type { GymBranding } from '../types';
+import { saveGymBranding, loadGymBranding, loadGymConfig, saveGymConfig, getAppName } from '../services/gymConfigService';
+import type { GymBranding, Gym } from '../types';
 
 const SettingsPage: React.FC = () => {
     const { user } = useUser();
@@ -41,6 +41,27 @@ const SettingsPage: React.FC = () => {
     const [isTestingLocalAI, setIsTestingLocalAI] = useState<boolean>(false);
     const [gymServerUrl, setGymServerUrlState] = useState<string>('');
     const [isCheckingServer, setIsCheckingServer] = useState<boolean>(false);
+    
+    // Estados para configuração da academia
+    const isAdmin = user.gymRole === 'admin' || user.username === 'Administrador' || user.username === 'Desenvolvedor';
+    const [gym, setGym] = useState<Gym | null>(null);
+    const [isEditingGym, setIsEditingGym] = useState(false);
+    const [gymFormData, setGymFormData] = useState({
+        name: '',
+        appName: '',
+        contactEmail: '',
+        contactPhone: '',
+        website: '',
+        cnpj: '',
+        address: '',
+        addressNumber: '',
+        addressComplement: '',
+        neighborhood: '',
+        city: '',
+        state: '',
+        zipCode: '',
+    });
+    
     const { showSuccess, showError } = useToast();
 
     // Carregar configurações do banco de dados
@@ -72,6 +93,30 @@ const SettingsPage: React.FC = () => {
                     setPrimaryColor(savedBranding.colors.primary || '#10b981');
                     setSecondaryColor(savedBranding.colors.secondary || '#059669');
                     setAccentColor(savedBranding.colors.accent || '#34d399');
+                }
+                
+                // Carregar dados da academia (apenas para administradores)
+                const isAdminUser = user.gymRole === 'admin' || user.username === 'Administrador' || user.username === 'Desenvolvedor';
+                if (isAdminUser) {
+                    const loadedGym = loadGymConfig();
+                    if (loadedGym) {
+                        setGym(loadedGym);
+                        setGymFormData({
+                            name: loadedGym.name,
+                            appName: loadedGym.appName || getAppName(),
+                            contactEmail: loadedGym.contactEmail || '',
+                            contactPhone: loadedGym.contactPhone || '',
+                            website: loadedGym.website || '',
+                            cnpj: loadedGym.cnpj || '',
+                            address: loadedGym.address || '',
+                            addressNumber: loadedGym.addressNumber || '',
+                            addressComplement: loadedGym.addressComplement || '',
+                            neighborhood: loadedGym.neighborhood || '',
+                            city: loadedGym.city || '',
+                            state: loadedGym.state || '',
+                            zipCode: loadedGym.zipCode || '',
+                        });
+                    }
                 }
             } catch (error) {
                 console.error('Erro ao carregar configurações:', error);
@@ -228,6 +273,83 @@ const SettingsPage: React.FC = () => {
         setBrandingDirty(true);
     };
 
+    // Handlers para configuração da academia
+    const handleGymInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setGymFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleGymSave = () => {
+        if (!gym) {
+            // Criar nova academia se não existir
+            const newGym: Gym = {
+                id: user.gymId || 'default-gym',
+                name: gymFormData.name,
+                appName: gymFormData.appName || getAppName(),
+                contactEmail: gymFormData.contactEmail,
+                contactPhone: gymFormData.contactPhone,
+                website: gymFormData.website,
+                cnpj: gymFormData.cnpj,
+                address: gymFormData.address,
+                addressNumber: gymFormData.addressNumber,
+                addressComplement: gymFormData.addressComplement,
+                neighborhood: gymFormData.neighborhood,
+                city: gymFormData.city,
+                state: gymFormData.state,
+                zipCode: gymFormData.zipCode,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                isActive: true,
+            };
+            saveGymConfig(newGym);
+            setGym(newGym);
+        } else {
+            const updatedGym: Gym = {
+                ...gym,
+                name: gymFormData.name,
+                appName: gymFormData.appName,
+                contactEmail: gymFormData.contactEmail,
+                contactPhone: gymFormData.contactPhone,
+                website: gymFormData.website,
+                cnpj: gymFormData.cnpj,
+                address: gymFormData.address,
+                addressNumber: gymFormData.addressNumber,
+                addressComplement: gymFormData.addressComplement,
+                neighborhood: gymFormData.neighborhood,
+                city: gymFormData.city,
+                state: gymFormData.state,
+                zipCode: gymFormData.zipCode,
+                updatedAt: new Date().toISOString(),
+            };
+            saveGymConfig(updatedGym);
+            setGym(updatedGym);
+        }
+        
+        setIsEditingGym(false);
+        showSuccess('Configuração da academia salva com sucesso!');
+    };
+
+    const handleGymCancel = () => {
+        if (gym) {
+            setGymFormData({
+                name: gym.name,
+                appName: gym.appName || getAppName(),
+                contactEmail: gym.contactEmail || '',
+                contactPhone: gym.contactPhone || '',
+                website: gym.website || '',
+                cnpj: gym.cnpj || '',
+                address: gym.address || '',
+                addressNumber: gym.addressNumber || '',
+                addressComplement: gym.addressComplement || '',
+                neighborhood: gym.neighborhood || '',
+                city: gym.city || '',
+                state: gym.state || '',
+                zipCode: gym.zipCode || '',
+            });
+        }
+        setIsEditingGym(false);
+    };
+
     // Observar mudanças nas cores (apenas após o carregamento inicial)
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     useEffect(() => {
@@ -307,44 +429,343 @@ const SettingsPage: React.FC = () => {
                 </Card>
             )}
 
-            <Card>
-                <div className="p-4 sm:p-6 divide-y divide-slate-200 dark:divide-slate-700">
-                    <div className="py-6">
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t('settings.language.title')}</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{t('settings.language.description')}</p>
+            {/* Seção: Idioma e Notificações */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <Card>
+                    <div className="p-4 sm:p-6">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                            🌐 {t('settings.language.title')}
+                        </h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                            {t('settings.language.description')}
+                        </p>
                         <select
                             value={language}
                             onChange={(e) => setLanguage(e.target.value as 'pt' | 'en' | 'es')}
-                            className="mt-4 block w-full max-w-xs pl-3 pr-10 py-2 text-base bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                            className="w-full pl-3 pr-10 py-2 text-base bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                         >
-                            <option value="pt">Português</option>
-                            <option value="en">English</option>
-                            <option value="es">Español</option>
+                            <option value="pt">🇧🇷 Português</option>
+                            <option value="en">🇺🇸 English</option>
+                            <option value="es">🇪🇸 Español</option>
                         </select>
                     </div>
+                </Card>
 
-                    <div className="py-6">
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t('settings.notifications.title')}</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{t('settings.notifications.description')}</p>
-                        <Button onClick={handleNotifications} className="mt-4">{t('settings.notifications.button')}</Button>
-                    </div>
-
-                    {/* Personalização do Sistema */}
-                    <div className="py-6">
+                <Card>
+                    <div className="p-4 sm:p-6">
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                            🎨 Personalização do Sistema
+                            🔔 {t('settings.notifications.title')}
                         </h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                            Personalize a aparência do sistema com suas cores e logo.
+                            {t('settings.notifications.description')}
                         </p>
+                        <Button onClick={handleNotifications} className="w-full sm:w-auto">
+                            {t('settings.notifications.button')}
+                        </Button>
+                    </div>
+                </Card>
+            </div>
 
-                        <div className="space-y-6">
-                            {/* Upload de Logo */}
-                            <div className="space-y-3">
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    Logo da Academia
-                                </label>
-                                <div className="flex items-center gap-4 flex-wrap">
+            {/* Seção: Configuração da Academia - Apenas para administradores */}
+            {isAdmin && (
+                <Card>
+                    <div className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+                            <div>
+                                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
+                                    ⚙️ Configuração da Academia
+                                </h2>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    Gerencie as informações e dados cadastrais da sua academia.
+                                </p>
+                            </div>
+                            {!isEditingGym && (
+                                <Button onClick={() => setIsEditingGym(true)} className="w-full sm:w-auto">
+                                    ✏️ Editar
+                                </Button>
+                            )}
+                        </div>
+
+                        {isEditingGym ? (
+                            <div className="space-y-6">
+                                    <div>
+                                        <label htmlFor="gym-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Nome da Academia
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            id="gym-name"
+                                            value={gymFormData.name}
+                                            onChange={handleGymInputChange}
+                                            className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="gym-appName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Nome do App
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="appName"
+                                            id="gym-appName"
+                                            value={gymFormData.appName}
+                                            onChange={handleGymInputChange}
+                                            placeholder="Ex: Academia XYZ - FitCoach.IA"
+                                            className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor="gym-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Email de Contato
+                                            </label>
+                                            <input
+                                                type="email"
+                                                name="contactEmail"
+                                                id="gym-email"
+                                                value={gymFormData.contactEmail}
+                                                onChange={handleGymInputChange}
+                                                className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="gym-phone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Telefone de Contato
+                                            </label>
+                                            <input
+                                                type="tel"
+                                                name="contactPhone"
+                                                id="gym-phone"
+                                                value={gymFormData.contactPhone}
+                                                onChange={handleGymInputChange}
+                                                className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="gym-website" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Website
+                                        </label>
+                                        <input
+                                            type="url"
+                                            name="website"
+                                            id="gym-website"
+                                            value={gymFormData.website}
+                                            onChange={handleGymInputChange}
+                                            placeholder="https://exemplo.com"
+                                            className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                        />
+                                    </div>
+
+                                    {/* Dados Cadastrais */}
+                                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                                        <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-4">
+                                            📋 Dados Cadastrais
+                                        </h3>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label htmlFor="gym-cnpj" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    CNPJ
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="cnpj"
+                                                    id="gym-cnpj"
+                                                    value={gymFormData.cnpj}
+                                                    onChange={handleGymInputChange}
+                                                    placeholder="00.000.000/0000-00"
+                                                    className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label htmlFor="gym-address" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    Endereço
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="address"
+                                                    id="gym-address"
+                                                    value={gymFormData.address}
+                                                    onChange={handleGymInputChange}
+                                                    placeholder="Rua, Avenida, etc."
+                                                    className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                                <div>
+                                                    <label htmlFor="gym-address-number" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                        Número
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="addressNumber"
+                                                        id="gym-address-number"
+                                                        value={gymFormData.addressNumber}
+                                                        onChange={handleGymInputChange}
+                                                        placeholder="123"
+                                                        className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                                    />
+                                                </div>
+                                                <div className="sm:col-span-2">
+                                                    <label htmlFor="gym-address-complement" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                        Complemento
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="addressComplement"
+                                                        id="gym-address-complement"
+                                                        value={gymFormData.addressComplement}
+                                                        onChange={handleGymInputChange}
+                                                        placeholder="Apto, Bloco, Sala, etc."
+                                                        className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label htmlFor="gym-neighborhood" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    Bairro
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="neighborhood"
+                                                    id="gym-neighborhood"
+                                                    value={gymFormData.neighborhood}
+                                                    onChange={handleGymInputChange}
+                                                    placeholder="Nome do bairro"
+                                                    className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                                <div className="sm:col-span-2">
+                                                    <label htmlFor="gym-city" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                        Cidade
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="city"
+                                                        id="gym-city"
+                                                        value={gymFormData.city}
+                                                        onChange={handleGymInputChange}
+                                                        placeholder="Nome da cidade"
+                                                        className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label htmlFor="gym-state" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                        Estado (UF)
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="state"
+                                                        id="gym-state"
+                                                        value={gymFormData.state}
+                                                        onChange={handleGymInputChange}
+                                                        placeholder="SP"
+                                                        maxLength={2}
+                                                        className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label htmlFor="gym-zipcode" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    CEP
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="zipCode"
+                                                    id="gym-zipcode"
+                                                    value={gymFormData.zipCode}
+                                                    onChange={handleGymInputChange}
+                                                    placeholder="00000-000"
+                                                    className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                        <Button variant="secondary" onClick={handleGymCancel}>
+                                            Cancelar
+                                        </Button>
+                                        <Button onClick={handleGymSave}>
+                                            Salvar Alterações
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {gym ? (
+                                        <>
+                                            <div>
+                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Nome da Academia:</span>
+                                                <p className="text-sm text-slate-900 dark:text-white">{gym.name || 'Não informado'}</p>
+                                            </div>
+                                            {gym.cnpj && (
+                                                <div>
+                                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">CNPJ:</span>
+                                                    <p className="text-sm text-slate-900 dark:text-white">{gym.cnpj}</p>
+                                                </div>
+                                            )}
+                                            {gym.contactPhone && (
+                                                <div>
+                                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Telefone:</span>
+                                                    <p className="text-sm text-slate-900 dark:text-white">{gym.contactPhone}</p>
+                                                </div>
+                                            )}
+                                            {(gym.address || gym.addressNumber || gym.neighborhood || gym.city || gym.state || gym.zipCode) && (
+                                                <div>
+                                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Endereço:</span>
+                                                    <p className="text-sm text-slate-900 dark:text-white">
+                                                        {[
+                                                            gym.address,
+                                                            gym.addressNumber && `nº ${gym.addressNumber}`,
+                                                            gym.addressComplement,
+                                                            gym.neighborhood,
+                                                            gym.city,
+                                                            gym.state,
+                                                            gym.zipCode
+                                                        ].filter(Boolean).join(', ')}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                                            Nenhuma informação cadastrada. Clique em "Editar" para configurar.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                    </div>
+                </Card>
+            )}
+
+            {/* Seção: Personalização do Sistema */}
+            <Card>
+                <div className="p-4 sm:p-6">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                        🎨 Personalização do Sistema
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                        Personalize a aparência do sistema com suas cores e logo.
+                    </p>
+
+                    <div className="space-y-6">
+                        {/* Upload de Logo */}
+                        <div className="space-y-3">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Logo da Academia
+                            </label>
+                            <div className="flex items-center gap-4 flex-wrap">
                                     <div className="flex-shrink-0">
                                         {logoPreview ? (
                                             <img
@@ -387,183 +808,188 @@ const SettingsPage: React.FC = () => {
                                         </Button>
                                     )}
                                 </div>
-                            </div>
+                        </div>
 
-                            {/* Cores Personalizadas */}
-                            <div className="space-y-4">
-                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                    Cores do Sistema
-                                </h3>
-                                
-                                {/* Cor Primária */}
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        Cor Primária
-                                    </label>
-                                    <div className="flex items-center gap-3 flex-wrap">
-                                        <input
-                                            type="color"
-                                            value={primaryColor}
-                                            onChange={(e) => setPrimaryColor(e.target.value)}
-                                            className="w-16 h-10 rounded border border-slate-300 dark:border-slate-600 cursor-pointer"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={primaryColor}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                if (/^#[0-9A-Fa-f]{0,6}$/.test(value) || value === '') {
-                                                    setPrimaryColor(value);
-                                                }
-                                            }}
-                                            className="flex-1 min-w-[120px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                            placeholder="#10b981"
-                                            maxLength={7}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => setPrimaryColor('#10b981')}
-                                        >
-                                            🔄 Padrão
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {/* Cor Secundária */}
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        Cor Secundária
-                                    </label>
-                                    <div className="flex items-center gap-3 flex-wrap">
-                                        <input
-                                            type="color"
-                                            value={secondaryColor}
-                                            onChange={(e) => setSecondaryColor(e.target.value)}
-                                            className="w-16 h-10 rounded border border-slate-300 dark:border-slate-600 cursor-pointer"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={secondaryColor}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                if (/^#[0-9A-Fa-f]{0,6}$/.test(value) || value === '') {
-                                                    setSecondaryColor(value);
-                                                }
-                                            }}
-                                            className="flex-1 min-w-[120px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                            placeholder="#059669"
-                                            maxLength={7}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => setSecondaryColor('#059669')}
-                                        >
-                                            🔄 Padrão
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {/* Cor de Destaque */}
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        Cor de Destaque
-                                    </label>
-                                    <div className="flex items-center gap-3 flex-wrap">
-                                        <input
-                                            type="color"
-                                            value={accentColor}
-                                            onChange={(e) => setAccentColor(e.target.value)}
-                                            className="w-16 h-10 rounded border border-slate-300 dark:border-slate-600 cursor-pointer"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={accentColor}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                if (/^#[0-9A-Fa-f]{0,6}$/.test(value) || value === '') {
-                                                    setAccentColor(value);
-                                                }
-                                            }}
-                                            className="flex-1 min-w-[120px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                            placeholder="#34d399"
-                                            maxLength={7}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => setAccentColor('#34d399')}
-                                        >
-                                            🔄 Padrão
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Preview */}
-                            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-                                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-                                    Preview
-                                </h4>
-                                <div className="space-y-2">
-                                    <div
-                                        className="px-4 py-2 rounded text-white text-sm font-medium text-center"
-                                        style={{ backgroundColor: primaryColor }}
-                                    >
-                                        Botão Primário
-                                    </div>
-                                    <div
-                                        className="px-4 py-2 rounded text-white text-sm font-medium text-center"
-                                        style={{ backgroundColor: secondaryColor }}
-                                    >
-                                        Botão Secundário
-                                    </div>
-                                    <div
-                                        className="px-4 py-2 rounded text-sm font-medium text-center border-2"
-                                        style={{ 
-                                            borderColor: accentColor,
-                                            color: accentColor
+                        {/* Cores Personalizadas */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                                🎨 Cores do Sistema
+                            </h3>
+                            
+                            {/* Cor Primária */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    Cor Primária
+                                </label>
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <input
+                                        type="color"
+                                        value={primaryColor}
+                                        onChange={(e) => setPrimaryColor(e.target.value)}
+                                        className="w-16 h-10 rounded border border-slate-300 dark:border-slate-600 cursor-pointer"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={primaryColor}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            if (/^#[0-9A-Fa-f]{0,6}$/.test(value) || value === '') {
+                                                setPrimaryColor(value);
+                                            }
                                         }}
+                                        className="flex-1 min-w-[120px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        placeholder="#10b981"
+                                        maxLength={7}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => setPrimaryColor('#10b981')}
                                     >
-                                        Destaque
-                                    </div>
+                                        🔄 Padrão
+                                    </Button>
                                 </div>
                             </div>
 
-                            {/* Botões de Ação */}
-                            <div className="flex gap-3 flex-wrap">
-                                <Button
-                                    type="button"
-                                    variant="primary"
-                                    onClick={handleSaveBranding}
-                                    disabled={!brandingDirty}
-                                >
-                                    💾 Salvar Personalização
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={handleResetBranding}
-                                >
-                                    🔄 Restaurar Padrão
-                                </Button>
+                            {/* Cor Secundária */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    Cor Secundária
+                                </label>
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <input
+                                        type="color"
+                                        value={secondaryColor}
+                                        onChange={(e) => setSecondaryColor(e.target.value)}
+                                        className="w-16 h-10 rounded border border-slate-300 dark:border-slate-600 cursor-pointer"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={secondaryColor}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            if (/^#[0-9A-Fa-f]{0,6}$/.test(value) || value === '') {
+                                                setSecondaryColor(value);
+                                            }
+                                        }}
+                                        className="flex-1 min-w-[120px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        placeholder="#059669"
+                                        maxLength={7}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => setSecondaryColor('#059669')}
+                                    >
+                                        🔄 Padrão
+                                    </Button>
+                                </div>
                             </div>
+
+                            {/* Cor de Destaque */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    Cor de Destaque
+                                </label>
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <input
+                                        type="color"
+                                        value={accentColor}
+                                        onChange={(e) => setAccentColor(e.target.value)}
+                                        className="w-16 h-10 rounded border border-slate-300 dark:border-slate-600 cursor-pointer"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={accentColor}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            if (/^#[0-9A-Fa-f]{0,6}$/.test(value) || value === '') {
+                                                setAccentColor(value);
+                                            }
+                                        }}
+                                        className="flex-1 min-w-[120px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        placeholder="#34d399"
+                                        maxLength={7}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => setAccentColor('#34d399')}
+                                    >
+                                        🔄 Padrão
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Preview */}
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                                👁️ Preview
+                            </h4>
+                            <div className="space-y-2">
+                                <div
+                                    className="px-4 py-2 rounded text-white text-sm font-medium text-center"
+                                    style={{ backgroundColor: primaryColor }}
+                                >
+                                    Botão Primário
+                                </div>
+                                <div
+                                    className="px-4 py-2 rounded text-white text-sm font-medium text-center"
+                                    style={{ backgroundColor: secondaryColor }}
+                                >
+                                    Botão Secundário
+                                </div>
+                                <div
+                                    className="px-4 py-2 rounded text-sm font-medium text-center border-2"
+                                    style={{ 
+                                        borderColor: accentColor,
+                                        color: accentColor
+                                    }}
+                                >
+                                    Destaque
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Botões de Ação */}
+                        <div className="flex gap-3 flex-wrap pt-2">
+                            <Button
+                                type="button"
+                                variant="primary"
+                                onClick={handleSaveBranding}
+                                disabled={!brandingDirty}
+                            >
+                                💾 Salvar Personalização
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={handleResetBranding}
+                            >
+                                🔄 Restaurar Padrão
+                            </Button>
                         </div>
                     </div>
+                </div>
+            </Card>
 
-                    <div className="py-6">
-                        <div className="mb-6">
-                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Integração com APIs de IA</h2>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                                Configure seus acessos a modelos pagos ou gratuitos e defina facilmente o endpoint do provedor escolhido.
-                            </p>
-                        </div>
+            {/* Seção: Integração com APIs de IA */}
+            <Card>
+                <div className="p-4 sm:p-6">
+                    <div className="mb-6">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                            🤖 Integração com APIs de IA
+                        </h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                            Configure seus acessos a modelos pagos ou gratuitos e defina facilmente o endpoint do provedor escolhido.
+                        </p>
+                    </div>
 
-                        <div className="space-y-6">
+                    <div className="space-y-6">
                             {/* Status Atual */}
                             <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
                                 <div className="flex items-center justify-between flex-wrap gap-3">
@@ -699,16 +1125,18 @@ const SettingsPage: React.FC = () => {
                                             </Button>
                                         </div>
                                     </div>
-                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            </Card>
 
-                    {/* Seção de IA Local Offline */}
-                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                            IA Local Offline
-                        </h2>
+            {/* Seção: IA Local Offline */}
+            <Card>
+                <div className="p-4 sm:p-6">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                        🖥️ IA Local Offline
+                    </h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
                             Use IA localmente sem depender de APIs externas. Requer Ollama instalado e rodando.
                         </p>
@@ -767,15 +1195,17 @@ const SettingsPage: React.FC = () => {
                                     </div>
                                 </div>
                             )}
-                        </div>
                     </div>
+                </div>
+            </Card>
 
-                    {/* Configuração do Servidor da Academia */}
-                    {(user.gymRole === 'admin' || user.gymRole === 'trainer' || user.gymRole === 'student') && (
-                        <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
-                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                                Servidor da Academia
-                            </h2>
+            {/* Seção: Configuração do Servidor da Academia */}
+            {(user.gymRole === 'admin' || user.gymRole === 'trainer' || user.gymRole === 'student') && (
+                <Card>
+                    <div className="p-4 sm:p-6">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                            🌐 Servidor da Academia
+                        </h2>
                             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                                 Configure a URL do servidor da academia para sincronização de dados e bloqueio de acesso.
                             </p>
@@ -822,27 +1252,30 @@ const SettingsPage: React.FC = () => {
                                     <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                                         Exemplo: http://192.168.1.100:3001 ou http://localhost:3001
                                     </p>
-                                </div>
                             </div>
                         </div>
-                    )}
-
-                    <div className="pt-6 flex flex-wrap items-center justify-end gap-3">
-                        {isDirty && (
-                            <span className="text-sm text-slate-500 dark:text-slate-400">
-                                Há alterações não salvas.
-                            </span>
-                        )}
-                        <Button
-                            type="button"
-                            disabled={!isDirty}
-                            onClick={handleSaveSettings}
-                        >
-                            Salvar Alterações
-                        </Button>
                     </div>
-                </div>
-            </Card>
+                </Card>
+            )}
+
+            {/* Botão de Salvar Configurações Gerais */}
+            {isDirty && (
+                <Card>
+                    <div className="p-4 sm:p-6">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <span className="text-sm text-slate-500 dark:text-slate-400">
+                                ⚠️ Há alterações não salvas nas configurações de API.
+                            </span>
+                            <Button
+                                type="button"
+                                onClick={handleSaveSettings}
+                            >
+                                💾 Salvar Alterações
+                            </Button>
+                        </div>
+                    </div>
+                </Card>
+            )}
         </div>
     );
 };

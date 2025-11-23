@@ -29,6 +29,8 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const GymAdminPage = lazy(() => import('./pages/GymAdminPage'));
 const StudentManagementPage = lazy(() => import('./pages/StudentManagementPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
+const PermissionsManagementPage = lazy(() => import('./pages/PermissionsManagementPage'));
+const VideoPresentationPage = lazy(() => import('./pages/VideoPresentationPage'));
 
 // Componente de loading
 const PageLoader = () => (
@@ -68,7 +70,7 @@ const App: React.FC = () => {
     const isAdmin = user.gymRole === 'admin' || isDefaultAdmin;
 
     // Rotas permitidas para administradores
-    const adminAllowedRoutes = ['/', '/privacy', '/configuracoes', '/perfil', '/student-management', '/gym-admin'];
+    const adminAllowedRoutes = ['/', '/privacy', '/configuracoes', '/perfil', '/student-management', '/gym-admin', '/permissions'];
     const isAdminAccessingStudentRoute = isAdmin && !adminAllowedRoutes.includes(path) && path !== '/admin-dashboard';
 
     // Se admin tentar acessar rota de aluno, redirecionar para dashboard
@@ -78,7 +80,8 @@ const App: React.FC = () => {
     }
 
     // Verificar se aluno precisa responder a enquete
-    const SURVEY_STORAGE_FLAG = 'nutriIA_enquete_v2_done';
+    // O flag da enquete é específico por usuário (username)
+    const SURVEY_STORAGE_FLAG = user.username ? `nutriIA_enquete_v2_done_${user.username}` : 'nutriIA_enquete_v2_done';
     const hasAnsweredSurvey = typeof window !== 'undefined' ? localStorage.getItem(SURVEY_STORAGE_FLAG) : null;
     const isStudentNeedingSurvey = isStudent && !hasAnsweredSurvey && path !== '/welcome-survey';
 
@@ -105,6 +108,7 @@ const App: React.FC = () => {
             case '/gym-admin': return <GymAdminPage />;
             case '/student-management': return <StudentManagementPage />;
             case '/admin-dashboard': return <AdminDashboardPage />;
+            case '/permissions': return <PermissionsManagementPage />;
             case '/':
             default:
                 // Se for admin, mostrar dashboard administrativo; caso contrário, mostrar home do aluno
@@ -116,6 +120,14 @@ const App: React.FC = () => {
     };
 
     if (path === '/presentation') {
+        return (
+            <Suspense fallback={<PageLoader />}>
+                <VideoPresentationPage />
+            </Suspense>
+        );
+    }
+
+    if (path === '/features') {
         return (
             <Suspense fallback={<PageLoader />}>
                 <PresentationPage />
