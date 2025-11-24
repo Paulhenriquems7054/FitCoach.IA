@@ -10,6 +10,7 @@ import {
   MapSearchResult,
 } from '../components/chatbot/assistantTypes';
 import { getOfflineChatResponse, isOnline } from './offlineService';
+import { getUser } from './databaseService';
 import type { User } from '../types';
 import { logger } from '../utils/logger';
 
@@ -174,18 +175,16 @@ export function resetAssistantSession(): void {
 // Conversational helpers
 // ---------------------------------------------------------------------------
 
-// Função auxiliar para obter dados do usuário do localStorage
-function getUserFromStorage(): User | null {
+// Função auxiliar para obter dados do usuário do IndexedDB
+async function getUserFromStorage(): Promise<User | null> {
   if (typeof window === 'undefined') return null;
   try {
-    const stored = window.localStorage.getItem('nutri.user');
-    if (stored) {
-      return JSON.parse(stored) as User;
-    }
+    const user = await getUser();
+    return user;
   } catch (e) {
     logger.warn('Erro ao ler dados do usuário', 'assistantService', e);
+    return null;
   }
-  return null;
 }
 
 export async function sendAssistantMessage(
@@ -200,7 +199,7 @@ export async function sendAssistantMessage(
   // Tentar IA Local primeiro (Ollama), depois chat offline
   logger.info('Usando modo offline: chat local', 'assistantService');
   
-  const user = getUserFromStorage();
+  const user = await getUserFromStorage();
   if (!user) {
     onError('Dados do usuário não encontrados. Por favor, recarregue a página.');
     return;
