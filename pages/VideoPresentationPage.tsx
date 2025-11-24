@@ -76,7 +76,7 @@ const VideoPresentationPage: React.FC = () => {
               videoRef.current.muted = false;
               videoRef.current.volume = 1.0;
             }
-            window.location.hash = '/';
+            window.location.hash = '/login';
           }}
           className="px-6 sm:px-8 md:px-10 py-3 sm:py-3.5 md:py-4 text-sm sm:text-base md:text-lg font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg border-none cursor-pointer inline-flex items-center justify-center min-w-[200px] sm:min-w-[240px] md:min-w-[280px] shadow-lg shadow-emerald-500/30 transition-all duration-200 hover:scale-105 hover:from-emerald-400 hover:to-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
           style={{ 
