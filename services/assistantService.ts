@@ -707,6 +707,24 @@ export async function startAssistantAudioSession(
     return;
   }
 
+  // Verificar se o navegador suporta acesso ao microfone
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    onError('Seu navegador não suporta acesso ao microfone. Por favor, use um navegador moderno (Chrome, Edge, Firefox ou Safari).');
+    return;
+  }
+
+  // Verificar permissão do microfone antes de tentar usar
+  try {
+    const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+    if (permissionStatus.state === 'denied') {
+      onError('Permissão do microfone foi negada. Por favor, permita o acesso ao microfone nas configurações do navegador e recarregue a página.');
+      return;
+    }
+  } catch (permError) {
+    // Alguns navegadores não suportam navigator.permissions.query, continuar normalmente
+    logger.debug('Não foi possível verificar permissão do microfone (navegador pode não suportar)', 'assistantService');
+  }
+
   // Verificar se Web Speech API está disponível
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
   const useWebSpeech = !API_KEY && !!SpeechRecognition;
@@ -746,7 +764,27 @@ export async function startAssistantAudioSession(
           // Ignorar erro de "no-speech" - é normal quando não há fala
           return;
         }
-        onError(`Erro no reconhecimento de voz: ${event.error}`);
+        
+        // Tratamento específico para erro de permissão
+        if (event.error === 'not-allowed') {
+          onError('Permissão do microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.');
+          stopAssistantAudioSession();
+          return;
+        }
+        
+        // Tratamento para outros erros comuns
+        let errorMessage = `Erro no reconhecimento de voz: ${event.error}`;
+        if (event.error === 'aborted') {
+          errorMessage = 'Reconhecimento de voz foi interrompido.';
+        } else if (event.error === 'network') {
+          errorMessage = 'Erro de rede no reconhecimento de voz. Verifique sua conexão.';
+        } else if (event.error === 'audio-capture') {
+          errorMessage = 'Não foi possível capturar áudio. Verifique se o microfone está conectado e funcionando.';
+        } else if (event.error === 'service-not-allowed') {
+          errorMessage = 'Serviço de reconhecimento de voz não permitido. Verifique as configurações do navegador.';
+        }
+        
+        onError(errorMessage);
         stopAssistantAudioSession();
       };
 
@@ -773,7 +811,27 @@ export async function startAssistantAudioSession(
   // Tentar usar Gemini Live Audio API
   try {
     const ai = getGeminiClient();
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    
+    // Solicitar permissão do microfone com tratamento de erro específico
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (mediaError: any) {
+      const errorName = mediaError?.name || mediaError?.message || 'unknown';
+      if (errorName === 'NotAllowedError' || errorName.includes('not-allowed') || mediaError?.message?.includes('permission')) {
+        onError('Permissão do microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.');
+        stopAssistantAudioSession();
+        return;
+      } else if (errorName === 'NotFoundError' || errorName.includes('not-found')) {
+        onError('Nenhum microfone encontrado. Verifique se o microfone está conectado.');
+        stopAssistantAudioSession();
+        return;
+      } else if (errorName === 'NotReadableError' || errorName.includes('not-readable')) {
+        onError('Não foi possível acessar o microfone. Ele pode estar sendo usado por outro aplicativo.');
+        stopAssistantAudioSession();
+        return;
+      }
+      throw mediaError; // Re-lançar outros erros
+    }
 
     inputAudioContext = new AudioContext({ sampleRate: 16_000 });
     outputAudioContext = new AudioContext({ sampleRate: 24_000 });
@@ -874,7 +932,27 @@ export async function startAssistantAudioSession(
           if (event.error === 'no-speech') {
             return;
           }
-          onError(`Erro no reconhecimento de voz: ${event.error}`);
+          
+          // Tratamento específico para erro de permissão
+          if (event.error === 'not-allowed') {
+            onError('Permissão do microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.');
+            stopAssistantAudioSession();
+            return;
+          }
+          
+          // Tratamento para outros erros comuns
+          let errorMessage = `Erro no reconhecimento de voz: ${event.error}`;
+          if (event.error === 'aborted') {
+            errorMessage = 'Reconhecimento de voz foi interrompido.';
+          } else if (event.error === 'network') {
+            errorMessage = 'Erro de rede no reconhecimento de voz. Verifique sua conexão.';
+          } else if (event.error === 'audio-capture') {
+            errorMessage = 'Não foi possível capturar áudio. Verifique se o microfone está conectado e funcionando.';
+          } else if (event.error === 'service-not-allowed') {
+            errorMessage = 'Serviço de reconhecimento de voz não permitido. Verifique as configurações do navegador.';
+          }
+          
+          onError(errorMessage);
           stopAssistantAudioSession();
         };
 
