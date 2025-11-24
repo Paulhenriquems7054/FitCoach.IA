@@ -9,7 +9,7 @@ import {
   WebSearchResult,
   MapSearchResult,
 } from '../components/chatbot/assistantTypes';
-import { getOfflineChatResponse, isOnline } from './offlineService';
+import { getOfflineChatResponse, isOnline, analyzeMealPhotoOffline } from './offlineService';
 import { getUser } from './databaseService';
 import type { User } from '../types';
 import { logger } from '../utils/logger';
@@ -19,6 +19,54 @@ type LiveSession = {
   close: () => void;
   sendRealtimeInput: (input: { media: GeminiBlob }) => void;
 };
+
+// Tipos para Web Speech API
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+
+interface SpeechRecognitionEvent {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal: boolean;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message?: string;
+}
+
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognition;
+}
+
+declare var SpeechRecognition: SpeechRecognitionConstructor | undefined;
+declare var webkitSpeechRecognition: SpeechRecognitionConstructor | undefined;
 
 // ---------------------------------------------------------------------------
 // Assistant profiles and voices
@@ -78,6 +126,9 @@ let mediaStreamSource: MediaStreamAudioSourceNode | undefined;
 let scriptProcessor: ScriptProcessorNode | undefined;
 const outputSources = new Set<AudioBufferSourceNode>();
 let nextStartTime = 0;
+let webSpeechRecognition: SpeechRecognition | null = null;
+let webSpeechFinalTranscript = '';
+let webSpeechOnTranscriptionChunk: ((text: string) => void) | null = null;
 
 let customPromptCache: string | null = null;
 let lastInstructionSignature: string | null = null;
@@ -384,6 +435,50 @@ export async function analyzeImageWithAssistant(
   onNewChunk: (chunk: string) => void,
   onError: (error: string) => void,
 ): Promise<void> {
+  // Verificar se API key está disponível e válida
+  const hasApiKey = !!API_KEY;
+  const online = isOnline();
+  
+  // Se não houver API key ou estiver offline, usar análise offline
+  if (!hasApiKey || !online) {
+    try {
+      logger.info('Usando análise offline de imagem', 'assistantService');
+      const analysis = await analyzeMealPhotoOffline(base64Image, mimeType);
+      
+      // Formatar análise como texto
+      let analysisText = `📸 Análise da Refeição\n\n`;
+      analysisText += `🍽️ Alimentos Identificados:\n`;
+      analysis.alimentos_identificados.forEach(item => {
+        analysisText += `• ${item.alimento}: ${item.quantidade_estimada}\n`;
+      });
+      
+      analysisText += `\n📊 Informação Nutricional Estimada:\n`;
+      analysisText += `• Calorias: ${analysis.estimativa_nutricional.total_calorias} kcal\n`;
+      analysisText += `• Proteínas: ${analysis.estimativa_nutricional.total_proteinas_g}g\n`;
+      analysisText += `• Carboidratos: ${analysis.estimativa_nutricional.total_carboidratos_g}g\n`;
+      analysisText += `• Gorduras: ${analysis.estimativa_nutricional.total_gorduras_g}g\n`;
+      
+      analysisText += `\n💡 Avaliação:\n${analysis.avaliacao_geral}\n`;
+      
+      if (prompt && prompt.trim() && !prompt.toLowerCase().includes('analise')) {
+        analysisText += `\n📝 Nota: ${prompt}`;
+      }
+      
+      // Simular streaming para melhor UX
+      const words = analysisText.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 20));
+        onNewChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
+      }
+      return;
+    } catch (offlineError) {
+      logger.error('Erro na análise offline', 'assistantService', offlineError);
+      onError('Erro ao analisar imagem. Tente novamente.');
+      return;
+    }
+  }
+
+  // Tentar usar API do Gemini se disponível
   try {
     const ai = getGeminiClient();
     const response = await ai.models.generateContent({
@@ -412,6 +507,49 @@ export async function analyzeImageWithAssistant(
       onError('Não recebemos uma análise da IA.');
     }
   } catch (error: unknown) {
+    // Se erro for de API key inválida, usar fallback offline
+    const errorObj = error as any;
+    const isApiKeyError = errorObj?.error?.code === 400 && 
+                         (errorObj?.error?.message?.includes('API key') || 
+                          errorObj?.error?.status === 'INVALID_ARGUMENT');
+    
+    if (isApiKeyError) {
+      logger.info('API key inválida, usando análise offline', 'assistantService');
+      try {
+        const analysis = await analyzeMealPhotoOffline(base64Image, mimeType);
+        
+        let analysisText = `📸 Análise da Refeição (Modo Offline)\n\n`;
+        analysisText += `🍽️ Alimentos Identificados:\n`;
+        analysis.alimentos_identificados.forEach(item => {
+          analysisText += `• ${item.alimento}: ${item.quantidade_estimada}\n`;
+        });
+        
+        analysisText += `\n📊 Informação Nutricional Estimada:\n`;
+        analysisText += `• Calorias: ${analysis.estimativa_nutricional.total_calorias} kcal\n`;
+        analysisText += `• Proteínas: ${analysis.estimativa_nutricional.total_proteinas_g}g\n`;
+        analysisText += `• Carboidratos: ${analysis.estimativa_nutricional.total_carboidratos_g}g\n`;
+        analysisText += `• Gorduras: ${analysis.estimativa_nutricional.total_gorduras_g}g\n`;
+        
+        analysisText += `\n💡 Avaliação:\n${analysis.avaliacao_geral}\n`;
+        
+        if (prompt && prompt.trim() && !prompt.toLowerCase().includes('analise')) {
+          analysisText += `\n📝 Nota: ${prompt}`;
+        }
+        
+        // Simular streaming
+        const words = analysisText.split(' ');
+        for (let i = 0; i < words.length; i++) {
+          await new Promise(resolve => setTimeout(resolve, 20));
+          onNewChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
+        }
+        return;
+      } catch (offlineError) {
+        logger.error('Erro no fallback offline', 'assistantService', offlineError);
+        onError('Erro ao analisar imagem. Tente novamente.');
+        return;
+      }
+    }
+    
     const errorMessage = error instanceof Error ? error.message : 'Erro ao analisar imagem.';
     logger.error('Erro ao analisar imagem', 'assistantService', error);
     onError(errorMessage);
@@ -565,10 +703,74 @@ export async function startAssistantAudioSession(
   onTurnComplete: () => void,
   onError: (error: string) => void,
 ): Promise<void> {
-  if (liveAudioSession) {
+  if (liveAudioSession || webSpeechRecognition) {
     return;
   }
 
+  // Verificar se Web Speech API está disponível
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  const useWebSpeech = !API_KEY && !!SpeechRecognition;
+
+  // Tentar usar Web Speech API (offline) se Gemini não estiver disponível
+  if (useWebSpeech) {
+    try {
+      webSpeechRecognition = new SpeechRecognition();
+      webSpeechRecognition.continuous = true;
+      webSpeechRecognition.interimResults = true;
+      webSpeechRecognition.lang = 'pt-BR';
+      webSpeechFinalTranscript = '';
+      webSpeechOnTranscriptionChunk = onTranscriptionChunk;
+
+      webSpeechRecognition.onresult = (event: SpeechRecognitionEvent) => {
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            webSpeechFinalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        // Enviar transcrição completa (final + interim)
+        const fullTranscript = webSpeechFinalTranscript + interimTranscript;
+        if (fullTranscript.trim() && webSpeechOnTranscriptionChunk) {
+          webSpeechOnTranscriptionChunk(fullTranscript);
+        }
+      };
+
+      webSpeechRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        logger.error('Erro na Web Speech API', 'assistantService', event);
+        if (event.error === 'no-speech') {
+          // Ignorar erro de "no-speech" - é normal quando não há fala
+          return;
+        }
+        onError(`Erro no reconhecimento de voz: ${event.error}`);
+        stopAssistantAudioSession();
+      };
+
+      webSpeechRecognition.onend = () => {
+        // Se ainda estiver gravando, reiniciar automaticamente
+        if (webSpeechRecognition) {
+          try {
+            webSpeechRecognition.start();
+          } catch (e) {
+            // Pode falhar se já estiver iniciado, ignorar
+          }
+        }
+      };
+
+      webSpeechRecognition.start();
+      logger.info('Usando Web Speech API para reconhecimento de voz', 'assistantService');
+      return;
+    } catch (error: unknown) {
+      logger.warn('Falha ao iniciar Web Speech API, tentando Gemini', 'assistantService', error);
+      // Continuar para tentar Gemini
+    }
+  }
+
+  // Tentar usar Gemini Live Audio API
   try {
     const ai = getGeminiClient();
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -635,15 +837,87 @@ export async function startAssistantAudioSession(
         inputAudioTranscription: {},
       },
     });
+    logger.info('Usando Gemini Live Audio API', 'assistantService');
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Erro ao iniciar áudio.';
     logger.error('Erro ao iniciar sessão de áudio', 'assistantService', error);
+    
+    // Se Gemini falhar e Web Speech não foi tentado, tentar Web Speech
+    if (!webSpeechRecognition && SpeechRecognition) {
+      try {
+        webSpeechRecognition = new SpeechRecognition();
+        webSpeechRecognition.continuous = true;
+        webSpeechRecognition.interimResults = true;
+        webSpeechRecognition.lang = 'pt-BR';
+        webSpeechFinalTranscript = '';
+        webSpeechOnTranscriptionChunk = onTranscriptionChunk;
+
+        webSpeechRecognition.onresult = (event: SpeechRecognitionEvent) => {
+          let interimTranscript = '';
+          
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              webSpeechFinalTranscript += transcript + ' ';
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          const fullTranscript = webSpeechFinalTranscript + interimTranscript;
+          if (fullTranscript.trim() && webSpeechOnTranscriptionChunk) {
+            webSpeechOnTranscriptionChunk(fullTranscript);
+          }
+        };
+
+        webSpeechRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+          if (event.error === 'no-speech') {
+            return;
+          }
+          onError(`Erro no reconhecimento de voz: ${event.error}`);
+          stopAssistantAudioSession();
+        };
+
+        webSpeechRecognition.onend = () => {
+          if (webSpeechRecognition) {
+            try {
+              webSpeechRecognition.start();
+            } catch (e) {
+              // Ignorar
+            }
+          }
+        };
+
+        webSpeechRecognition.start();
+        logger.info('Fallback para Web Speech API', 'assistantService');
+        return;
+      } catch (fallbackError) {
+        logger.error('Falha no fallback Web Speech API', 'assistantService', fallbackError);
+      }
+    }
+    
     onError(errorMessage);
     stopAssistantAudioSession();
   }
 }
 
 export function stopAssistantAudioSession(): void {
+  // Parar Web Speech Recognition se estiver ativo
+  if (webSpeechRecognition) {
+    try {
+      webSpeechRecognition.stop();
+      // Enviar transcrição final se houver
+      if (webSpeechFinalTranscript.trim() && webSpeechOnTranscriptionChunk) {
+        webSpeechOnTranscriptionChunk(webSpeechFinalTranscript.trim());
+      }
+      webSpeechRecognition = null;
+      webSpeechFinalTranscript = '';
+      webSpeechOnTranscriptionChunk = null;
+    } catch (error) {
+      logger.warn('Erro ao parar Web Speech Recognition', 'assistantService', error);
+    }
+  }
+
   if (liveAudioSession) {
     try {
       liveAudioSession.close();

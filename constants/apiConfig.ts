@@ -12,7 +12,7 @@ export const PAID_API_KEY_STORAGE_KEY = 'nutria.api.paidKey';
 export const FREE_API_KEY_STORAGE_KEY = 'nutria.api.freeKey';
 export const PROVIDER_LINK_STORAGE_KEY = 'nutria.api.providerLink';
 
-export const DEFAULT_FREE_API_KEY = 'AIzaSyAt_NhK5SrefQmIUC3iaELCKvD93xlTG8s';
+export const DEFAULT_FREE_API_KEY = 'AIzaSyAL0hVrXc3hbWrYXh7YG0icvElYma7FLOE';
 export const DEFAULT_PROVIDER_LINK = 'https://ai.google.dev/';
 
 const DEFAULT_CONFIG: ApiConfig = {
