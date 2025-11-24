@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useGymBrandingContext } from './GymBrandingProvider';
 
 interface LogoProps {
@@ -17,6 +17,7 @@ export const Logo: React.FC<LogoProps> = ({
   className = '' 
 }) => {
   const { logo, appName, colors, hasBranding } = useGymBrandingContext();
+  const videoRef = useRef<HTMLVideoElement>(null);
   
   const sizeClasses = {
     sm: 'w-8 h-8',
@@ -24,6 +25,13 @@ export const Logo: React.FC<LogoProps> = ({
     lg: 'w-16 h-16',
     xl: 'w-24 h-24',
   };
+
+  // Configurar velocidade do vídeo quando carregar
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = 0.5; // 50% da velocidade normal (mais lento)
+    }
+  }, []);
 
   // Se tiver logo da academia, usar ele
   if (hasBranding && logo) {
@@ -61,6 +69,7 @@ export const Logo: React.FC<LogoProps> = ({
     <div className={`flex items-center gap-2 ${className}`}>
       <div className={`${sizeClasses[size]} rounded-full overflow-hidden border-2 shadow-lg flex-shrink-0 flex items-center justify-center bg-slate-900/30`} style={{ borderColor: `${colors.primary}30` }}>
         <video
+          ref={videoRef}
           autoPlay
           loop
           muted
@@ -70,8 +79,14 @@ export const Logo: React.FC<LogoProps> = ({
             maxWidth: '85%',
             maxHeight: '85%'
           }}
+          onLoadedMetadata={(e) => {
+            const video = e.target as HTMLVideoElement;
+            if (video) {
+              video.playbackRate = 0.5; // 50% da velocidade normal
+            }
+          }}
         >
-          <source src="/icons/Vídeo-Nutri.mp4" type="video/mp4" />
+          <source src="/icons/FITCOACH.IA.mp4" type="video/mp4" />
           {/* Fallback para navegadores que não suportam vídeo */}
           <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-blue-500 flex items-center justify-center text-white font-bold text-xs">
             A.IA
