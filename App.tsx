@@ -23,7 +23,6 @@ const AnalysisPage = lazy(() => import('./pages/AnalysisPage'));
 const SmartMealPage = lazy(() => import('./pages/SmartMealPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const ProfessionalDashboardPage = lazy(() => import('./pages/ProfessionalDashboardPage'));
-const PresentationPage = lazy(() => import('./pages/PresentationPage'));
 const WelcomeSurveyPage = lazy(() => import('./pages/WelcomeSurveyPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const GymAdminPage = lazy(() => import('./pages/GymAdminPage'));
@@ -123,14 +122,6 @@ const App: React.FC = () => {
         return (
             <Suspense fallback={<PageLoader />}>
                 <VideoPresentationPage />
-            </Suspense>
-        );
-    }
-
-    if (path === '/features') {
-        return (
-            <Suspense fallback={<PageLoader />}>
-                <PresentationPage />
             </Suspense>
         );
     }
