@@ -50,11 +50,22 @@ const ProfilePage: React.FC = () => {
         setFormData((prev) => ({ ...prev, [name]: name === 'idade' || name === 'peso' || name === 'altura' ? Number(value) : value }));
     };
 
-    const handlePhotoChange = (photoUrl: string | null) => {
-        const updatedFormData = { ...formData, photoUrl: photoUrl || undefined };
-        setFormData(updatedFormData);
-        // Salvar imediatamente quando a foto for alterada
-        setUser(updatedFormData);
+    const handlePhotoChange = async (photoUrl: string | null) => {
+        try {
+            const updatedUser = { ...user, photoUrl: photoUrl || undefined };
+            // Salvar no banco de dados
+            await saveUser(updatedUser);
+            // Atualizar contexto
+            setUser(updatedUser);
+            // Atualizar formData se não for admin
+            if (!isAdmin) {
+                setFormData(updatedUser);
+            }
+            showSuccess('Foto de perfil atualizada com sucesso!');
+        } catch (error: any) {
+            console.error('Erro ao atualizar foto de perfil:', error);
+            showError(error.message || 'Erro ao atualizar foto de perfil');
+        }
     };
 
     const handleSave = () => {
@@ -403,6 +414,21 @@ const ProfilePage: React.FC = () => {
                     </p>
                 </div>
 
+                {/* Seção de Foto de Perfil */}
+                <Card>
+                    <div className="p-4 sm:p-6">
+                        <div className="flex flex-col items-center pb-6 border-b border-slate-200 dark:border-slate-700">
+                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Foto de Perfil</h2>
+                            <PhotoUploader
+                                currentPhotoUrl={user.photoUrl}
+                                userName={user.nome || user.username || 'Administrador'}
+                                onPhotoChange={handlePhotoChange}
+                                disabled={false}
+                            />
+                        </div>
+                    </div>
+                </Card>
+
                 {/* Seção de Gerenciamento de Credenciais de Administrador e Desenvolvedor */}
                 <Card>
                     <div className="p-4 sm:p-6 space-y-6">
@@ -688,19 +714,6 @@ const ProfilePage: React.FC = () => {
                                     </div>
                                 </div>
                             )}
-                        </div>
-                    </Card>
-                )}
-
-                {!isDefaultUser && (
-                    <Card>
-                        <div className="p-4 sm:p-6 text-center py-8">
-                            <p className="text-slate-600 dark:text-slate-400 mb-4">
-                                Para configurar a academia, acesse a página de Configurações.
-                            </p>
-                            <Button onClick={() => window.location.hash = '#/configuracoes'}>
-                                Ir para Configurações
-                            </Button>
                         </div>
                     </Card>
                 )}
