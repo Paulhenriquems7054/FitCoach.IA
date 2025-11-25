@@ -5,6 +5,7 @@ import App from './App';
 import { ThemeProvider } from './context/ThemeContext';
 import { UserProvider } from './context/UserContext';
 import { I18nProvider } from './context/I18nContext';
+import { DeviceProvider } from './context/DeviceContext';
 import { DatabaseInitializer } from './components/DatabaseInitializer';
 
 // Service Worker management
@@ -107,13 +108,15 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <DatabaseInitializer>
-      <ThemeProvider>
-        <UserProvider>
-          <I18nProvider>
-            <App />
-          </I18nProvider>
-        </UserProvider>
-      </ThemeProvider>
+      <DeviceProvider>
+        <ThemeProvider>
+          <UserProvider>
+            <I18nProvider>
+              <App />
+            </I18nProvider>
+          </UserProvider>
+        </ThemeProvider>
+      </DeviceProvider>
     </DatabaseInitializer>
   </React.StrictMode>
 );

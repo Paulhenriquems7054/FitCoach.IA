@@ -7,6 +7,7 @@ import { Card } from './components/ui/Card';
 import { ToastProvider } from './components/ui/Toast';
 import { GymBrandingProvider } from './components/GymBrandingProvider';
 import { useUser } from './context/UserContext';
+import { useDeviceContext } from './context/DeviceContext';
 import { usePermissions } from './hooks/usePermissions';
 import { getCurrentUsername } from './services/databaseService';
 
@@ -47,37 +48,163 @@ const PageLoader = () => (
     </div>
 );
 
+/**
+ * Aplica otimizações específicas do dispositivo
+ */
+const applyDeviceOptimizations = (device: ReturnType<typeof useDeviceContext>) => {
+    if (typeof window === 'undefined') return;
+
+    // Adicionar classes CSS baseadas no dispositivo
+    const root = document.documentElement;
+    
+    // Remover classes anteriores
+    root.classList.remove('device-mobile', 'device-tablet', 'device-desktop', 'device-touch', 'device-no-touch');
+    
+    // Adicionar classes baseadas no tipo de dispositivo
+    if (device.isMobile) {
+        root.classList.add('device-mobile');
+    } else if (device.isTablet) {
+        root.classList.add('device-tablet');
+    } else {
+        root.classList.add('device-desktop');
+    }
+    
+    // Adicionar classe de touch
+    if (device.isTouch) {
+        root.classList.add('device-touch');
+    } else {
+        root.classList.add('device-no-touch');
+    }
+    
+    // Otimizações específicas para mobile
+    if (device.isMobile) {
+        // Prevenir zoom em inputs (melhor UX)
+        const viewport = document.querySelector('meta[name="viewport"]');
+        if (viewport) {
+            viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes');
+        }
+    }
+    
+    // Otimizações para desktop
+    if (device.isDesktop) {
+        // Habilitar hover effects
+        root.classList.add('device-hover-enabled');
+    }
+    
+    // Salvar informações do dispositivo no localStorage para referência futura
+    try {
+        const deviceInfo = {
+            type: device.type,
+            os: device.os,
+            browser: device.browser,
+            deviceId: device.deviceId,
+            lastSeen: new Date().toISOString()
+        };
+        localStorage.setItem('fitcoach.device.info', JSON.stringify(deviceInfo));
+    } catch (error) {
+        console.warn('Não foi possível salvar informações do dispositivo', error);
+    }
+};
+
 const App: React.FC = () => {
     const { path } = useRouter();
     const { user } = useUser();
     const permissions = usePermissions();
+    const device = useDeviceContext();
     const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
     // Verificar se é o primeiro acesso (apresentação ainda não foi vista)
     const PRESENTATION_SEEN_KEY = 'fitcoach.presentation.seen';
-    const hasSeenPresentation = typeof window !== 'undefined' 
-        ? localStorage.getItem(PRESENTATION_SEEN_KEY) === 'true' 
-        : true;
+    const [hasSeenPresentation, setHasSeenPresentation] = useState<boolean | null>(null);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     // Rotas públicas (não requerem autenticação)
     const publicRoutes = ['/premium', '/presentation', '/login'];
     const isPublicRoute = publicRoutes.includes(path);
 
-    // Se é o primeiro acesso e não está na apresentação ou login, redirecionar via render (não useEffect)
-    // Isso é tratado no render abaixo
-
-    // Verificar se usuário está realmente logado
+    // Inicializar verificação de apresentação e login de forma síncrona
     useEffect(() => {
+        // Verificar apresentação de forma síncrona
+        // Em mobile, pode pular a apresentação se já foi vista em outro dispositivo
+        const checkPresentation = () => {
+            if (typeof window !== 'undefined') {
+                // Verificar flag global
+                const seenGlobal = localStorage.getItem(PRESENTATION_SEEN_KEY) === 'true';
+                
+                // Verificar flag específica do dispositivo
+                const deviceKey = `fitcoach.presentation.seen.${device.deviceId}`;
+                const seenDevice = localStorage.getItem(deviceKey) === 'true';
+                
+                // Se foi visto globalmente OU neste dispositivo específico
+                setHasSeenPresentation(seenGlobal || seenDevice);
+            } else {
+                setHasSeenPresentation(false); // Default: não viu (mostrar apresentação)
+            }
+        };
+
+        checkPresentation();
+
+        // Listener para mudanças no localStorage (quando apresentação é marcada como vista)
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === PRESENTATION_SEEN_KEY) {
+                checkPresentation();
+            }
+        };
+
+        // Listener para evento customizado (quando apresentação é marcada na mesma aba)
+        const handlePresentationSeen = () => {
+            checkPresentation();
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        window.addEventListener('presentation-seen', handlePresentationSeen);
+
+        // Aplicar otimizações específicas do dispositivo
+        applyDeviceOptimizations(device);
+
+        // Verificar se usuário está realmente logado
         const checkLogin = async () => {
             try {
                 const currentUsername = await getCurrentUsername();
                 setIsLoggedIn(!!currentUsername && currentUsername.trim() !== '');
             } catch (error) {
                 setIsLoggedIn(false);
+            } finally {
+                setIsInitialized(true);
             }
         };
         checkLogin();
-    }, []);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('presentation-seen', handlePresentationSeen);
+        };
+    }, [device]);
+
+    // Aguardar inicialização antes de decidir roteamento
+    if (!isInitialized || hasSeenPresentation === null) {
+        return <PageLoader />;
+    }
+
+    // Se path está vazio (sem hash), decidir baseado na flag de apresentação
+    if (!path || path === '') {
+        if (!hasSeenPresentation) {
+            // Primeiro acesso: redirecionar para apresentação
+            window.location.hash = '#/presentation';
+            return <PageLoader />;
+        } else {
+            // Já viu apresentação: redirecionar para login
+            window.location.hash = '#/login';
+            return <PageLoader />;
+        }
+    }
+
+    // Lógica de primeiro acesso: se não viu apresentação e não está em rota pública, redirecionar
+    // Isso garante que mesmo com hash na URL, o primeiro acesso sempre mostre a apresentação
+    if (!hasSeenPresentation && path !== '/presentation' && path !== '/login' && path !== '/premium') {
+        window.location.hash = '#/presentation';
+        return <PageLoader />;
+    }
 
     // Se for rota pública, permitir acesso sem verificar autenticação
     if (isPublicRoute && path === '/premium') {
@@ -94,7 +221,7 @@ const App: React.FC = () => {
         );
     }
 
-    // Se ainda está verificando login, mostrar loading
+    // Se ainda está verificando login, mostrar loading (apenas para rotas privadas)
     if (isLoggedIn === null && !isPublicRoute) {
         return <PageLoader />;
     }
@@ -168,25 +295,6 @@ const App: React.FC = () => {
         }
     };
 
-    // Verificar primeiro acesso antes de renderizar outras páginas
-    // Se não há path definido (acesso inicial sem hash), decidir baseado na flag
-    if (!path || path === '') {
-        if (!hasSeenPresentation) {
-            // Primeiro acesso: redirecionar para apresentação
-            window.location.hash = '#/presentation';
-            return <PageLoader />;
-        } else {
-            // Já viu apresentação: redirecionar para login
-            window.location.hash = '#/login';
-            return <PageLoader />;
-        }
-    }
-    
-    // Se é o primeiro acesso e não está na apresentação ou login, redirecionar
-    if (!hasSeenPresentation && path !== '/presentation' && path !== '/login' && path !== '/premium') {
-        window.location.hash = '#/presentation';
-        return <PageLoader />;
-    }
 
     if (path === '/presentation') {
         return (
