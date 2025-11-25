@@ -169,13 +169,23 @@ const App: React.FC = () => {
     };
 
     // Verificar primeiro acesso antes de renderizar outras páginas
+    // Se não há path definido (acesso inicial sem hash), decidir baseado na flag
+    if (!path || path === '') {
+        if (!hasSeenPresentation) {
+            // Primeiro acesso: redirecionar para apresentação
+            window.location.hash = '#/presentation';
+            return <PageLoader />;
+        } else {
+            // Já viu apresentação: redirecionar para login
+            window.location.hash = '#/login';
+            return <PageLoader />;
+        }
+    }
+    
     // Se é o primeiro acesso e não está na apresentação ou login, redirecionar
     if (!hasSeenPresentation && path !== '/presentation' && path !== '/login' && path !== '/premium') {
-        return (
-            <Suspense fallback={<PageLoader />}>
-                <VideoPresentationPage />
-            </Suspense>
-        );
+        window.location.hash = '#/presentation';
+        return <PageLoader />;
     }
 
     if (path === '/presentation') {
