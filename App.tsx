@@ -199,9 +199,9 @@ const App: React.FC = () => {
         }
     }
 
-    // Lógica de primeiro acesso: se não viu apresentação e não está em rota pública, redirecionar
-    // Isso garante que mesmo com hash na URL, o primeiro acesso sempre mostre a apresentação
-    if (!hasSeenPresentation && path !== '/presentation' && path !== '/login' && path !== '/premium') {
+    // Lógica de primeiro acesso: se não viu apresentação, só permitir /presentation e /premium
+    // Se tentar acessar /login ou qualquer outra rota no primeiro acesso, redirecionar para apresentação
+    if (!hasSeenPresentation && path !== '/presentation' && path !== '/premium') {
         window.location.hash = '#/presentation';
         return <PageLoader />;
     }
