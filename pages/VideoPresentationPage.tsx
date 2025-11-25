@@ -1,9 +1,12 @@
 /**
  * Página de Apresentação - Apenas Vídeo
  * Versão otimizada sem atrasos
+ * Exibe apenas uma vez - controlado por localStorage
  */
 
 import React, { useRef, useEffect } from 'react';
+
+const PRESENTATION_SEEN_KEY = 'fitcoach.presentation.seen';
 
 const VideoPresentationPage: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -37,6 +40,18 @@ const VideoPresentationPage: React.FC = () => {
     };
   }, []);
 
+  const handleNext = () => {
+    // Marcar apresentação como vista
+    try {
+      localStorage.setItem(PRESENTATION_SEEN_KEY, 'true');
+    } catch (error) {
+      console.warn('Não foi possível salvar flag de apresentação vista', error);
+    }
+
+    // Redirecionar para login
+    window.location.hash = '/login';
+  };
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-slate-100 overflow-hidden flex flex-col">
       <div className="relative w-full flex-1 flex flex-col justify-center items-center overflow-hidden">
@@ -44,7 +59,6 @@ const VideoPresentationPage: React.FC = () => {
           <video
             ref={videoRef}
             autoPlay
-            loop
             playsInline
             preload="auto"
             src="/icons/FITCOACH.IA.mp4"
@@ -70,14 +84,7 @@ const VideoPresentationPage: React.FC = () => {
 
       <div className="relative z-10 w-full flex flex-col items-center justify-center pb-8 sm:pb-12 md:pb-16 px-4">
         <button
-          onClick={() => {
-            if (videoRef.current) {
-              videoRef.current.playbackRate = 1.0;
-              videoRef.current.muted = false;
-              videoRef.current.volume = 1.0;
-            }
-            window.location.hash = '/login';
-          }}
+          onClick={handleNext}
           className="px-6 sm:px-8 md:px-10 py-3 sm:py-3.5 md:py-4 text-sm sm:text-base md:text-lg font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg border-none cursor-pointer inline-flex items-center justify-center min-w-[200px] sm:min-w-[240px] md:min-w-[280px] shadow-lg shadow-emerald-500/30 transition-all duration-200 hover:scale-105 hover:from-emerald-400 hover:to-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900"
           style={{ 
             boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3), 0 4px 6px -2px rgba(16, 185, 129, 0.2)',

@@ -46,6 +46,13 @@ export const deleteUserAccount = async (user: User): Promise<void> => {
   localStorage.removeItem('nutri_ia_active_sessions');
   localStorage.removeItem('nutri_ia_current_session_id');
   
+  // Limpar flag de apresentação vista para mostrar novamente após deletar conta
+  try {
+    localStorage.removeItem('fitcoach.presentation.seen');
+  } catch (error) {
+    console.warn('Erro ao limpar flag de apresentação', error);
+  }
+  
   // Redirecionar para página inicial
   window.location.hash = '#/presentation';
 };
