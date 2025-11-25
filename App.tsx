@@ -1,5 +1,5 @@
 
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { Layout } from './components/layout/Layout';
 import { useRouter } from './hooks/useRouter';
 import { Skeleton } from './components/ui/Skeleton';
@@ -8,6 +8,7 @@ import { ToastProvider } from './components/ui/Toast';
 import { GymBrandingProvider } from './components/GymBrandingProvider';
 import { useUser } from './context/UserContext';
 import { usePermissions } from './hooks/usePermissions';
+import { getCurrentUsername } from './services/databaseService';
 
 // Lazy load das páginas para reduzir o bundle inicial
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -30,6 +31,7 @@ const StudentManagementPage = lazy(() => import('./pages/StudentManagementPage')
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const PermissionsManagementPage = lazy(() => import('./pages/PermissionsManagementPage'));
 const VideoPresentationPage = lazy(() => import('./pages/VideoPresentationPage'));
+const PremiumPage = lazy(() => import('./pages/PremiumPage'));
 
 // Componente de loading
 const PageLoader = () => (
@@ -49,9 +51,56 @@ const App: React.FC = () => {
     const { path } = useRouter();
     const { user } = useUser();
     const permissions = usePermissions();
+    const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
-    // Verificar se é aluno tentando acessar rotas administrativas ou restritas
-    const isStudent = user.gymRole === 'student';
+    // Verificar se é o primeiro acesso (apresentação ainda não foi vista)
+    const PRESENTATION_SEEN_KEY = 'fitcoach.presentation.seen';
+    const hasSeenPresentation = typeof window !== 'undefined' 
+        ? localStorage.getItem(PRESENTATION_SEEN_KEY) === 'true' 
+        : true;
+
+    // Rotas públicas (não requerem autenticação)
+    const publicRoutes = ['/premium', '/presentation', '/login'];
+    const isPublicRoute = publicRoutes.includes(path);
+
+    // Se é o primeiro acesso e não está na apresentação ou login, redirecionar via render (não useEffect)
+    // Isso é tratado no render abaixo
+
+    // Verificar se usuário está realmente logado
+    useEffect(() => {
+        const checkLogin = async () => {
+            try {
+                const currentUsername = await getCurrentUsername();
+                setIsLoggedIn(!!currentUsername && currentUsername.trim() !== '');
+            } catch (error) {
+                setIsLoggedIn(false);
+            }
+        };
+        checkLogin();
+    }, []);
+
+    // Se for rota pública, permitir acesso sem verificar autenticação
+    if (isPublicRoute && path === '/premium') {
+        return (
+            <GymBrandingProvider>
+                <ToastProvider>
+                    <Layout>
+                        <Suspense fallback={<PageLoader />}>
+                            <PremiumPage />
+                        </Suspense>
+                    </Layout>
+                </ToastProvider>
+            </GymBrandingProvider>
+        );
+    }
+
+    // Se ainda está verificando login, mostrar loading
+    if (isLoggedIn === null && !isPublicRoute) {
+        return <PageLoader />;
+    }
+
+    // Verificar se é aluno tentando acessar rotas administrativas ou restritas (apenas se logado)
+    const isStudent = isLoggedIn && user.gymRole === 'student';
     const adminRoutes = ['/gym-admin', '/student-management', '/professional'];
     const restrictedRoutes = ['/privacy', '/configuracoes'];
     const isAccessingAdminRoute = adminRoutes.includes(path);
@@ -64,12 +113,12 @@ const App: React.FC = () => {
         return null;
     }
 
-    // Verificar se é admin
-    const isDefaultAdmin = user.username === 'Administrador' || user.username === 'Desenvolvedor';
-    const isAdmin = user.gymRole === 'admin' || isDefaultAdmin;
+    // Verificar se é admin (apenas se estiver logado)
+    const isDefaultAdmin = isLoggedIn && (user.username === 'Administrador' || user.username === 'Desenvolvedor');
+    const isAdmin = isLoggedIn && (user.gymRole === 'admin' || isDefaultAdmin);
 
     // Rotas permitidas para administradores
-    const adminAllowedRoutes = ['/', '/privacy', '/configuracoes', '/perfil', '/student-management', '/gym-admin', '/permissions'];
+    const adminAllowedRoutes = ['/', '/privacy', '/configuracoes', '/perfil', '/student-management', '/gym-admin', '/permissions', '/premium'];
     const isAdminAccessingStudentRoute = isAdmin && !adminAllowedRoutes.includes(path) && path !== '/admin-dashboard';
 
     // Se admin tentar acessar rota de aluno, redirecionar para dashboard
@@ -108,6 +157,7 @@ const App: React.FC = () => {
             case '/student-management': return <StudentManagementPage />;
             case '/admin-dashboard': return <AdminDashboardPage />;
             case '/permissions': return <PermissionsManagementPage />;
+            case '/premium': return <PremiumPage />;
             case '/':
             default:
                 // Se for admin, mostrar dashboard administrativo; caso contrário, mostrar home do aluno
@@ -117,6 +167,16 @@ const App: React.FC = () => {
                 return <HomePage />;
         }
     };
+
+    // Verificar primeiro acesso antes de renderizar outras páginas
+    // Se é o primeiro acesso e não está na apresentação ou login, redirecionar
+    if (!hasSeenPresentation && path !== '/presentation' && path !== '/login' && path !== '/premium') {
+        return (
+            <Suspense fallback={<PageLoader />}>
+                <VideoPresentationPage />
+            </Suspense>
+        );
+    }
 
     if (path === '/presentation') {
         return (

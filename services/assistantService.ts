@@ -735,6 +735,27 @@ export async function startAssistantAudioSession(
   // Tentar usar Web Speech API primeiro (mais confiável para captura de áudio)
   if (useWebSpeech) {
     try {
+      // Tentar solicitar permissão do microfone antes de iniciar Web Speech API
+      try {
+        const testStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        testStream.getTracks().forEach(track => track.stop()); // Parar o stream de teste
+        logger.debug('Permissão do microfone confirmada', 'assistantService');
+      } catch (mediaError: any) {
+        const errorName = mediaError?.name || mediaError?.message || 'unknown';
+        if (errorName === 'NotAllowedError' || errorName.includes('not-allowed') || mediaError?.message?.includes('permission')) {
+          onError('Permissão do microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.');
+          return;
+        } else if (errorName === 'NotFoundError' || errorName.includes('not-found')) {
+          onError('Nenhum microfone encontrado. Verifique se o microfone está conectado.');
+          return;
+        } else if (errorName === 'NotReadableError' || errorName.includes('not-readable')) {
+          onError('Não foi possível acessar o microfone. Verifique se ele não está sendo usado por outro aplicativo.');
+          return;
+        }
+        // Se for outro erro, continuar e deixar a Web Speech API tentar
+        logger.warn('Erro ao verificar permissão do microfone, continuando...', 'assistantService', mediaError);
+      }
+      
       logger.info('Iniciando Web Speech API para reconhecimento de voz', 'assistantService');
       webSpeechRecognition = new SpeechRecognition();
       webSpeechRecognition.continuous = true;
@@ -765,33 +786,66 @@ export async function startAssistantAudioSession(
       };
 
       webSpeechRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        logger.error('Erro na Web Speech API', 'assistantService', event);
-        if (event.error === 'no-speech') {
-          // Ignorar erro de "no-speech" - é normal quando não há fala
+        const errorType = event?.error || (event as any)?.type || 'unknown';
+        const errorMsg = event?.message || '';
+        
+        // Log do erro com informações estruturadas
+        try {
+          logger.error(`Erro na Web Speech API: ${errorType}`, 'assistantService', {
+            error: errorType,
+            message: errorMsg,
+            errorCode: (event as any)?.errorCode,
+          });
+        } catch (logError) {
+          // Se houver erro ao fazer log, apenas logar a mensagem básica
+          console.error(`[assistantService] Erro na Web Speech API: ${errorType}`);
+        }
+        
+        // Ignorar erro de "no-speech" - é normal quando não há fala
+        if (errorType === 'no-speech') {
+          logger.debug('Erro "no-speech" ignorado (normal quando não há fala)', 'assistantService');
           return;
         }
         
-        // Tratamento específico para erro de permissão
-        if (event.error === 'not-allowed') {
-          onError('Permissão do microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.');
+        // Tratamento específico para cada tipo de erro
+        let errorMessage = '';
+        let shouldStop = true;
+        
+        switch (errorType) {
+          case 'not-allowed':
+            errorMessage = 'Permissão do microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.';
+            break;
+          case 'audio-capture':
+            errorMessage = 'Não foi possível capturar áudio. Verifique se o microfone está conectado, funcionando e não está sendo usado por outro aplicativo.';
+            break;
+          case 'aborted':
+            errorMessage = 'Reconhecimento de voz foi interrompido.';
+            shouldStop = false; // Não parar se foi apenas interrompido
+            break;
+          case 'network':
+            errorMessage = 'Erro de rede no reconhecimento de voz. Verifique sua conexão com a internet.';
+            break;
+          case 'service-not-allowed':
+            errorMessage = 'Serviço de reconhecimento de voz não permitido. Verifique as configurações do navegador.';
+            break;
+          case 'bad-grammar':
+            errorMessage = 'Erro na gramática do reconhecimento de voz.';
+            shouldStop = false;
+            break;
+          case 'language-not-supported':
+            errorMessage = 'Idioma não suportado. Verifique se o navegador suporta português (pt-BR).';
+            break;
+          default:
+            errorMessage = `Erro no reconhecimento de voz: ${errorType}. ${errorMsg ? `Detalhes: ${errorMsg}` : 'Verifique se o microfone está conectado e funcionando.'}`;
+        }
+        
+        if (errorMessage) {
+          onError(errorMessage);
+        }
+        
+        if (shouldStop) {
           stopAssistantAudioSession();
-          return;
         }
-        
-        // Tratamento para outros erros comuns
-        let errorMessage = `Erro no reconhecimento de voz: ${event.error}`;
-        if (event.error === 'aborted') {
-          errorMessage = 'Reconhecimento de voz foi interrompido.';
-        } else if (event.error === 'network') {
-          errorMessage = 'Erro de rede no reconhecimento de voz. Verifique sua conexão.';
-        } else if (event.error === 'audio-capture') {
-          errorMessage = 'Não foi possível capturar áudio. Verifique se o microfone está conectado e funcionando.';
-        } else if (event.error === 'service-not-allowed') {
-          errorMessage = 'Serviço de reconhecimento de voz não permitido. Verifique as configurações do navegador.';
-        }
-        
-        onError(errorMessage);
-        stopAssistantAudioSession();
       };
 
       webSpeechRecognition.onstart = () => {
@@ -970,31 +1024,58 @@ export async function startAssistantAudioSession(
         };
 
         webSpeechRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          if (event.error === 'no-speech') {
+          const errorType = event?.error || (event as any)?.type || 'unknown';
+          const errorMsg = event?.message || '';
+          
+          // Log do erro com informações estruturadas
+          try {
+            logger.error(`Erro na Web Speech API (fallback): ${errorType}`, 'assistantService', {
+              error: errorType,
+              message: errorMsg,
+              errorCode: (event as any)?.errorCode,
+            });
+          } catch (logError) {
+            // Se houver erro ao fazer log, apenas logar a mensagem básica
+            console.error(`[assistantService] Erro na Web Speech API (fallback): ${errorType}`);
+          }
+          
+          // Ignorar erro de "no-speech" - é normal quando não há fala
+          if (errorType === 'no-speech') {
             return;
           }
           
-          // Tratamento específico para erro de permissão
-          if (event.error === 'not-allowed') {
-            onError('Permissão do microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.');
+          // Tratamento específico para cada tipo de erro
+          let errorMessage = '';
+          let shouldStop = true;
+          
+          switch (errorType) {
+            case 'not-allowed':
+              errorMessage = 'Permissão do microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.';
+              break;
+            case 'audio-capture':
+              errorMessage = 'Não foi possível capturar áudio. Verifique se o microfone está conectado, funcionando e não está sendo usado por outro aplicativo.';
+              break;
+            case 'aborted':
+              errorMessage = 'Reconhecimento de voz foi interrompido.';
+              shouldStop = false;
+              break;
+            case 'network':
+              errorMessage = 'Erro de rede no reconhecimento de voz. Verifique sua conexão com a internet.';
+              break;
+            case 'service-not-allowed':
+              errorMessage = 'Serviço de reconhecimento de voz não permitido. Verifique as configurações do navegador.';
+              break;
+            default:
+              errorMessage = `Erro no reconhecimento de voz: ${errorType}. ${errorMsg ? `Detalhes: ${errorMsg}` : 'Verifique se o microfone está conectado e funcionando.'}`;
+          }
+          
+          if (errorMessage) {
+            onError(errorMessage);
+          }
+          
+          if (shouldStop) {
             stopAssistantAudioSession();
-            return;
           }
-          
-          // Tratamento para outros erros comuns
-          let errorMessage = `Erro no reconhecimento de voz: ${event.error}`;
-          if (event.error === 'aborted') {
-            errorMessage = 'Reconhecimento de voz foi interrompido.';
-          } else if (event.error === 'network') {
-            errorMessage = 'Erro de rede no reconhecimento de voz. Verifique sua conexão.';
-          } else if (event.error === 'audio-capture') {
-            errorMessage = 'Não foi possível capturar áudio. Verifique se o microfone está conectado e funcionando.';
-          } else if (event.error === 'service-not-allowed') {
-            errorMessage = 'Serviço de reconhecimento de voz não permitido. Verifique as configurações do navegador.';
-          }
-          
-    onError(errorMessage);
-    stopAssistantAudioSession();
         };
 
         webSpeechRecognition.onend = () => {

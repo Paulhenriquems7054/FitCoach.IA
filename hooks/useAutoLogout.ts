@@ -59,14 +59,9 @@ export const useAutoLogout = (timeoutMinutes: number = 30) => {
       subscription: 'free',
     });
     
-    // Limpar flag de apresentação vista para mostrar novamente após logout
-    try {
-      localStorage.removeItem('fitcoach.presentation.seen');
-    } catch (error) {
-      console.warn('Erro ao limpar flag de apresentação', error);
-    }
-    
-    window.location.hash = '#/presentation';
+    // NÃO limpar flag de apresentação - usuário já viu, não precisa ver novamente
+    // Redirecionar para a página de login (não mostrar apresentação novamente)
+    window.location.hash = '#/login';
   };
 
   useEffect(() => {
