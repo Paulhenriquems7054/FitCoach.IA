@@ -43,7 +43,24 @@ const VideoPresentationPage: React.FC = () => {
   const handleNext = () => {
     // Marcar apresentação como vista
     try {
+      // Marcar globalmente
       localStorage.setItem(PRESENTATION_SEEN_KEY, 'true');
+      
+      // Marcar também para este dispositivo específico
+      try {
+        const deviceInfo = localStorage.getItem('fitcoach.device.info');
+        if (deviceInfo) {
+          const parsed = JSON.parse(deviceInfo);
+          const deviceKey = `fitcoach.presentation.seen.${parsed.deviceId}`;
+          localStorage.setItem(deviceKey, 'true');
+        }
+      } catch (e) {
+        // Ignorar erro se não houver device info
+      }
+      
+      // Disparar evento customizado para notificar outras partes do app
+      // Isso garante que o App.tsx seja atualizado imediatamente
+      window.dispatchEvent(new Event('presentation-seen'));
     } catch (error) {
       console.warn('Não foi possível salvar flag de apresentação vista', error);
     }
