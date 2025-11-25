@@ -50,8 +50,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuToggle, sidebarOpen = false }) =>
         subscription: 'free',
       });
       
-      // Redirecionar para a página de apresentação
-      window.location.hash = '#/presentation';
+      // Redirecionar para a página de login (não mostrar apresentação novamente)
+      window.location.hash = '#/login';
     }
   };
 

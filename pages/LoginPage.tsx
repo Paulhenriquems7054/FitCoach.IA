@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
-import { loginUser, usernameExists, saveLoginSession, resetPassword } from '../services/databaseService';
+import { loginUser, usernameExists, saveLoginSession, resetPassword, getUserByUsername } from '../services/databaseService';
 import { useUser } from '../context/UserContext';
 import { useTheme } from '../context/ThemeContext';
 import { MoonIcon } from '../components/icons/MoonIcon';
@@ -10,9 +10,10 @@ import { SunIcon } from '../components/icons/SunIcon';
 import { XIcon } from '../components/icons/XIcon';
 import { EyeIcon } from '../components/icons/EyeIcon';
 import { EyeSlashIcon } from '../components/icons/EyeSlashIcon';
+import { useToast } from '../components/ui/Toast';
+import { getSupabaseClient, getUserFromSupabase } from '../services/supabaseService';
 import type { LoginCredentials } from '../types';
 import { sanitizeInput, sanitizeEmail } from '../utils/security';
-import { useToast } from '../components/ui/Toast';
 
 const LoginPage: React.FC = () => {
     const { user, setUser } = useUser();
@@ -33,6 +34,105 @@ const LoginPage: React.FC = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+
+    // Processar token de acesso do email (quando usuário clica no link do email)
+    useEffect(() => {
+        // Ler token tanto da query string quanto do hash (para compatibilidade)
+        const urlParams = new URLSearchParams(window.location.search);
+        let token = urlParams.get('token');
+        
+        // Se não encontrou na query string, tentar no hash
+        if (!token && window.location.hash) {
+            const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+            token = hashParams.get('token');
+        }
+        
+        if (token) {
+            handleTokenLogin(token);
+        }
+    }, []);
+
+    const handleTokenLogin = async (token: string) => {
+        setIsLoading(true);
+        setError(null);
+        
+        try {
+            // Decodificar token (formato: userId:timestamp em base64)
+            // O token pode ter caracteres removidos, então tentar decodificar de forma mais robusta
+            let decoded: string;
+            try {
+                // Tentar decodificar diretamente
+                decoded = atob(token);
+            } catch (e) {
+                // Se falhar, tentar adicionar padding se necessário
+                try {
+                    const paddedToken = token + '='.repeat((4 - token.length % 4) % 4);
+                    decoded = atob(paddedToken);
+                } catch (e2) {
+                    throw new Error('Token inválido: formato incorreto');
+                }
+            }
+            
+            const [userId] = decoded.split(':');
+            
+            if (!userId) {
+                throw new Error('Token inválido: ID do usuário não encontrado');
+            }
+
+            // Buscar usuário no Supabase
+            const supabase = getSupabaseClient();
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', userId)
+                .single();
+
+            if (userError) {
+                console.error('Erro ao buscar usuário:', userError);
+                if (userError.code === 'PGRST116') {
+                    throw new Error('Usuário não encontrado. Por favor, entre em contato com o suporte.');
+                }
+                throw new Error(`Erro ao buscar usuário: ${userError.message}`);
+            }
+
+            if (!userData) {
+                throw new Error('Usuário não encontrado no banco de dados');
+            }
+
+            // Converter para formato local e fazer login
+            const localUser = await getUserFromSupabase(userId);
+            
+            if (localUser) {
+                await saveLoginSession(localUser);
+                setUser(localUser);
+                showSuccess('Login realizado com sucesso! Bem-vindo ao FitCoach.IA!');
+                
+                // Limpar o token da URL após login bem-sucedido
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Verificar se é o primeiro acesso (apresentação ainda não foi vista)
+                const PRESENTATION_SEEN_KEY = 'fitcoach.presentation.seen';
+                const hasSeenPresentation = localStorage.getItem(PRESENTATION_SEEN_KEY) === 'true';
+                
+                // Redirecionar para presentation apenas se for o primeiro acesso
+                // Caso contrário, redirecionar para home
+                if (!hasSeenPresentation) {
+                    window.location.hash = '#/presentation';
+                } else {
+                    window.location.hash = '#/';
+                }
+            } else {
+                throw new Error('Erro ao carregar dados do usuário. Tente fazer login manualmente.');
+            }
+        } catch (error: any) {
+            console.error('Erro no login por token:', error);
+            const errorMsg = error.message || 'Erro ao processar token de acesso. Tente fazer login manualmente.';
+            setError(errorMsg);
+            showError(errorMsg);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleToggleTheme = () => {
         if (themeSetting === 'dark') {
@@ -173,8 +273,9 @@ const LoginPage: React.FC = () => {
                     try {
                         const { syncBlockStatus } = await import('../services/syncService');
                         await syncBlockStatus(user.username || sanitizedUsername);
-                        // Recarregar usuário após sincronização
-                        const syncedUser = await getUserByUsername(user.username || sanitizedUsername);
+                        // Recarregar usuário após sincronização usando a função importada
+                        const { getUserByUsername: getUserByUsernameFn } = await import('../services/databaseService');
+                        const syncedUser = await getUserByUsernameFn(user.username || sanitizedUsername);
                         if (syncedUser) {
                             Object.assign(user, syncedUser);
                         }
