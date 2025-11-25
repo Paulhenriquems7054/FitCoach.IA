@@ -59,6 +59,13 @@ export const useAutoLogout = (timeoutMinutes: number = 30) => {
       subscription: 'free',
     });
     
+    // Limpar flag de apresentação vista para mostrar novamente após logout
+    try {
+      localStorage.removeItem('fitcoach.presentation.seen');
+    } catch (error) {
+      console.warn('Erro ao limpar flag de apresentação', error);
+    }
+    
     window.location.hash = '#/presentation';
   };
 

@@ -1,9 +1,23 @@
 
 import { useState, useEffect } from 'react';
 
+const PRESENTATION_SEEN_KEY = 'fitcoach.presentation.seen';
+
 const normalizePath = (hash: string) => {
-  // Se não houver hash ou hash vazio, ir para apresentação
+  // Se não houver hash ou hash vazio
   if (!hash || hash === '#') {
+    // Verificar se já viu a apresentação
+    try {
+      const hasSeenPresentation = localStorage.getItem(PRESENTATION_SEEN_KEY) === 'true';
+      if (hasSeenPresentation) {
+        // Se já viu, ir direto para login
+        return '/login';
+      }
+    } catch (error) {
+      // Se houver erro ao acessar localStorage, mostrar apresentação por segurança
+      console.warn('Erro ao verificar flag de apresentação', error);
+    }
+    // Se não viu, mostrar apresentação
     return '/presentation';
   }
   

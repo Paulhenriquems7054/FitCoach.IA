@@ -241,14 +241,22 @@ const NutriAssistant: React.FC = () => {
         setCurrentInputTranscription('');
         setCurrentOutputTranscription('');
         await startAssistantAudioSession(
-          (chunk) => setCurrentInputTranscription((prev) => prev + chunk),
+          (chunk) => {
+            // Se chunk for vazio, apenas indica que está ouvindo (não atualizar)
+            if (chunk.trim()) {
+              setCurrentInputTranscription((prev) => prev + chunk);
+            }
+          },
           (audioBuffer) => playAssistantAudioChunk(audioBuffer),
           (transcriptionChunk) => {
             setCurrentOutputTranscription((prev) => prev + transcriptionChunk);
             appendStreamingMessage(transcriptionChunk);
           },
           () => finalizeStreamingMessage(),
-          (error) => handleAssistantError(error),
+          (error) => {
+            handleAssistantError(error);
+            setIsRecording(false);
+          },
         );
       } catch (error: any) {
         handleAssistantError(`Não foi possível iniciar a captura de áudio: ${error.message || 'erro desconhecido'}`);
@@ -388,10 +396,14 @@ const NutriAssistant: React.FC = () => {
             {isRecording && (
               <div className="flex justify-start">
                 <div className="max-w-[75%] rounded-2xl bg-slate-800/60 px-4 py-3 text-slate-200">
-                  Gravando&nbsp;
-                  <span className="animate-pulse">🎤</span>
-                  {currentInputTranscription && (
+                  <div className="flex items-center gap-2">
+                    <span className="animate-pulse">🎤</span>
+                    <span>Ouvindo...</span>
+                  </div>
+                  {currentInputTranscription ? (
                     <p className="mt-2 text-sm text-slate-100/90">{currentInputTranscription}</p>
+                  ) : (
+                    <p className="mt-2 text-xs text-slate-400/70 italic">Fale algo para começar a transcrição</p>
                   )}
                 </div>
               </div>
@@ -433,7 +445,7 @@ const NutriAssistant: React.FC = () => {
                   ? 'bg-rose-500 text-white hover:bg-rose-400 focus:ring-rose-300/60'
                   : 'text-slate-300 hover:text-emerald-300 focus:ring-emerald-300/60'
               }`}
-              disabled={isLoading}
+              disabled={isLoading && !isRecording}
               aria-label={isRecording ? 'Encerrar captura de áudio' : 'Iniciar captura de áudio'}
             >
               {isRecording ? (

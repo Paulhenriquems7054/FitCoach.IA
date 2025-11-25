@@ -134,9 +134,19 @@
         }
       })();
       
-      // Redirect to presentation page if not already there
+      // Redirect to presentation page if not already there and hasn't seen it
       if (window.location.pathname === '/' && !window.location.hash) {
-        window.location.replace('/#/presentation');
+        try {
+          const hasSeenPresentation = localStorage.getItem('fitcoach.presentation.seen') === 'true';
+          if (!hasSeenPresentation) {
+            window.location.replace('/#/presentation');
+          } else {
+            window.location.replace('/#/login');
+          }
+        } catch (error) {
+          // Se houver erro ao acessar localStorage, mostrar apresentação por segurança
+          window.location.replace('/#/presentation');
+        }
       }
       
       // Force reload if coming from cache

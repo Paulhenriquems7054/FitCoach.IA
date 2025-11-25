@@ -28,6 +28,7 @@ interface SpeechRecognition extends EventTarget {
   start(): void;
   stop(): void;
   abort(): void;
+  onstart: (() => void) | null;
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
@@ -234,7 +235,7 @@ async function getUserFromStorage(): Promise<User | null> {
     return user;
   } catch (e) {
     logger.warn('Erro ao ler dados do usuário', 'assistantService', e);
-    return null;
+  return null;
   }
 }
 
@@ -713,25 +714,28 @@ export async function startAssistantAudioSession(
     return;
   }
 
-  // Verificar permissão do microfone antes de tentar usar
+  // Verificar permissão do microfone antes de tentar usar (opcional, alguns navegadores não suportam)
   try {
     const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
     if (permissionStatus.state === 'denied') {
       onError('Permissão do microfone foi negada. Por favor, permita o acesso ao microfone nas configurações do navegador e recarregue a página.');
       return;
     }
+    logger.info(`Status da permissão do microfone: ${permissionStatus.state}`, 'assistantService');
   } catch (permError) {
     // Alguns navegadores não suportam navigator.permissions.query, continuar normalmente
+    // A permissão será solicitada automaticamente quando getUserMedia for chamado
     logger.debug('Não foi possível verificar permissão do microfone (navegador pode não suportar)', 'assistantService');
   }
 
   // Verificar se Web Speech API está disponível
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-  const useWebSpeech = !API_KEY && !!SpeechRecognition;
+  const useWebSpeech = !!SpeechRecognition; // Sempre tentar Web Speech primeiro se disponível
 
-  // Tentar usar Web Speech API (offline) se Gemini não estiver disponível
+  // Tentar usar Web Speech API primeiro (mais confiável para captura de áudio)
   if (useWebSpeech) {
     try {
+      logger.info('Iniciando Web Speech API para reconhecimento de voz', 'assistantService');
       webSpeechRecognition = new SpeechRecognition();
       webSpeechRecognition.continuous = true;
       webSpeechRecognition.interimResults = true;
@@ -746,6 +750,7 @@ export async function startAssistantAudioSession(
           const transcript = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
             webSpeechFinalTranscript += transcript + ' ';
+            logger.debug(`Transcrição final recebida: ${transcript}`, 'assistantService');
           } else {
             interimTranscript += transcript;
           }
@@ -754,6 +759,7 @@ export async function startAssistantAudioSession(
         // Enviar transcrição completa (final + interim)
         const fullTranscript = webSpeechFinalTranscript + interimTranscript;
         if (fullTranscript.trim() && webSpeechOnTranscriptionChunk) {
+          logger.debug(`Enviando transcrição: ${fullTranscript}`, 'assistantService');
           webSpeechOnTranscriptionChunk(fullTranscript);
         }
       };
@@ -788,33 +794,48 @@ export async function startAssistantAudioSession(
         stopAssistantAudioSession();
       };
 
+      webSpeechRecognition.onstart = () => {
+        logger.info('Web Speech API iniciado com sucesso, aguardando fala...', 'assistantService');
+      };
+
       webSpeechRecognition.onend = () => {
+        logger.debug('Web Speech API encerrado, reiniciando se necessário...', 'assistantService');
         // Se ainda estiver gravando, reiniciar automaticamente
         if (webSpeechRecognition) {
           try {
             webSpeechRecognition.start();
+            logger.debug('Web Speech API reiniciado', 'assistantService');
           } catch (e) {
             // Pode falhar se já estiver iniciado, ignorar
+            logger.debug('Web Speech API já estava iniciado', 'assistantService');
           }
         }
       };
 
       webSpeechRecognition.start();
-      logger.info('Usando Web Speech API para reconhecimento de voz', 'assistantService');
+      logger.info('Web Speech API iniciado, aguardando captura de áudio...', 'assistantService');
+      // Notificar que a captura iniciou
+      onTranscriptionChunk(''); // Enviar string vazia para indicar que está ouvindo
       return;
     } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
       logger.warn('Falha ao iniciar Web Speech API, tentando Gemini', 'assistantService', error);
-      // Continuar para tentar Gemini
+      // Continuar para tentar Gemini apenas se Web Speech falhar
     }
   }
 
-  // Tentar usar Gemini Live Audio API
+  // Tentar usar Gemini Live Audio API apenas se Web Speech não estiver disponível ou falhou
+  if (!API_KEY) {
+    onError('API key não configurada e Web Speech API não disponível. Configure uma API key ou use um navegador que suporte Web Speech API (Chrome, Edge).');
+    return;
+  }
+
   try {
     const ai = getGeminiClient();
     
     // Solicitar permissão do microfone com tratamento de erro específico
     try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (mediaError: any) {
       const errorName = mediaError?.name || mediaError?.message || 'unknown';
       if (errorName === 'NotAllowedError' || errorName.includes('not-allowed') || mediaError?.message?.includes('permission')) {
@@ -839,15 +860,33 @@ export async function startAssistantAudioSession(
     mediaStreamSource = inputAudioContext.createMediaStreamSource(mediaStream);
     scriptProcessor = inputAudioContext.createScriptProcessor(4_096, 1, 1);
 
+    let audioChunkCount = 0;
     scriptProcessor.onaudioprocess = (event) => {
       if (!liveAudioSession) return;
       const channelData = event.inputBuffer.getChannelData(0);
+      
+      // Verificar se há áudio sendo captado (não apenas silêncio)
+      const hasAudio = channelData.some(sample => Math.abs(sample) > 0.01);
+      if (hasAudio) {
+        audioChunkCount++;
+        if (audioChunkCount === 1) {
+          logger.info('Áudio detectado e sendo enviado para Gemini', 'assistantService');
+        }
+      }
+      
       const blob = createGeminiBlob(channelData);
+      try {
       liveAudioSession.sendRealtimeInput({ media: blob });
+      } catch (error) {
+        logger.error('Erro ao enviar áudio para Gemini', 'assistantService', error);
+      }
     };
 
     mediaStreamSource.connect(scriptProcessor);
     scriptProcessor.connect(inputAudioContext.destination);
+
+    // Verificar se o áudio está sendo captado
+    logger.info('Microfone conectado, iniciando sessão Gemini Live Audio', 'assistantService');
 
     liveAudioSession = await ai.live.connect({
       model: LIVE_AUDIO_MODEL,
@@ -895,7 +934,9 @@ export async function startAssistantAudioSession(
         inputAudioTranscription: {},
       },
     });
-    logger.info('Usando Gemini Live Audio API', 'assistantService');
+    logger.info('Sessão Gemini Live Audio conectada com sucesso', 'assistantService');
+    // Notificar que a captura iniciou
+    onTranscriptionChunk(''); // Enviar string vazia para indicar que está ouvindo
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Erro ao iniciar áudio.';
     logger.error('Erro ao iniciar sessão de áudio', 'assistantService', error);
@@ -952,8 +993,8 @@ export async function startAssistantAudioSession(
             errorMessage = 'Serviço de reconhecimento de voz não permitido. Verifique as configurações do navegador.';
           }
           
-          onError(errorMessage);
-          stopAssistantAudioSession();
+    onError(errorMessage);
+    stopAssistantAudioSession();
         };
 
         webSpeechRecognition.onend = () => {
@@ -1106,4 +1147,5 @@ function encode(bytes: Uint8Array): string {
   }
   return btoa(binary);
 }
+
 

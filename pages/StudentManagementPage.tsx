@@ -317,6 +317,7 @@ const StudentManagementPage: React.FC = () => {
                 genero: user.genero,
                 // Peso, altura e objetivo não são editáveis aqui (coletados na enquete)
             });
+            setShowStudentPassword(true); // Mostrar matrícula por padrão
             setShowStudentForm(false);
             setShowTrainerForm(false);
             setShowReceptionistForm(false);
@@ -1296,28 +1297,20 @@ const StudentManagementPage: React.FC = () => {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Nova Matrícula (Senha)
+                                            Matrícula (Senha)
                                         </label>
                                         <div className="relative">
                                             <input
-                                                type={showStudentPassword ? 'text' : 'password'}
+                                                type="text"
                                                 name="matricula"
                                                 value={studentForm.matricula}
                                                 onChange={handleStudentFormChange}
-                                                className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                                placeholder="Deixe em branco para manter a senha atual"
+                                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                placeholder="Matrícula do aluno"
                                             />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowStudentPassword(!showStudentPassword)}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                                                aria-label={showStudentPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                                            >
-                                                {showStudentPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                                            </button>
                                         </div>
                                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                            Digite uma nova matrícula para alterar a senha. Deixe em branco para manter a senha atual.
+                                            Matrícula atual do aluno. Altere para modificar a senha.
                                         </p>
                                     </div>
                                 </div>
