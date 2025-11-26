@@ -4,12 +4,14 @@
  * Exibe apenas uma vez - controlado por localStorage
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 
 const PRESENTATION_SEEN_KEY = 'fitcoach.presentation.seen';
 
 const VideoPresentationPage: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoError, setVideoError] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
 
   // Configurar vídeo apenas uma vez
   useEffect(() => {
@@ -19,6 +21,7 @@ const VideoPresentationPage: React.FC = () => {
     // Configurações iniciais - velocidade normal
     video.playbackRate = 1.0;
     video.volume = 1.0;
+    // Iniciar mutado para garantir autoplay (alguns navegadores bloqueiam autoplay com áudio)
     video.muted = false;
 
     // Garantir que sempre esteja em velocidade normal
@@ -33,10 +36,44 @@ const VideoPresentationPage: React.FC = () => {
       ensureNormalSpeed();
     };
 
+    // Handlers de eventos do vídeo
+    const handleLoadedData = () => {
+      setVideoLoaded(true);
+      setVideoError(false);
+      // Tentar reproduzir o vídeo
+      video.play().catch((err) => {
+        console.warn('Erro ao reproduzir vídeo automaticamente:', err);
+        // Se falhar, tentar com muted
+        video.muted = true;
+        video.play().catch((err2) => {
+          console.warn('Erro ao reproduzir vídeo mesmo mutado:', err2);
+        });
+      });
+    };
+
+    const handleError = () => {
+      console.error('Erro ao carregar vídeo');
+      setVideoError(true);
+      setVideoLoaded(false);
+    };
+
+    const handleCanPlay = () => {
+      setVideoLoaded(true);
+    };
+
     video.addEventListener('ratechange', handleRateChange);
+    video.addEventListener('loadeddata', handleLoadedData);
+    video.addEventListener('error', handleError);
+    video.addEventListener('canplay', handleCanPlay);
+
+    // Tentar carregar o vídeo
+    video.load();
 
     return () => {
       video.removeEventListener('ratechange', handleRateChange);
+      video.removeEventListener('loadeddata', handleLoadedData);
+      video.removeEventListener('error', handleError);
+      video.removeEventListener('canplay', handleCanPlay);
     };
   }, []);
 
@@ -73,21 +110,51 @@ const VideoPresentationPage: React.FC = () => {
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-slate-100 overflow-hidden flex flex-col">
       <div className="relative w-full flex-1 flex flex-col justify-center items-center overflow-hidden">
         <div className="relative w-full flex items-center justify-center flex-1">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            preload="auto"
-            src="/icons/FITCOACH.IA.mp4"
-            className="w-full h-auto"
-            style={{
-              width: '100%',
-              height: 'auto',
-              maxHeight: '100vh',
-              objectFit: 'contain',
-              objectPosition: 'center',
-            }}
-          />
+          {videoError ? (
+            // Fallback se o vídeo não carregar
+            <div className="flex flex-col items-center justify-center text-center px-4 py-8">
+              <div className="mb-6">
+                <h1 className="text-4xl md:text-6xl font-extrabold mb-4">
+                  <span className="text-emerald-400">FitCoach</span>
+                  <span className="text-white">.IA</span>
+                </h1>
+                <p className="text-xl md:text-2xl text-slate-300">
+                  Seu Coach de Treino Inteligente
+                </p>
+              </div>
+              <div className="text-slate-400 text-sm md:text-base max-w-md">
+                <p>Bem-vindo ao FitCoach.IA</p>
+                <p className="mt-2">Sua jornada para um treino personalizado e inteligente começa aqui.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                preload="auto"
+                src="/icons/FITCOACH.IA.mp4"
+                className="w-full h-auto"
+                style={{
+                  width: '100%',
+                  height: 'auto',
+                  maxHeight: '100vh',
+                  objectFit: 'contain',
+                  objectPosition: 'center',
+                }}
+                onError={() => setVideoError(true)}
+              />
+              {!videoLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-400 mb-4"></div>
+                    <p className="text-slate-300 text-sm">Carregando apresentação...</p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/5 via-slate-950/10 to-slate-900/20 z-[1]" />
           
