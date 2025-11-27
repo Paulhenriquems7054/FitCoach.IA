@@ -19,6 +19,8 @@ import {
 } from '../services/geminiService';
 import { ChatMessage, WebSearchResult, MapSearchResult } from '../types';
 import { logger } from '../../utils/logger';
+import { checkTextUsage, incrementTextMessageCount } from '../../services/usageLimitService';
+import { useToast } from '../../components/ui/Toast';
 
 const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> => {
   return new Promise((resolve, reject) => {
@@ -49,6 +51,7 @@ const PLACEHOLDER_TEXT: { [key: string]: string } = {
 };
 
 const ChatbotPopup: React.FC = () => {
+  const { showError } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -100,12 +103,22 @@ const ChatbotPopup: React.FC = () => {
   const handleSendMessage = useCallback(async () => {
     if (input.trim() === '' || isLoading) return;
 
+    // Verificar limite de mensagens de texto
+    const textStatus = await checkTextUsage();
+    if (!textStatus.canSend) {
+      showError('Limite de segurança diário atingido.');
+      return;
+    }
+
     const userMessageContent = input.trim();
     const messageToAdd: ChatMessage = { role: 'user', content: userMessageContent };
     
     setMessages((prev) => [...prev, messageToAdd]);
     setInput('');
     setIsLoading(true);
+
+    // Incrementar contador de mensagens
+    await incrementTextMessageCount();
     // Ensure any active audio session (recording or transcribing) is stopped when sending a text message
     if (isRecording || isTranscribing) {
       await stopLiveAudioSession();

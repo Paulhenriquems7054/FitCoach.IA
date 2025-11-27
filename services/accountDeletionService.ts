@@ -1,59 +1,121 @@
-import { clearLoginSession, deleteUser } from './databaseService';
-import { clearActivityLogs } from './activityLogService';
-import { endAllOtherSessions } from './sessionService';
-import type { User } from '../types';
+/**
+ * Serviço para deletar conta do usuário
+ * Remove permanentemente todos os dados do usuário
+ */
+
+import { getSupabaseClient } from './supabaseService';
+import { getUser, deleteUser as deleteUserFromDB } from './databaseService';
+import { logger } from '../utils/logger';
 
 /**
- * Anonimiza os dados do usuário em vez de excluir completamente
+ * Deleta permanentemente a conta do usuário
+ * Remove dados do Supabase e IndexedDB
  */
-export const anonymizeUserData = async (user: User): Promise<void> => {
-  // Criar usuário anonimizado
-  const anonymizedUser: User = {
-    ...user,
-    nome: 'Usuário Anônimo',
-    username: undefined,
-    password: undefined,
-    photoUrl: undefined,
-    isAnonymized: true,
-    weightHistory: [],
-    completedChallengeIds: [],
-    points: 0,
-    disciplineScore: 0,
-  };
+export async function deleteUserAccount(): Promise<{ success: boolean; error?: string }> {
+    try {
+        const user = await getUser();
+        if (!user || !user.id) {
+            return { success: false, error: 'Usuário não encontrado' };
+        }
 
-  await deleteUser(user.username || '');
-  
-  // Limpar logs e sessões
-  clearActivityLogs();
-  endAllOtherSessions();
-};
+        const supabase = getSupabaseClient();
+        const userId = user.id;
 
-/**
- * Exclui completamente a conta do usuário
- */
-export const deleteUserAccount = async (user: User): Promise<void> => {
-  if (user.username) {
-    await deleteUser(user.username);
-  }
-  
-  // Limpar todos os dados
-  await clearLoginSession();
-  clearActivityLogs();
-  endAllOtherSessions();
-  
-  // Limpar localStorage relacionado
-  localStorage.removeItem('nutri_ia_activity_logs');
-  localStorage.removeItem('nutri_ia_active_sessions');
-  localStorage.removeItem('nutri_ia_current_session_id');
-  
-  // Limpar flag de apresentação vista para mostrar novamente após deletar conta
-  try {
-    localStorage.removeItem('fitcoach.presentation.seen');
-  } catch (error) {
-    console.warn('Erro ao limpar flag de apresentação', error);
-  }
-  
-  // Redirecionar para página inicial
-  window.location.hash = '#/presentation';
-};
+        // 1. Deletar histórico de chat
+        const { error: chatError } = await supabase
+            .from('chat_messages')
+            .delete()
+            .eq('user_id', userId);
 
+        if (chatError) {
+            logger.warn('Erro ao deletar histórico de chat', 'accountDeletionService', chatError);
+            // Continuar mesmo se falhar
+        }
+
+        // 2. Deletar outros dados relacionados
+        const tablesToClean = [
+            'weight_history',
+            'wellness_plans',
+            'completed_workouts',
+            'meal_plans',
+            'meal_analyses',
+            'recipes',
+        ];
+
+        for (const table of tablesToClean) {
+            const { error } = await supabase
+                .from(table)
+                .delete()
+                .eq('user_id', userId);
+            
+            if (error) {
+                logger.warn(`Erro ao deletar dados de ${table}`, 'accountDeletionService', error);
+            }
+        }
+
+        // 3. Deletar assinaturas e pagamentos
+        const { error: subscriptionError } = await supabase
+            .from('user_subscriptions')
+            .delete()
+            .eq('user_id', userId);
+
+        if (subscriptionError) {
+            logger.warn('Erro ao deletar assinaturas', 'accountDeletionService', subscriptionError);
+        }
+
+        const { error: paymentError } = await supabase
+            .from('payments')
+            .delete()
+            .eq('user_id', userId);
+
+        if (paymentError) {
+            logger.warn('Erro ao deletar pagamentos', 'accountDeletionService', paymentError);
+        }
+
+        // 4. Deletar usuário da tabela users
+        const { error: userError } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', userId);
+
+        if (userError) {
+            logger.error('Erro ao deletar usuário do Supabase', 'accountDeletionService', userError);
+            return { success: false, error: 'Erro ao deletar conta no servidor' };
+        }
+
+        // 5. Deletar do IndexedDB local
+        try {
+            await deleteUserFromDB();
+        } catch (dbError) {
+            logger.warn('Erro ao deletar do IndexedDB', 'accountDeletionService', dbError);
+            // Continuar mesmo se falhar
+        }
+
+        // 6. Limpar localStorage
+        try {
+            localStorage.clear();
+        } catch (storageError) {
+            logger.warn('Erro ao limpar localStorage', 'accountDeletionService', storageError);
+        }
+
+        // 7. Deletar do Supabase Auth (se possível)
+        try {
+            const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+            if (authError) {
+                logger.warn('Erro ao deletar do Auth', 'accountDeletionService', authError);
+                // Continuar mesmo se falhar (pode não ter permissão)
+            }
+        } catch (authError) {
+            logger.warn('Erro ao deletar do Auth', 'accountDeletionService', authError);
+        }
+
+        logger.info('Conta deletada com sucesso', 'accountDeletionService');
+        return { success: true };
+    } catch (error) {
+        logger.error('Erro ao deletar conta', 'accountDeletionService', error);
+        return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Erro desconhecido ao deletar conta' 
+        };
+    }
+}

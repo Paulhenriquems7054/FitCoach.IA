@@ -22,6 +22,22 @@ export interface User {
   weightHistory: { date: string; weight: number }[];
   role: 'user' | 'professional';
   subscription: 'free' | 'premium';
+  
+  // Controle de Plano
+  planType?: 'free' | 'monthly' | 'annual' | 'academy_starter' | 'academy_growth' | 'personal_team';
+  subscriptionStatus?: 'active' | 'inactive' | 'expired';
+  expiryDate?: string; // ISO date string
+  
+  // Controle de Voz (Gemini Live)
+  voiceDailyLimitSeconds?: number; // Padrão: 900 (15 minutos)
+  voiceUsedTodaySeconds?: number;
+  voiceBalanceUpsell?: number; // Saldo de minutos comprados que não expiram
+  lastUsageDate?: string; // ISO date string - para resetar contador diário
+  
+  // Controle de Chat (Texto)
+  textMsgCountToday?: number;
+  lastMsgDate?: string; // ISO date string - para resetar contador diário
+  
   // Multi-tenancy: campos para academias
   gymId?: string; // ID da academia (se o usuário pertence a uma)
   gymRole?: 'student' | 'admin' | 'trainer' | 'receptionist'; // Papel na academia
@@ -267,4 +283,25 @@ export interface Patient {
     goal: Goal;
     lastCheckin: string;
     progress: 'on_track' | 'stagnated' | 'behind';
+}
+
+/**
+ * Interface para cupons de desconto
+ */
+export interface Coupon {
+    id?: string;
+    code: string; // Código único do cupom (ex: ACADEMIA-VIP)
+    planLinked: 'free' | 'monthly' | 'annual' | 'academy_starter' | 'academy_growth' | 'personal_team';
+    maxUses: number; // Quantas pessoas podem usar
+    currentUses: number; // Contador atual
+    isActive: boolean;
+    description?: string;
+    discountPercentage?: number; // Percentual de desconto (opcional)
+    discountAmount?: number; // Valor fixo de desconto (opcional)
+    validFrom?: string; // ISO date string
+    validUntil?: string; // ISO date string (NULL = sem expiração)
+    createdBy?: string; // UUID do usuário que criou
+    metadata?: Record<string, any>;
+    createdAt?: string;
+    updatedAt?: string;
 }

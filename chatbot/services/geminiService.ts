@@ -14,6 +14,7 @@ const outputSources = new Set<AudioBufferSourceNode>();
 let mediaStream: MediaStream | undefined;
 let mediaStreamSource: MediaStreamAudioSourceNode | undefined;
 let scriptProcessor: ScriptProcessorNode | undefined;
+let monitoringInterval: NodeJS.Timeout | null = null; // Para monitorar uso de voz
 
 // The `window.aistudio` type is already declared globally (e.g., in a d.ts file or another module).
 // Removing this redundant declaration to resolve the TypeScript error.
@@ -474,6 +475,24 @@ export async function startLiveAudioSession(
     await stopLiveAudioSession(); // Ensure existing session is stopped
   }
 
+  // Verificar limite de voz antes de iniciar
+  try {
+    const { checkVoiceUsage } = await import('../../services/usageLimitService');
+    const voiceStatus = await checkVoiceUsage();
+    if (!voiceStatus.canUse) {
+      onError('Limite diário atingido. Gerencie sua conta em nosso site.', false);
+      return;
+    }
+  } catch (error) {
+    logger.warn('Erro ao verificar limite de voz', 'chatbot/geminiService', error);
+    // Continuar mesmo se falhar a verificação
+  }
+
+  // Variáveis para monitoramento de tempo
+  let sessionStartTime = Date.now();
+  let lastCheckTime = Date.now();
+  const CHECK_INTERVAL = 1000; // Verificar a cada 1 segundo
+
   try {
     const ai = getGeminiClient();
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -535,6 +554,48 @@ export async function startLiveAudioSession(
       callbacks: {
         onopen: () => {
           logger.debug('Sessão ao vivo aberta', 'chatbot/geminiService');
+          sessionStartTime = Date.now();
+          lastCheckTime = Date.now();
+          
+          // Iniciar monitoramento de tempo
+          monitoringInterval = setInterval(async () => {
+            try {
+              const elapsed = Math.floor((Date.now() - lastCheckTime) / 1000);
+              if (elapsed > 0) {
+                const { consumeVoiceSeconds, checkVoiceUsage } = await import('../../services/usageLimitService');
+                
+                // Consumir segundos decorridos
+                const consumeResult = await consumeVoiceSeconds(elapsed);
+                if (!consumeResult.success) {
+                  // Limite atingido, encerrar sessão
+                  logger.warn('Limite de voz atingido, encerrando sessão', 'chatbot/geminiService');
+                  clearInterval(monitoringInterval!);
+                  monitoringInterval = null;
+                  await stopLiveAudioSession();
+                  onError('Limite diário atingido. Gerencie sua conta em nosso site.', false);
+                  onSessionEndedUnexpectedly();
+                  return;
+                }
+                
+                // Verificar se ainda há saldo
+                const status = await checkVoiceUsage();
+                if (!status.canUse) {
+                  logger.warn('Limite de voz atingido, encerrando sessão', 'chatbot/geminiService');
+                  clearInterval(monitoringInterval!);
+                  monitoringInterval = null;
+                  await stopLiveAudioSession();
+                  onError('Limite diário atingido. Gerencie sua conta em nosso site.', false);
+                  onSessionEndedUnexpectedly();
+                  return;
+                }
+                
+                lastCheckTime = Date.now();
+              }
+            } catch (error) {
+              logger.error('Erro no monitoramento de voz', 'chatbot/geminiService', error);
+            }
+          }, CHECK_INTERVAL);
+          
           onSuccess();
         },
         onmessage: async (message: LiveServerMessage) => {
@@ -600,6 +661,20 @@ export async function startLiveAudioSession(
         },
         onclose: (e: CloseEvent) => {
           logger.debug('Sessão ao vivo fechada', 'chatbot/geminiService');
+          // Parar monitoramento
+          if (monitoringInterval) {
+            clearInterval(monitoringInterval);
+            monitoringInterval = null;
+          }
+          // Consumir tempo restante
+          const elapsed = Math.floor((Date.now() - lastCheckTime) / 1000);
+          if (elapsed > 0) {
+            import('../../services/usageLimitService').then(({ consumeVoiceSeconds }) => {
+              consumeVoiceSeconds(elapsed).catch(err => 
+                logger.warn('Erro ao consumir tempo final', 'chatbot/geminiService', err)
+              );
+            });
+          }
           stopLiveAudioSession().then(onSessionEndedUnexpectedly);
         },
       },
@@ -632,6 +707,12 @@ export async function startLiveAudioSession(
 export async function stopLiveAudioSession(): Promise<void> {
   if (isCleaningUp) return;
   isCleaningUp = true;
+  
+  // Parar monitoramento se estiver ativo
+  if (monitoringInterval) {
+    clearInterval(monitoringInterval);
+    monitoringInterval = null;
+  }
   
   try {
     if (sessionPromiseForCleanup) {

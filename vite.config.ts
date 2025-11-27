@@ -40,8 +40,11 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [
         react(),
-        // Remove console.log, console.info, console.debug em produção
-        removeConsole({ includes: ['log', 'info', 'debug'] }),
+        // Remove console.log, console.info, console.debug apenas em produção
+        ...(mode === 'production' 
+          ? [removeConsole({ includes: ['log', 'info', 'debug'] })]
+          : []
+        ),
         // Plugin para desabilitar service worker em desenvolvimento
         {
           name: 'disable-service-worker-dev',

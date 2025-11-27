@@ -60,6 +60,21 @@ CREATE TABLE IF NOT EXISTS public.users (
     last_sync_at TIMESTAMPTZ,
     gym_server_url TEXT,
     
+    -- Controle de Plano
+    plan_type TEXT CHECK (plan_type IN ('free', 'monthly', 'annual', 'academy_starter', 'academy_growth', 'personal_team')) DEFAULT 'free',
+    subscription_status TEXT CHECK (subscription_status IN ('active', 'inactive', 'expired')) DEFAULT 'active',
+    expiry_date TIMESTAMPTZ,
+    
+    -- Controle de Voz (Gemini Live)
+    voice_daily_limit_seconds INTEGER DEFAULT 900, -- 15 minutos padrão
+    voice_used_today_seconds INTEGER DEFAULT 0,
+    voice_balance_upsell INTEGER DEFAULT 0, -- Saldo de minutos comprados que não expiram
+    last_usage_date DATE, -- Para resetar contador diário
+    
+    -- Controle de Chat (Texto)
+    text_msg_count_today INTEGER DEFAULT 0,
+    last_msg_date DATE, -- Para resetar contador diário
+    
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -70,6 +85,11 @@ CREATE INDEX IF NOT EXISTS idx_users_username ON public.users(username);
 CREATE INDEX IF NOT EXISTS idx_users_gym_id ON public.users(gym_id);
 CREATE INDEX IF NOT EXISTS idx_users_gym_role ON public.users(gym_role);
 CREATE INDEX IF NOT EXISTS idx_users_matricula ON public.users(matricula);
+CREATE INDEX IF NOT EXISTS idx_users_plan_type ON public.users(plan_type);
+CREATE INDEX IF NOT EXISTS idx_users_subscription_status ON public.users(subscription_status);
+CREATE INDEX IF NOT EXISTS idx_users_expiry_date ON public.users(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_users_last_usage_date ON public.users(last_usage_date);
+CREATE INDEX IF NOT EXISTS idx_users_last_msg_date ON public.users(last_msg_date);
 
 -- ============================================================================
 -- TABELAS DE ASSINATURA
@@ -350,6 +370,48 @@ CREATE TABLE IF NOT EXISTS public.app_settings (
 );
 
 -- ============================================================================
+-- TABELA DE CUPONS
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.coupons (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    
+    -- Código do cupom (único)
+    code TEXT NOT NULL UNIQUE,
+    
+    -- Plano vinculado ao cupom
+    plan_linked TEXT NOT NULL CHECK (plan_linked IN ('free', 'monthly', 'annual', 'academy_starter', 'academy_growth', 'personal_team')),
+    
+    -- Limites de uso
+    max_uses INTEGER NOT NULL DEFAULT 1 CHECK (max_uses > 0),
+    current_uses INTEGER NOT NULL DEFAULT 0 CHECK (current_uses >= 0),
+    
+    -- Status do cupom
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    
+    -- Informações adicionais
+    description TEXT,
+    discount_percentage DECIMAL(5,2), -- Percentual de desconto (opcional)
+    discount_amount DECIMAL(10,2), -- Valor fixo de desconto (opcional)
+    valid_from TIMESTAMPTZ DEFAULT NOW(), -- Data de início da validade
+    valid_until TIMESTAMPTZ, -- Data de fim da validade (NULL = sem expiração)
+    
+    -- Metadata
+    created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Índices para cupons
+CREATE INDEX IF NOT EXISTS idx_coupons_code ON public.coupons(code);
+CREATE INDEX IF NOT EXISTS idx_coupons_plan_linked ON public.coupons(plan_linked);
+CREATE INDEX IF NOT EXISTS idx_coupons_is_active ON public.coupons(is_active);
+CREATE INDEX IF NOT EXISTS idx_coupons_valid_until ON public.coupons(valid_until);
+
+-- ============================================================================
 -- FUNÇÕES E TRIGGERS
 -- ============================================================================
 
@@ -393,6 +455,10 @@ CREATE TRIGGER update_wellness_plans_updated_at BEFORE UPDATE ON public.wellness
 
 DROP TRIGGER IF EXISTS update_meal_plans_updated_at ON public.meal_plans;
 CREATE TRIGGER update_meal_plans_updated_at BEFORE UPDATE ON public.meal_plans
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_coupons_updated_at ON public.coupons;
+CREATE TRIGGER update_coupons_updated_at BEFORE UPDATE ON public.coupons
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Função para gerar número de fatura único
