@@ -19,6 +19,8 @@ import { testLocalIA } from '../services/localAIService';
 import { configureGymServer, getGymServerUrlConfig, checkServerAvailability } from '../services/syncService';
 import { useToast } from '../components/ui/Toast';
 import { saveGymBranding, loadGymBranding, loadGymConfig, saveGymConfig, getAppName } from '../services/gymConfigService';
+import { deleteUserAccount } from '../services/accountDeletionService';
+import { Alert } from '../components/ui/Alert';
 import type { GymBranding, Gym } from '../types';
 
 const SettingsPage: React.FC = () => {
@@ -41,6 +43,8 @@ const SettingsPage: React.FC = () => {
     const [isTestingLocalAI, setIsTestingLocalAI] = useState<boolean>(false);
     const [gymServerUrl, setGymServerUrlState] = useState<string>('');
     const [isCheckingServer, setIsCheckingServer] = useState<boolean>(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     
     // Estados para configuração da academia
     const isAdmin = user.gymRole === 'admin' || user.username === 'Administrador' || user.username === 'Desenvolvedor';
@@ -1274,6 +1278,84 @@ const SettingsPage: React.FC = () => {
                         </div>
                     </div>
                 </Card>
+            )}
+
+            {/* Seção de Excluir Conta */}
+            <Card>
+                <div className="p-4 sm:p-6">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                        🗑️ Excluir Conta
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                        Ao excluir sua conta, todos os seus dados serão permanentemente removidos e não poderão ser recuperados.
+                    </p>
+                    <Button
+                        variant="secondary"
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                        Excluir minha conta
+                    </Button>
+                </div>
+            </Card>
+
+            {/* Modal de Confirmação de Exclusão */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <Card className="w-full max-w-md">
+                        <div className="p-6">
+                            <h2 className="text-xl font-bold text-red-600 dark:text-red-400 mb-4">
+                                Confirmar Exclusão de Conta
+                            </h2>
+                            <Alert type="error" title="Atenção" className="mb-4">
+                                Esta ação é irreversível. Todos os seus dados serão permanentemente deletados, incluindo:
+                                <ul className="list-disc list-inside mt-2 space-y-1">
+                                    <li>Seu perfil e informações pessoais</li>
+                                    <li>Histórico de chat</li>
+                                    <li>Planos de treino e refeições</li>
+                                    <li>Histórico de peso</li>
+                                    <li>Todos os outros dados associados à sua conta</li>
+                                </ul>
+                            </Alert>
+                            <div className="flex gap-3 mt-6">
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setShowDeleteConfirm(false)}
+                                    className="flex-1"
+                                    disabled={isDeleting}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    onClick={async () => {
+                                        setIsDeleting(true);
+                                        try {
+                                            const result = await deleteUserAccount();
+                                            if (result.success) {
+                                                showSuccess('Conta excluída com sucesso');
+                                                // Redirecionar para login após 2 segundos
+                                                setTimeout(() => {
+                                                    window.location.hash = '#/login';
+                                                    window.location.reload();
+                                                }, 2000);
+                                            } else {
+                                                showError(result.error || 'Erro ao excluir conta');
+                                                setIsDeleting(false);
+                                            }
+                                        } catch (error: any) {
+                                            showError(error.message || 'Erro ao excluir conta');
+                                            setIsDeleting(false);
+                                        }
+                                    }}
+                                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                                    disabled={isDeleting}
+                                >
+                                    {isDeleting ? 'Excluindo...' : 'Confirmar Exclusão'}
+                                </Button>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
             )}
         </div>
     );

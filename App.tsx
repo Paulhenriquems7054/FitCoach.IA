@@ -162,6 +162,19 @@ const App: React.FC = () => {
         // Aplicar otimizações específicas do dispositivo
         applyDeviceOptimizations(device);
 
+        // Verificar se há token na URL para login automático
+        const checkTokenLogin = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            
+            if (token) {
+                // Redirecionar para login com token
+                window.location.hash = `#/login?token=${token}`;
+                // Limpar token da URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        };
+
         // Verificar se usuário está realmente logado
         const checkLogin = async () => {
             try {
@@ -173,6 +186,8 @@ const App: React.FC = () => {
                 setIsInitialized(true);
             }
         };
+        
+        checkTokenLogin();
         checkLogin();
 
         return () => {

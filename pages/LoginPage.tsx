@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
-import { loginUser, usernameExists, saveLoginSession, resetPassword, getUserByUsername } from '../services/databaseService';
+import { loginUser, usernameExists, saveLoginSession, resetPassword, getUserByUsername, registerUser } from '../services/databaseService';
 import { useUser } from '../context/UserContext';
 import { useTheme } from '../context/ThemeContext';
 import { MoonIcon } from '../components/icons/MoonIcon';
@@ -12,6 +12,7 @@ import { EyeIcon } from '../components/icons/EyeIcon';
 import { EyeSlashIcon } from '../components/icons/EyeSlashIcon';
 import { useToast } from '../components/ui/Toast';
 import { getSupabaseClient, getUserFromSupabase } from '../services/supabaseService';
+import { validateCoupon, applyCouponToUser } from '../services/couponService';
 import type { LoginCredentials } from '../types';
 import { sanitizeInput, sanitizeEmail } from '../utils/security';
 
@@ -34,6 +35,21 @@ const LoginPage: React.FC = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+    
+    // Estados para cadastro
+    const [showSignup, setShowSignup] = useState(false);
+    const [signupName, setSignupName] = useState('');
+    const [signupEmail, setSignupEmail] = useState('');
+    const [signupPassword, setSignupPassword] = useState('');
+    const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
+    const [signupCouponCode, setSignupCouponCode] = useState('');
+    const [signupError, setSignupError] = useState<string | null>(null);
+    const [signupSuccess, setSignupSuccess] = useState<string | null>(null);
+    const [isSigningUp, setIsSigningUp] = useState(false);
+    const [showSignupPassword, setShowSignupPassword] = useState(false);
+    const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
+    const [couponValidated, setCouponValidated] = useState(false);
+    const [validatedCouponPlan, setValidatedCouponPlan] = useState<string | null>(null);
 
     // Processar token de acesso do email (quando usuário clica no link do email)
     useEffect(() => {
@@ -239,6 +255,215 @@ const LoginPage: React.FC = () => {
             setForgotPasswordError(errorMessage);
         } finally {
             setIsResettingPassword(false);
+        }
+    };
+
+    const handleValidateCoupon = async () => {
+        if (!signupCouponCode.trim()) {
+            setSignupError('Por favor, informe o código de convite');
+            setCouponValidated(false);
+            setValidatedCouponPlan(null);
+            return;
+        }
+
+        setSignupError(null);
+        const validation = await validateCoupon(signupCouponCode.trim());
+        
+        if (validation.isValid && validation.coupon) {
+            setCouponValidated(true);
+            setValidatedCouponPlan(validation.coupon.planLinked);
+            showSuccess(`Código válido! Você receberá o plano: ${validation.coupon.planLinked}`);
+        } else {
+            setCouponValidated(false);
+            setValidatedCouponPlan(null);
+            const errorMsg = validation.error || 'Código de convite inválido';
+            setSignupError(errorMsg);
+            showError(errorMsg);
+        }
+    };
+
+    const handleSignup = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSignupError(null);
+        setSignupSuccess(null);
+        setIsSigningUp(true);
+
+        try {
+            // Validações básicas
+            if (!signupName.trim()) {
+                setSignupError('Por favor, informe seu nome');
+                setIsSigningUp(false);
+                return;
+            }
+
+            if (!signupEmail.trim()) {
+                setSignupError('Por favor, informe seu e-mail');
+                setIsSigningUp(false);
+                return;
+            }
+
+            const sanitizedEmail = sanitizeEmail(signupEmail.trim());
+            if (!sanitizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitizedEmail)) {
+                setSignupError('Por favor, informe um e-mail válido');
+                setIsSigningUp(false);
+                return;
+            }
+
+            if (!signupPassword.trim()) {
+                setSignupError('Por favor, informe uma senha');
+                setIsSigningUp(false);
+                return;
+            }
+
+            if (signupPassword.length < 6) {
+                setSignupError('A senha deve ter pelo menos 6 caracteres');
+                setIsSigningUp(false);
+                return;
+            }
+
+            if (signupPassword !== signupConfirmPassword) {
+                setSignupError('As senhas não coincidem');
+                setIsSigningUp(false);
+                return;
+            }
+
+            // Validar cupom se fornecido
+            let couponPlan: string | null = null;
+            if (signupCouponCode.trim()) {
+                const validation = await validateCoupon(signupCouponCode.trim());
+                if (!validation.isValid) {
+                    setSignupError(validation.error || 'Código de convite inválido');
+                    setIsSigningUp(false);
+                    return;
+                }
+                if (validation.coupon) {
+                    couponPlan = validation.coupon.planLinked;
+                }
+            }
+
+            // Criar usuário no Supabase Auth
+            const supabase = getSupabaseClient();
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: sanitizedEmail,
+                password: signupPassword,
+                options: {
+                    data: {
+                        nome: sanitizeInput(signupName.trim(), 100),
+                        username: sanitizeInput(signupName.trim().toLowerCase().replace(/\s+/g, '_'), 50),
+                    }
+                }
+            });
+
+            if (authError) {
+                throw new Error(authError.message || 'Erro ao criar conta');
+            }
+
+            if (!authData.user) {
+                throw new Error('Erro ao criar usuário');
+            }
+
+            const userId = authData.user.id;
+            const username = sanitizeInput(signupName.trim().toLowerCase().replace(/\s+/g, '_'), 50);
+
+            // Verificar se username já existe
+            const exists = await usernameExists(username);
+            if (exists) {
+                // Se já existe, adicionar número
+                let newUsername = username;
+                let counter = 1;
+                while (await usernameExists(newUsername)) {
+                    newUsername = `${username}_${counter}`;
+                    counter++;
+                }
+            }
+
+            // Criar registro na tabela users com plano do cupom
+            const userData = {
+                nome: sanitizeInput(signupName.trim(), 100),
+                username: username,
+                idade: 0,
+                genero: 'Masculino' as const,
+                peso: 0,
+                altura: 0,
+                objetivo: 'perder peso' as const,
+                points: 0,
+                disciplineScore: 0,
+                completedChallengeIds: [],
+                isAnonymized: false,
+                weightHistory: [],
+                role: 'user' as const,
+                subscription: 'free' as const,
+                // Aplicar plano do cupom se houver
+                planType: couponPlan ? couponPlan as any : 'free',
+                subscriptionStatus: couponPlan ? 'active' as const : 'active' as const,
+            };
+
+            // Criar usuário no banco local (IndexedDB)
+            const newUser = await registerUser(username, signupPassword, userData);
+
+            // Criar usuário no Supabase
+            const { error: userError } = await supabase
+                .from('users')
+                .insert({
+                    id: userId,
+                    nome: userData.nome,
+                    username: userData.username,
+                    email: sanitizedEmail,
+                    idade: userData.idade,
+                    genero: userData.genero,
+                    peso: userData.peso,
+                    altura: userData.altura,
+                    objetivo: userData.objetivo,
+                    points: userData.points,
+                    discipline_score: userData.disciplineScore,
+                    completed_challenge_ids: userData.completedChallengeIds,
+                    is_anonymized: userData.isAnonymized,
+                    role: userData.role,
+                    plan_type: userData.planType,
+                    subscription_status: userData.subscriptionStatus,
+                    voice_daily_limit_seconds: 900,
+                    voice_used_today_seconds: 0,
+                    voice_balance_upsell: 0,
+                    text_msg_count_today: 0,
+                });
+
+            if (userError) {
+                console.error('Erro ao criar usuário no Supabase:', userError);
+                // Continuar mesmo se houver erro no Supabase
+            }
+
+            // Aplicar cupom se fornecido
+            if (signupCouponCode.trim() && couponPlan) {
+                const applyResult = await applyCouponToUser(signupCouponCode.trim(), userId);
+                if (!applyResult.success) {
+                    console.warn('Erro ao aplicar cupom:', applyResult.error);
+                    // Não bloquear o cadastro se falhar aplicar o cupom
+                }
+            }
+
+            setSignupSuccess('Conta criada com sucesso! Você já pode fazer login.');
+            showSuccess('Conta criada com sucesso!');
+
+            // Limpar formulário
+            setSignupName('');
+            setSignupEmail('');
+            setSignupPassword('');
+            setSignupConfirmPassword('');
+            setSignupCouponCode('');
+            setCouponValidated(false);
+            setValidatedCouponPlan(null);
+
+            // Fechar modal e voltar para login após 2 segundos
+            setTimeout(() => {
+                setShowSignup(false);
+                setSignupSuccess(null);
+            }, 2000);
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao criar conta. Tente novamente.';
+            setSignupError(errorMessage);
+            showError(errorMessage);
+        } finally {
+            setIsSigningUp(false);
         }
     };
 
@@ -462,7 +687,14 @@ const LoginPage: React.FC = () => {
 
                         {/* Footer */}
                         <div className="mt-6">
-                            <div className="flex items-center justify-end">
+                            <div className="flex items-center justify-between">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSignup(true)}
+                                    className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
+                                >
+                                    Criar conta
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => setShowForgotPassword(true)}
@@ -623,6 +855,219 @@ const LoginPage: React.FC = () => {
                                         disabled={isResettingPassword}
                                     >
                                         {isResettingPassword ? 'Redefinindo...' : 'Redefinir Senha'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* Modal de Cadastro */}
+            {showSignup && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4" aria-modal="true">
+                    <Card className="w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-y-auto animate-fade-in-up">
+                        <div className="p-3 sm:p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
+                            <h2 className="text-base sm:text-lg font-bold flex items-center gap-2 truncate pr-2">
+                                ✨ Criar Conta
+                            </h2>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowSignup(false);
+                                    setSignupName('');
+                                    setSignupEmail('');
+                                    setSignupPassword('');
+                                    setSignupConfirmPassword('');
+                                    setSignupCouponCode('');
+                                    setSignupError(null);
+                                    setSignupSuccess(null);
+                                    setCouponValidated(false);
+                                    setValidatedCouponPlan(null);
+                                }}
+                                className="p-1 sm:p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0"
+                                aria-label="Fechar"
+                            >
+                                <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500" />
+                            </button>
+                        </div>
+                        <div className="p-4 sm:p-6">
+                            {signupError && (
+                                <Alert type="error" title="Erro" className="mb-4">
+                                    {signupError}
+                                </Alert>
+                            )}
+                            {signupSuccess && (
+                                <Alert type="success" title="Sucesso" className="mb-4">
+                                    {signupSuccess}
+                                </Alert>
+                            )}
+
+                            <form onSubmit={handleSignup} className="space-y-4">
+                                {/* Campo de Código de Convite */}
+                                <div>
+                                    <label htmlFor="couponCode" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Possui código de convite? (Opcional)
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            id="couponCode"
+                                            type="text"
+                                            value={signupCouponCode}
+                                            onChange={(e) => {
+                                                setSignupCouponCode(e.target.value.toUpperCase());
+                                                setCouponValidated(false);
+                                                setValidatedCouponPlan(null);
+                                                setSignupError(null);
+                                            }}
+                                            className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            placeholder="Ex: ACADEMIA-VIP"
+                                            autoComplete="off"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            onClick={handleValidateCoupon}
+                                            disabled={!signupCouponCode.trim() || couponValidated}
+                                        >
+                                            {couponValidated ? '✓' : 'Validar'}
+                                        </Button>
+                                    </div>
+                                    {couponValidated && validatedCouponPlan && (
+                                        <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                            ✓ Código válido! Plano: {validatedCouponPlan}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Nome */}
+                                <div>
+                                    <label htmlFor="signupName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Nome Completo *
+                                    </label>
+                                    <input
+                                        id="signupName"
+                                        type="text"
+                                        value={signupName}
+                                        onChange={(e) => setSignupName(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        placeholder="Seu nome completo"
+                                        required
+                                        autoComplete="name"
+                                    />
+                                </div>
+
+                                {/* E-mail */}
+                                <div>
+                                    <label htmlFor="signupEmail" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        E-mail *
+                                    </label>
+                                    <input
+                                        id="signupEmail"
+                                        type="email"
+                                        value={signupEmail}
+                                        onChange={(e) => setSignupEmail(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        placeholder="seu@email.com"
+                                        required
+                                        autoComplete="email"
+                                    />
+                                </div>
+
+                                {/* Senha */}
+                                <div>
+                                    <label htmlFor="signupPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Senha *
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            id="signupPassword"
+                                            type={showSignupPassword ? "text" : "password"}
+                                            value={signupPassword}
+                                            onChange={(e) => setSignupPassword(e.target.value)}
+                                            className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            placeholder="••••••••"
+                                            required
+                                            minLength={6}
+                                            autoComplete="new-password"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowSignupPassword(!showSignupPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none"
+                                            aria-label={showSignupPassword ? "Ocultar senha" : "Mostrar senha"}
+                                        >
+                                            {showSignupPassword ? (
+                                                <EyeSlashIcon className="w-5 h-5" />
+                                            ) : (
+                                                <EyeIcon className="w-5 h-5" />
+                                            )}
+                                        </button>
+                                    </div>
+                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                        Mínimo de 6 caracteres
+                                    </p>
+                                </div>
+
+                                {/* Confirmar Senha */}
+                                <div>
+                                    <label htmlFor="signupConfirmPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Confirmar Senha *
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            id="signupConfirmPassword"
+                                            type={showSignupConfirmPassword ? "text" : "password"}
+                                            value={signupConfirmPassword}
+                                            onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                                            className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            placeholder="••••••••"
+                                            required
+                                            minLength={6}
+                                            autoComplete="new-password"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none"
+                                            aria-label={showSignupConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
+                                        >
+                                            {showSignupConfirmPassword ? (
+                                                <EyeSlashIcon className="w-5 h-5" />
+                                            ) : (
+                                                <EyeIcon className="w-5 h-5" />
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        className="flex-1"
+                                        onClick={() => {
+                                            setShowSignup(false);
+                                            setSignupName('');
+                                            setSignupEmail('');
+                                            setSignupPassword('');
+                                            setSignupConfirmPassword('');
+                                            setSignupCouponCode('');
+                                            setSignupError(null);
+                                            setSignupSuccess(null);
+                                            setCouponValidated(false);
+                                            setValidatedCouponPlan(null);
+                                        }}
+                                    >
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        variant="primary"
+                                        className="flex-1"
+                                        disabled={isSigningUp}
+                                    >
+                                        {isSigningUp ? 'Criando...' : 'Criar Conta'}
                                     </Button>
                                 </div>
                             </form>

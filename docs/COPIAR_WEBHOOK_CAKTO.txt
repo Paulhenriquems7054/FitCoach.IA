@@ -1,0 +1,14 @@
+INSTRUÇÕES PARA COPIAR O WEBHOOK CAKTO:
+
+1. Abra o arquivo: supabase/functions/cakto-webhook/index.ts
+2. Selecione TODO o conteúdo (Ctrl+A)
+3. Copie (Ctrl+C)
+4. Vá no Dashboard do Supabase > Edge Functions > cakto-webhook
+5. Cole o código
+6. Salve e faça deploy
+
+OU
+
+Use o conteúdo abaixo (arquivo completo):
+
+

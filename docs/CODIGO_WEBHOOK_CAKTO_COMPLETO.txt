@@ -1,3 +1,12 @@
+===========================================
+CÓDIGO COMPLETO DO WEBHOOK CAKTO
+===========================================
+
+Copie TODO o código abaixo e cole no Dashboard do Supabase
+na função cakto-webhook
+
+===========================================
+
 /**
  * Supabase Edge Function para processar webhooks do Cakto
  * 
@@ -449,4 +458,18 @@ async function sendAccessEmail(
     });
   }
 }
+
+===========================================
+FIM DO CÓDIGO
+===========================================
+
+INSTRUÇÕES:
+1. Copie TODO o código acima (do primeiro import até o último })
+2. No Dashboard do Supabase, vá em Edge Functions > cakto-webhook
+3. Clique em "Edit"
+4. Selecione TODO o código antigo (Ctrl+A) e delete
+5. Cole o código novo (Ctrl+V)
+6. Clique em "Deploy" ou "Save"
+7. Pronto! ✅
+
 

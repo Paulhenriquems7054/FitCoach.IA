@@ -8,6 +8,7 @@ import { useToast } from '../components/ui/Toast';
 import { SparklesIcon } from '../components/icons/SparklesIcon';
 import { ChartBarIcon } from '../components/icons/ChartBarIcon';
 import { BoltIcon } from '../components/icons/BoltIcon';
+import { CheckoutModal } from '../components/CheckoutModal';
 import { getSubscriptionPlans, getActiveSubscription } from '../services/supabaseService';
 import { logger } from '../utils/logger';
 
@@ -24,10 +25,18 @@ interface SubscriptionPlan {
 
 const PremiumPage: React.FC = () => {
     const { user } = useUser();
-    const { showError } = useToast();
+    const { showError, showSuccess } = useToast();
     const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
     const [activeSubscription, setActiveSubscription] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [checkoutModal, setCheckoutModal] = useState<{
+        isOpen: boolean;
+        planId: string;
+        planName: string;
+        displayName: string;
+        price: number;
+        priceYearly?: number;
+    } | null>(null);
     
     useEffect(() => {
         loadPlans();
@@ -116,13 +125,22 @@ const PremiumPage: React.FC = () => {
         return plan?.description || '';
     };
     
-    const getPaymentLink = (planName: string): string => {
-        const paymentLinks: Record<string, string> = {
-            'basic': 'https://pay.cakto.com.br/3bewmsy_665747',
-            'premium': 'https://pay.cakto.com.br/8djcjc6',
-            'enterprise': 'https://pay.cakto.com.br/35tdhxu'
-        };
-        return paymentLinks[planName] || '#';
+    const handleSubscribe = (plan: SubscriptionPlan) => {
+        setCheckoutModal({
+            isOpen: true,
+            planId: plan.id,
+            planName: plan.name,
+            displayName: plan.display_name,
+            price: plan.price_monthly,
+            priceYearly: plan.price_yearly || undefined
+        });
+    };
+
+    const handleCheckoutSuccess = async () => {
+        showSuccess('Assinatura ativada com sucesso!');
+        setCheckoutModal(null);
+        // Recarregar assinatura
+        await loadActiveSubscription();
     };
     
     return (
@@ -262,19 +280,19 @@ const PremiumPage: React.FC = () => {
                                     <div className={`p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 ${
                                         isPopular ? 'bg-primary-50/50 dark:bg-primary-900/20' : ''
                                     }`}>
-                                        <a
-                                            href={getPaymentLink(plan.name)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className={`w-full inline-flex items-center justify-center px-6 py-3 font-bold shadow-lg hover:shadow-xl transition-all duration-300 text-sm sm:text-base rounded-lg ${
+                                        <Button
+                                            onClick={() => handleSubscribe(plan)}
+                                            variant={isPopular ? "primary" : "secondary"}
+                                            className={`w-full ${
                                                 isPopular
                                                     ? 'bg-gradient-to-r from-primary-600 to-amber-500 hover:from-primary-700 hover:to-amber-600 text-white'
-                                                    : 'bg-slate-700 hover:bg-slate-800 text-white'
+                                                    : ''
                                             }`}
+                                            size="lg"
                                         >
                                             {isPopular && <StarIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />}
                                             Assinar {plan.display_name}
-                                        </a>
+                                        </Button>
                                     </div>
                                 </Card>
                             );
@@ -351,6 +369,20 @@ const PremiumPage: React.FC = () => {
                         </div>
                     </Card>
                 </div>
+            )}
+
+            {/* Modal de Checkout */}
+            {checkoutModal && (
+                <CheckoutModal
+                    isOpen={checkoutModal.isOpen}
+                    onClose={() => setCheckoutModal(null)}
+                    planId={checkoutModal.planId}
+                    planName={checkoutModal.planName}
+                    displayName={checkoutModal.displayName}
+                    price={checkoutModal.price}
+                    priceYearly={checkoutModal.priceYearly}
+                    onSuccess={handleCheckoutSuccess}
+                />
             )}
         </div>
     );

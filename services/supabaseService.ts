@@ -39,6 +39,20 @@ export interface Database {
           blocked_reason: string | null;
           last_sync_at: string | null;
           gym_server_url: string | null;
+          // Controle de Plano
+          plan_type: 'free' | 'monthly' | 'annual' | 'academy_starter' | 'academy_growth' | 'personal_team' | null;
+          subscription_status: 'active' | 'inactive' | 'expired' | null;
+          expiry_date: string | null;
+          // Controle de Voz
+          voice_daily_limit_seconds: number | null;
+          voice_used_today_seconds: number | null;
+          voice_balance_upsell: number | null;
+          last_usage_date: string | null;
+          // Controle de Chat
+          text_msg_count_today: number | null;
+          last_msg_date: string | null;
+          // Email
+          email: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -228,6 +242,17 @@ function userToSupabase(user: User, userId?: string): Database['public']['Tables
     blocked_reason: user.blockedReason || null,
     last_sync_at: user.lastSyncAt || null,
     gym_server_url: user.gymServerUrl || null,
+    // Novos campos de plano, voz e chat
+    plan_type: (user.planType || 'free') as any,
+    subscription_status: (user.subscriptionStatus || 'active') as any,
+    expiry_date: user.expiryDate || null,
+    voice_daily_limit_seconds: user.voiceDailyLimitSeconds || 900,
+    voice_used_today_seconds: user.voiceUsedTodaySeconds || 0,
+    voice_balance_upsell: user.voiceBalanceUpsell || 0,
+    last_usage_date: user.lastUsageDate || null,
+    text_msg_count_today: user.textMsgCountToday || 0,
+    last_msg_date: user.lastMsgDate || null,
+    email: (user as any).email || null,
   };
 }
 
@@ -264,6 +289,16 @@ function supabaseToUser(row: Database['public']['Tables']['users']['Row']): User
     blockedReason: row.blocked_reason || undefined,
     lastSyncAt: row.last_sync_at || undefined,
     gymServerUrl: row.gym_server_url || undefined,
+    // Novos campos de plano, voz e chat
+    planType: row.plan_type || undefined,
+    subscriptionStatus: row.subscription_status || undefined,
+    expiryDate: row.expiry_date || undefined,
+    voiceDailyLimitSeconds: row.voice_daily_limit_seconds || undefined,
+    voiceUsedTodaySeconds: row.voice_used_today_seconds || undefined,
+    voiceBalanceUpsell: row.voice_balance_upsell || undefined,
+    lastUsageDate: row.last_usage_date || undefined,
+    textMsgCountToday: row.text_msg_count_today || undefined,
+    lastMsgDate: row.last_msg_date || undefined,
   };
 }
 
