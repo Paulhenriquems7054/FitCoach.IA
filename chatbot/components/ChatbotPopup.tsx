@@ -60,6 +60,7 @@ const ChatbotPopup: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false); // State for voice chat recording
   const [isTranscribing, setIsTranscribing] = useState(false); // State for transcription to input
   const [isAudioLoading, setIsAudioLoading] = useState(false); // General audio session loading
+  const [showLimitModal, setShowLimitModal] = useState(false); // Modal para bloqueio de voz
   const [loadingAudioIndex, setLoadingAudioIndex] = useState<number | null>(null);
   const [playbackState, setPlaybackState] = useState<{ index: number; status: 'playing' | 'paused' } | null>(null);
   const [isThinkingMode, setIsThinkingMode] = useState(false);
@@ -613,6 +614,17 @@ const ChatbotPopup: React.FC = () => {
           if (typeof window !== 'undefined' && windowWithAiStudio.aistudio && typeof windowWithAiStudio.aistudio.openSelectKey === 'function') {
               windowWithAiStudio.aistudio.openSelectKey();
           }
+        } else if (error.includes('Limite diário atingido')) {
+          // Bloqueio de venda: mostrar apenas opção de gerenciar conta (sem preço/link de compra direto)
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'system',
+              content: 'Limite diário atingido. Gerencie sua conta em nosso site para ajustar seu plano ou tempo de uso.',
+              isError: true,
+            },
+          ]);
+          setShowLimitModal(true);
         } else {
           setMessages((prev) => [...prev, { role: 'system', content: `Erro de áudio: ${error}`, isError: true }]);
         }
@@ -918,6 +930,44 @@ const ChatbotPopup: React.FC = () => {
             <button onClick={handleSendMessage} className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors duration-300 disabled:bg-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500" disabled={isLoading || input.trim() === '' || isRecording} aria-label="Enviar mensagem">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de limite diário de voz (Google Play: sem preço/link de compra direto) */}
+      {showLimitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+              Limite diário de voz atingido
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Para manter a segurança e as regras da loja, o uso de voz foi bloqueado por hoje.
+            </p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Você pode gerenciar seu plano e seu tempo de uso acessando a página de conta.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
+              <button
+                type="button"
+                className="flex-1 px-4 py-2 rounded-md border border-slate-300 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
+                onClick={() => setShowLimitModal(false)}
+              >
+                Fechar
+              </button>
+              <button
+                type="button"
+                className="flex-1 px-4 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  setShowLimitModal(false);
+                  if (typeof window !== 'undefined') {
+                    window.location.hash = '#/premium';
+                  }
+                }}
+              >
+                Gerenciar conta
+              </button>
+            </div>
           </div>
         </div>
       )}
