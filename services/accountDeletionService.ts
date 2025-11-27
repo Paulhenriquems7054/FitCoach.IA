@@ -119,3 +119,52 @@ export async function deleteUserAccount(): Promise<{ success: boolean; error?: s
         };
     }
 }
+
+/**
+ * Anonimiza os dados do usuário sem deletar a conta
+ * Remove informações pessoais identificáveis mas mantém a conta ativa
+ */
+export async function anonymizeUserData(user: any): Promise<{ success: boolean; error?: string }> {
+    try {
+        if (!user || !user.id) {
+            return { success: false, error: 'Usuário não encontrado' };
+        }
+
+        const supabase = getSupabaseClient();
+        const userId = user.id;
+
+        // Anonimizar dados pessoais na tabela users
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({
+                nome: 'Usuário Anônimo',
+                email: `anon_${userId.substring(0, 8)}@anon.fitcoach.ia`,
+                is_anonymized: true,
+            })
+            .eq('id', userId);
+
+        if (updateError) {
+            logger.error('Erro ao anonimizar dados do usuário', 'accountDeletionService', updateError);
+            return { success: false, error: 'Erro ao anonimizar dados no servidor' };
+        }
+
+        // Deletar histórico de chat (dados sensíveis)
+        const { error: chatError } = await supabase
+            .from('chat_messages')
+            .delete()
+            .eq('user_id', userId);
+
+        if (chatError) {
+            logger.warn('Erro ao deletar histórico de chat durante anonimização', 'accountDeletionService', chatError);
+        }
+
+        logger.info('Dados anonimizados com sucesso', 'accountDeletionService');
+        return { success: true };
+    } catch (error) {
+        logger.error('Erro ao anonimizar dados', 'accountDeletionService', error);
+        return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Erro desconhecido ao anonimizar dados' 
+        };
+    }
+}

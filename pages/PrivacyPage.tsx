@@ -127,10 +127,15 @@ const PrivacyPage: React.FC = () => {
     const handleDeleteAccount = async () => {
         if (deleteOption === 'anonymize') {
             try {
-                await anonymizeUserData(user);
-                showSuccess('Dados anonimizados com sucesso');
-                setShowDeleteConfirm(false);
-                window.location.hash = '#/presentation';
+                const result = await anonymizeUserData(user);
+                if (result.success) {
+                    showSuccess('Dados anonimizados com sucesso');
+                    setShowDeleteConfirm(false);
+                    window.location.hash = '#/presentation';
+                    window.location.reload();
+                } else {
+                    showError(result.error || 'Erro ao anonimizar dados');
+                }
             } catch (error) {
                 showError('Erro ao anonimizar dados');
             }
@@ -139,8 +144,15 @@ const PrivacyPage: React.FC = () => {
                 return;
             }
             try {
-                await deleteUserAccount(user);
-                showSuccess('Conta excluída com sucesso');
+                const result = await deleteUserAccount();
+                if (result.success) {
+                    showSuccess('Conta excluída com sucesso');
+                    setShowDeleteConfirm(false);
+                    window.location.hash = '#/login';
+                    window.location.reload();
+                } else {
+                    showError(result.error || 'Erro ao excluir conta');
+                }
             } catch (error) {
                 showError('Erro ao excluir conta');
             }
