@@ -1,0 +1,127 @@
+import React, { useState } from 'react';
+import { Card } from './ui/Card';
+import { Button } from './ui/Button';
+import { Alert } from './ui/Alert';
+import { couponService, type CouponValidationError } from '../services/supabaseService';
+import { useToast } from './ui/Toast';
+
+interface InviteCodeEntryProps {
+  onCodeValidated: (couponCode: string) => void;
+  onSkip?: () => void; // Opção para pular e ir direto para login
+}
+
+export const InviteCodeEntry: React.FC<InviteCodeEntryProps> = ({ onCodeValidated, onSkip }) => {
+  const [code, setCode] = useState('');
+  const [isValidating, setIsValidating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
+
+  const errorMessages: Record<CouponValidationError, string> = {
+    CUPOM_INEXISTENTE: 'Código de convite não encontrado',
+    CUPOM_INATIVO: 'Este código de convite não está mais ativo',
+    CUPOM_ESGOTADO: 'Este código de convite já foi usado o máximo de vezes',
+    CUPOM_EXPIRADO: 'Este código de convite expirou',
+    CUPOM_NAO_VALIDO: 'Este código de convite ainda não está válido',
+    LIMITE_CONTAS_ATINGIDO: 'Limite de contas vinculadas atingido para este pagamento',
+    PAGAMENTO_INATIVO: 'O pagamento vinculado a este código não está ativo',
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!code.trim()) {
+      setError('Por favor, digite um código de convite');
+      return;
+    }
+
+    setIsValidating(true);
+
+    try {
+      const result = await couponService.validateCoupon(code.trim().toUpperCase());
+
+      if (result.success) {
+        showToast('Código válido! Redirecionando...', 'success');
+        onCodeValidated(code.trim().toUpperCase());
+      } else {
+        const errorMessage = result.error 
+          ? errorMessages[result.error] || result.message || 'Código inválido'
+          : result.message || 'Código inválido';
+        setError(errorMessage);
+        showToast(errorMessage, 'error');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao validar código';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 px-4">
+      <Card className="w-full max-w-md">
+        <div className="p-6 space-y-6">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Código de Convite
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Digite o código de convite que você recebeu para acessar o FitCoach.IA
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="invite-code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Código de Convite
+              </label>
+              <input
+                id="invite-code"
+                type="text"
+                value={code}
+                onChange={(e) => {
+                  setCode(e.target.value.toUpperCase());
+                  setError(null);
+                }}
+                placeholder="Ex: ACADEMIA-VIP"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-gray-800 dark:text-white transition-all"
+                disabled={isValidating}
+                autoFocus
+                autoComplete="off"
+              />
+            </div>
+
+            {error && (
+              <Alert type="error" title="Erro">
+                {error}
+              </Alert>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isValidating || !code.trim()}
+            >
+              {isValidating ? 'Validando...' : 'Continuar'}
+            </Button>
+          </form>
+
+          {onSkip && (
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={onSkip}
+                className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+              >
+                Já tenho uma conta
+              </button>
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+};
+

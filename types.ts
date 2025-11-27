@@ -304,4 +304,21 @@ export interface Coupon {
     metadata?: Record<string, any>;
     createdAt?: string;
     updatedAt?: string;
+    // Campos para vínculo com Cakto
+    caktoCustomerId?: string | null; // ID do cliente Cakto vinculado ao cupom
+    linkedAccountsCount?: number; // Número de contas já vinculadas
+    maxLinkedAccounts?: number | null; // Limite máximo de contas (NULL = ilimitado)
+}
+
+/**
+ * Interface para vínculo entre usuário e cupom
+ */
+export interface UserCouponLink {
+    id?: string;
+    userId: string; // ID do usuário
+    couponId: string; // ID do cupom
+    linkedAt?: string; // ISO date string - quando foi vinculado
+    metadata?: Record<string, any>;
+    createdAt?: string;
+    updatedAt?: string;
 }
