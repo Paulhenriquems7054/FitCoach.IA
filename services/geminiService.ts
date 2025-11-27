@@ -209,7 +209,12 @@ export const startChat = (user: User, language: 'pt' | 'en' | 'es' = 'pt'): void
   const ai = getGeminiClient();
   chat = ai.chats.create({
     model: 'gemini-2.5-flash',
-    config: { systemInstruction: langPrompts[language] },
+    config: { 
+      systemInstruction: langPrompts[language],
+      generationConfig: {
+        maxOutputTokens: 1024,
+      },
+    },
   });
 };
 export const sendMessageToChat = (message: string) => {

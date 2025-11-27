@@ -201,6 +201,9 @@ export async function generateGroundedResponse(prompt: string): Promise<{ text: 
       model: FLASH_MODEL,
       contents: prompt,
       config: {
+        generationConfig: {
+          maxOutputTokens: 1024,
+        },
         tools: [{ googleSearch: {} }],
       },
     });
@@ -257,7 +260,12 @@ export async function generateMapsGroundedResponse(prompt: string): Promise<{ te
     const response = await ai.models.generateContent({
       model: FLASH_MODEL,
       contents: prompt,
-      config: config,
+      config: {
+        ...config,
+        generationConfig: {
+          maxOutputTokens: 1024,
+        },
+      },
     });
 
     const text = response.text;

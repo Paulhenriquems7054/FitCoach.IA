@@ -200,12 +200,20 @@ export async function initializeAssistantSession(
   
   interface ChatConfig {
     systemInstruction: string;
+    generationConfig?: {
+      maxOutputTokens: number;
+    };
     thinkingConfig?: {
       thinkingBudget: number;
     };
   }
   
-  const config: ChatConfig = { systemInstruction };
+  const config: ChatConfig = { 
+    systemInstruction,
+    generationConfig: {
+      maxOutputTokens: 1024, // Limitar tamanho máximo da resposta de texto
+    },
+  };
 
   if (useProModelForThinking) {
     config.thinkingConfig = { thinkingBudget: 32768 };
@@ -325,6 +333,9 @@ export async function generateGroundedResponse(prompt: string): Promise<{ text: 
       model: FLASH_MODEL,
       contents: prompt,
       config: {
+        generationConfig: {
+          maxOutputTokens: 1024,
+        },
         tools: [{ googleSearch: {} }],
       },
     });
@@ -376,7 +387,12 @@ export async function generateMapsGroundedResponse(prompt: string): Promise<{ te
     const response = await ai.models.generateContent({
       model: FLASH_MODEL,
       contents: prompt,
-      config,
+      config: {
+        ...config,
+        generationConfig: {
+          maxOutputTokens: 1024,
+        },
+      },
     });
 
     const text = response.text ?? 'Não foi possível obter resultados do Maps.';

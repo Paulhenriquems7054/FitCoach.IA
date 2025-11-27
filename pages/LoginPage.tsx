@@ -36,8 +36,9 @@ const LoginPage: React.FC = () => {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
     
-    // Estados para cadastro
+    // Estados para cadastro com código de convite
     const [showSignup, setShowSignup] = useState(false);
+    const [signupStep, setSignupStep] = useState<1 | 2>(1); // 1: código, 2: dados de acesso
     const [signupName, setSignupName] = useState('');
     const [signupEmail, setSignupEmail] = useState('');
     const [signupPassword, setSignupPassword] = useState('');
@@ -273,6 +274,8 @@ const LoginPage: React.FC = () => {
             setCouponValidated(true);
             setValidatedCouponPlan(validation.coupon.planLinked);
             showSuccess(`Código válido! Você receberá o plano: ${validation.coupon.planLinked}`);
+            // Avançar para a etapa 2 (criação de conta) somente após cupom válido
+            setSignupStep(2);
         } else {
             setCouponValidated(false);
             setValidatedCouponPlan(null);
@@ -289,6 +292,13 @@ const LoginPage: React.FC = () => {
         setIsSigningUp(true);
 
         try {
+            // Fluxo de convite: obrigar validação de cupom antes de criar conta
+            if (!couponValidated || !signupCouponCode.trim()) {
+                setSignupError('Valide seu código de convite antes de concluir o cadastro.');
+                setIsSigningUp(false);
+                return;
+            }
+
             // Validações básicas
             if (!signupName.trim()) {
                 setSignupError('Por favor, informe seu nome');
@@ -432,7 +442,7 @@ const LoginPage: React.FC = () => {
                 // Continuar mesmo se houver erro no Supabase
             }
 
-            // Aplicar cupom se fornecido
+            // Aplicar cupom (obrigatório neste fluxo)
             if (signupCouponCode.trim() && couponPlan) {
                 const applyResult = await applyCouponToUser(signupCouponCode.trim(), userId);
                 if (!applyResult.success) {
@@ -579,8 +589,17 @@ const LoginPage: React.FC = () => {
 
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+            {/* Logo de fundo suave */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                <img
+                    src="/icons/play_store_512.png"
+                    alt="Logo FitCoach.IA"
+                    className="select-none opacity-25 dark:opacity-15 w-[280px] h-[280px] sm:w-[360px] sm:h-[360px] object-contain"
+                />
+            </div>
+
+            <div className="max-w-md w-full space-y-8 relative z-10">
                 {/* Header */}
                 <div className="text-center">
                     <h1 className="text-4xl font-extrabold">
@@ -588,20 +607,25 @@ const LoginPage: React.FC = () => {
                         <span className="text-slate-800 dark:text-slate-200">.IA</span>
                     </h1>
                     <h2 className="mt-6 text-3xl font-bold text-slate-900 dark:text-white">
-                        Fazer Login
+                        Bem-vindo
                     </h2>
                     <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                        Entre com seu nome e senha
+                        Primeiro acesso? Use seu <span className="font-semibold">código de convite</span>. Já tem conta? Faça login abaixo.
                     </p>
                 </div>
 
                 <Card>
                     <div className="p-6">
-                        {/* Theme toggle button - inside card, top right */}
-                        <div className="flex justify-end mb-4">
+                        {/* Logo centralizada e Theme toggle - inside card, top */}
+                        <div className="flex items-center justify-center mb-4 relative">
+                            <img
+                                src="/icons/play_store_512.png"
+                                alt="Logo FitCoach.IA"
+                                className="h-16 w-auto object-contain sm:h-20"
+                            />
                             <button
                                 onClick={handleToggleTheme}
-                                className="p-2 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative group"
+                                className="absolute right-0 p-2 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
                                 aria-label={`Alternar tema (${getThemeLabel()})`}
                                 title={`Tema: ${getThemeLabel()}`}
                             >
@@ -613,7 +637,7 @@ const LoginPage: React.FC = () => {
                         </div>
 
 
-                        {/* Messages */}
+                        {/* Mensagens */}
                         {error && (
                             <Alert type="error" title="Erro" className="mb-4">
                                 {error}
@@ -625,7 +649,31 @@ const LoginPage: React.FC = () => {
                             </Alert>
                         )}
 
-                        {/* Form */}
+                        {/* Bloco: Primeiro acesso com código de convite */}
+                        <div className="mb-6 p-4 rounded-lg border border-dashed border-primary-300/70 bg-primary-50/70 dark:bg-slate-900/40 dark:border-primary-500/60">
+                            <p className="text-sm font-semibold text-primary-800 dark:text-primary-300 mb-1">
+                                Primeiro acesso?
+                            </p>
+                            <p className="text-xs text-slate-700 dark:text-slate-300 mb-3">
+                                Se você recebeu um código da sua academia ou personal, comece por aqui para liberar seu acesso premium.
+                            </p>
+                            <Button
+                                type="button"
+                                onClick={() => {
+                                    setShowSignup(true);
+                                    setSignupStep(1);
+                                }}
+                                variant="primary"
+                                className="w-full"
+                            >
+                                Inserir Código de Convite
+                            </Button>
+                        </div>
+
+                        {/* Formulário: Já tenho conta */}
+                        <p className="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                            Já tenho conta
+                        </p>
                         <form onSubmit={handleLogin} className="space-y-4">
 
                             <div>
@@ -687,13 +735,16 @@ const LoginPage: React.FC = () => {
 
                         {/* Footer */}
                         <div className="mt-6">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                 <button
                                     type="button"
-                                    onClick={() => setShowSignup(true)}
+                                    onClick={() => {
+                                        setShowSignup(true);
+                                        setSignupStep(1);
+                                    }}
                                     className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                                 >
-                                    Criar conta
+                                    Tenho código de convite
                                 </button>
                                 <button
                                     type="button"
@@ -869,7 +920,7 @@ const LoginPage: React.FC = () => {
                     <Card className="w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-y-auto animate-fade-in-up">
                         <div className="p-3 sm:p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
                             <h2 className="text-base sm:text-lg font-bold flex items-center gap-2 truncate pr-2">
-                                ✨ Criar Conta
+                                ✨ Acesso com Código de Convite
                             </h2>
                             <button
                                 type="button"
@@ -884,6 +935,8 @@ const LoginPage: React.FC = () => {
                                     setSignupSuccess(null);
                                     setCouponValidated(false);
                                     setValidatedCouponPlan(null);
+                                    setSignupStep(1);
+            setSignupStep(1);
                                 }}
                                 className="p-1 sm:p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0"
                                 aria-label="Fechar"
@@ -903,174 +956,195 @@ const LoginPage: React.FC = () => {
                                 </Alert>
                             )}
 
-                            <form onSubmit={handleSignup} className="space-y-4">
-                                {/* Campo de Código de Convite */}
-                                <div>
-                                    <label htmlFor="couponCode" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Possui código de convite? (Opcional)
-                                    </label>
-                                    <div className="flex gap-2">
+                            {/* Etapa 1: Inserir Código de Convite */}
+                            {signupStep === 1 && (
+                                <form onSubmit={(e) => { e.preventDefault(); handleValidateCoupon(); }} className="space-y-4">
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                                        Primeiro, insira o código de convite fornecido pela sua academia ou personal.
+                                    </p>
+                                    <div>
+                                        <label htmlFor="couponCode" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Código de Convite *
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                id="couponCode"
+                                                type="text"
+                                                value={signupCouponCode}
+                                                onChange={(e) => {
+                                                    setSignupCouponCode(e.target.value.toUpperCase());
+                                                    setCouponValidated(false);
+                                                    setValidatedCouponPlan(null);
+                                                    setSignupError(null);
+                                                }}
+                                                className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                placeholder="Ex: ACADEMIA-VIP"
+                                                autoComplete="off"
+                                            />
+                                            <Button
+                                                type="submit"
+                                                variant="primary"
+                                                disabled={!signupCouponCode.trim()}
+                                            >
+                                                Validar
+                                            </Button>
+                                        </div>
+                                        {couponValidated && validatedCouponPlan && (
+                                            <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                                ✓ Código válido! Plano: {validatedCouponPlan}
+                                            </p>
+                                        )}
+                                    </div>
+                                </form>
+                            )}
+
+                            {/* Etapa 2: Criar Conta (E-mail e Senha) */}
+                            {signupStep === 2 && (
+                                <form onSubmit={handleSignup} className="space-y-4">
+                                    <div className="mb-2">
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            Código de convite validado: <span className="font-medium">{signupCouponCode}</span>
+                                        </p>
+                                        {validatedCouponPlan && (
+                                            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                                                Plano liberado: {validatedCouponPlan}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Nome */}
+                                    <div>
+                                        <label htmlFor="signupName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Nome Completo *
+                                        </label>
                                         <input
-                                            id="couponCode"
+                                            id="signupName"
                                             type="text"
-                                            value={signupCouponCode}
-                                            onChange={(e) => {
-                                                setSignupCouponCode(e.target.value.toUpperCase());
-                                                setCouponValidated(false);
-                                                setValidatedCouponPlan(null);
-                                                setSignupError(null);
-                                            }}
-                                            className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                            placeholder="Ex: ACADEMIA-VIP"
-                                            autoComplete="off"
+                                            value={signupName}
+                                            onChange={(e) => setSignupName(e.target.value)}
+                                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            placeholder="Seu nome completo"
+                                            required
+                                            autoComplete="name"
                                         />
+                                    </div>
+
+                                    {/* E-mail */}
+                                    <div>
+                                        <label htmlFor="signupEmail" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            E-mail *
+                                        </label>
+                                        <input
+                                            id="signupEmail"
+                                            type="email"
+                                            value={signupEmail}
+                                            onChange={(e) => setSignupEmail(e.target.value)}
+                                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            placeholder="seu@email.com"
+                                            required
+                                            autoComplete="email"
+                                        />
+                                    </div>
+
+                                    {/* Senha */}
+                                    <div>
+                                        <label htmlFor="signupPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Senha *
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                id="signupPassword"
+                                                type={showSignupPassword ? "text" : "password"}
+                                                value={signupPassword}
+                                                onChange={(e) => setSignupPassword(e.target.value)}
+                                                className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                placeholder="••••••••"
+                                                required
+                                                minLength={6}
+                                                autoComplete="new-password"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowSignupPassword(!showSignupPassword)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none"
+                                                aria-label={showSignupPassword ? "Ocultar senha" : "Mostrar senha"}
+                                            >
+                                                {showSignupPassword ? (
+                                                    <EyeSlashIcon className="w-5 h-5" />
+                                                ) : (
+                                                    <EyeIcon className="w-5 h-5" />
+                                                )}
+                                            </button>
+                                        </div>
+                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                            Mínimo de 6 caracteres
+                                        </p>
+                                    </div>
+
+                                    {/* Confirmar Senha */}
+                                    <div>
+                                        <label htmlFor="signupConfirmPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Confirmar Senha *
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                id="signupConfirmPassword"
+                                                type={showSignupConfirmPassword ? "text" : "password"}
+                                                value={signupConfirmPassword}
+                                                onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                                                className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                placeholder="••••••••"
+                                                required
+                                                minLength={6}
+                                                autoComplete="new-password"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none"
+                                                aria-label={showSignupConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
+                                            >
+                                                {showSignupConfirmPassword ? (
+                                                    <EyeSlashIcon className="w-5 h-5" />
+                                                ) : (
+                                                    <EyeIcon className="w-5 h-5" />
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3 pt-2">
                                         <Button
                                             type="button"
                                             variant="secondary"
-                                            onClick={handleValidateCoupon}
-                                            disabled={!signupCouponCode.trim() || couponValidated}
+                                            className="flex-1"
+                                            onClick={() => {
+                                                setShowSignup(false);
+                                                setSignupName('');
+                                                setSignupEmail('');
+                                                setSignupPassword('');
+                                                setSignupConfirmPassword('');
+                                                setSignupCouponCode('');
+                                                setSignupError(null);
+                                                setSignupSuccess(null);
+                                                setCouponValidated(false);
+                                                setValidatedCouponPlan(null);
+                                                setSignupStep(1);
+                                            }}
                                         >
-                                            {couponValidated ? '✓' : 'Validar'}
+                                            Cancelar
+                                        </Button>
+                                        <Button
+                                            type="submit"
+                                            variant="primary"
+                                            className="flex-1"
+                                            disabled={isSigningUp}
+                                        >
+                                            {isSigningUp ? 'Criando...' : 'Concluir Cadastro'}
                                         </Button>
                                     </div>
-                                    {couponValidated && validatedCouponPlan && (
-                                        <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
-                                            ✓ Código válido! Plano: {validatedCouponPlan}
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* Nome */}
-                                <div>
-                                    <label htmlFor="signupName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Nome Completo *
-                                    </label>
-                                    <input
-                                        id="signupName"
-                                        type="text"
-                                        value={signupName}
-                                        onChange={(e) => setSignupName(e.target.value)}
-                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                        placeholder="Seu nome completo"
-                                        required
-                                        autoComplete="name"
-                                    />
-                                </div>
-
-                                {/* E-mail */}
-                                <div>
-                                    <label htmlFor="signupEmail" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        E-mail *
-                                    </label>
-                                    <input
-                                        id="signupEmail"
-                                        type="email"
-                                        value={signupEmail}
-                                        onChange={(e) => setSignupEmail(e.target.value)}
-                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                        placeholder="seu@email.com"
-                                        required
-                                        autoComplete="email"
-                                    />
-                                </div>
-
-                                {/* Senha */}
-                                <div>
-                                    <label htmlFor="signupPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Senha *
-                                    </label>
-                                    <div className="relative">
-                                        <input
-                                            id="signupPassword"
-                                            type={showSignupPassword ? "text" : "password"}
-                                            value={signupPassword}
-                                            onChange={(e) => setSignupPassword(e.target.value)}
-                                            className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                            placeholder="••••••••"
-                                            required
-                                            minLength={6}
-                                            autoComplete="new-password"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowSignupPassword(!showSignupPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none"
-                                            aria-label={showSignupPassword ? "Ocultar senha" : "Mostrar senha"}
-                                        >
-                                            {showSignupPassword ? (
-                                                <EyeSlashIcon className="w-5 h-5" />
-                                            ) : (
-                                                <EyeIcon className="w-5 h-5" />
-                                            )}
-                                        </button>
-                                    </div>
-                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                        Mínimo de 6 caracteres
-                                    </p>
-                                </div>
-
-                                {/* Confirmar Senha */}
-                                <div>
-                                    <label htmlFor="signupConfirmPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Confirmar Senha *
-                                    </label>
-                                    <div className="relative">
-                                        <input
-                                            id="signupConfirmPassword"
-                                            type={showSignupConfirmPassword ? "text" : "password"}
-                                            value={signupConfirmPassword}
-                                            onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                                            className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                            placeholder="••••••••"
-                                            required
-                                            minLength={6}
-                                            autoComplete="new-password"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 focus:outline-none"
-                                            aria-label={showSignupConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
-                                        >
-                                            {showSignupConfirmPassword ? (
-                                                <EyeSlashIcon className="w-5 h-5" />
-                                            ) : (
-                                                <EyeIcon className="w-5 h-5" />
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3 pt-2">
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        className="flex-1"
-                                        onClick={() => {
-                                            setShowSignup(false);
-                                            setSignupName('');
-                                            setSignupEmail('');
-                                            setSignupPassword('');
-                                            setSignupConfirmPassword('');
-                                            setSignupCouponCode('');
-                                            setSignupError(null);
-                                            setSignupSuccess(null);
-                                            setCouponValidated(false);
-                                            setValidatedCouponPlan(null);
-                                        }}
-                                    >
-                                        Cancelar
-                                    </Button>
-                                    <Button
-                                        type="submit"
-                                        variant="primary"
-                                        className="flex-1"
-                                        disabled={isSigningUp}
-                                    >
-                                        {isSigningUp ? 'Criando...' : 'Criar Conta'}
-                                    </Button>
-                                </div>
-                            </form>
+                                </form>
+                            )}
                         </div>
                     </Card>
                 </div>
