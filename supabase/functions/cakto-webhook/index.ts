@@ -36,19 +36,47 @@ interface CaktoWebhookPayload {
   };
 }
 
-// Mapeamento de planos Cakto para IDs do Supabase
-const PLAN_MAPPING: Record<string, string> = {
-  'basic': Deno.env.get('PLAN_BASIC_ID') || '',
-  'premium': Deno.env.get('PLAN_PREMIUM_ID') || '',
-  'enterprise': Deno.env.get('PLAN_ENTERPRISE_ID') || '',
+// Mapeamento de checkout IDs Cakto para produtos conforme documentação
+interface ProductMapping {
+  type: 'subscription' | 'recharge' | 'company' | 'personal';
+  plan?: string;
+  name?: string;
+}
+
+const CHECKOUT_ID_TO_PRODUCT: Record<string, ProductMapping> = {
+  // Planos B2C
+  'zeygxve_668421': { type: 'subscription', plan: 'monthly', name: 'Plano Mensal' },
+  'wvbkepi_668441': { type: 'subscription', plan: 'annual_vip', name: 'Plano Anual VIP' },
+  
+  // Recargas
+  'ihfy8cz_668443': { type: 'recharge', plan: 'turbo', name: 'Sessão Turbo' },
+  'hhxugxb_668446': { type: 'recharge', plan: 'voice_bank', name: 'Banco de Voz 100' },
+  'trszqtv_668453': { type: 'recharge', plan: 'pass_libre', name: 'Passe Livre 30 Dias' },
+  
+  // Planos B2B (Academias)
+  'cemyp2n_668537': { type: 'company', plan: 'starter', name: 'Pack Starter' },
+  'vi6djzq_668541': { type: 'company', plan: 'growth', name: 'Pack Growth' },
+  '3dis6ds_668546': { type: 'company', plan: 'pro', name: 'Pack Pro' },
+  
+  // Planos Personal Trainers
+  '3dgheuc_666289': { type: 'personal', plan: 'team_5', name: 'Team 5' },
+  '3etp85e_666303': { type: 'personal', plan: 'team_15', name: 'Team 15' },
+  
+  // Links antigos (compatibilidade)
+  '3bewmsy_665747': { type: 'subscription', plan: 'basic', name: 'Basic' },
+  '8djcjc6': { type: 'subscription', plan: 'premium', name: 'Premium' },
+  '35tdhxu': { type: 'subscription', plan: 'enterprise', name: 'Enterprise' },
 };
 
-// Mapeamento de links de pagamento para planos
-const PAYMENT_LINK_TO_PLAN: Record<string, string> = {
-  'https://pay.cakto.com.br/3bewmsy_665747': 'basic',
-  'https://pay.cakto.com.br/8djcjc6': 'premium',
-  'https://pay.cakto.com.br/35tdhxu': 'enterprise',
-};
+/**
+ * Extrai checkout ID do payment_link
+ */
+function extractCheckoutId(paymentLink?: string): string | null {
+  if (!paymentLink) return null;
+  // Formato: https://pay.cakto.com.br/zeygxve_668421
+  const match = paymentLink.match(/pay\.cakto\.com\.br\/([a-z0-9_]+)/);
+  return match ? match[1] : null;
+}
 
 serve(async (req) => {
   // Handle CORS
@@ -81,8 +109,40 @@ serve(async (req) => {
 
     const payload: CaktoWebhookPayload = await req.json();
 
+    // 1. Salvar webhook no log primeiro
+    let webhookLogId: string | null = null;
+    try {
+      const { data: webhookLog, error: logError } = await supabaseClient
+        .from('cakto_webhooks')
+        .insert({
+          event_type: payload.event,
+          cakto_transaction_id: payload.data.id,
+          checkout_id: extractCheckoutId(payload.data.payment_link),
+          payload: payload as any,
+          processed: false,
+        })
+        .select('id')
+        .single();
+
+      if (logError) {
+        console.error('Error logging webhook:', logError);
+      } else {
+        webhookLogId = webhookLog?.id || null;
+      }
+    } catch (error) {
+      console.error('Error creating webhook log:', error);
+      // Continuar mesmo se falhar o log
+    }
+
     // Processar apenas eventos de pagamento confirmado
     if (payload.event !== 'payment.completed' && payload.data.status !== 'paid') {
+      // Marcar como processado mesmo que não seja evento relevante
+      if (webhookLogId) {
+        await supabaseClient
+          .from('cakto_webhooks')
+          .update({ processed: true, processed_at: new Date().toISOString() })
+          .eq('id', webhookLogId);
+      }
       return new Response(
         JSON.stringify({ message: 'Event not processed' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -91,29 +151,59 @@ serve(async (req) => {
 
     const { data } = payload;
     const userEmail = data.customer?.email || data.metadata?.user_email;
-    const planName = data.metadata?.plan_name || 
-                     PAYMENT_LINK_TO_PLAN[data.payment_link || ''] || 
-                     'basic';
+    
+    // Extrair checkout ID do payment_link
+    const checkoutId = extractCheckoutId(data.payment_link);
+    const product = checkoutId ? CHECKOUT_ID_TO_PRODUCT[checkoutId] : null;
 
     if (!userEmail) {
+      if (webhookLogId) {
+        await supabaseClient
+          .from('cakto_webhooks')
+          .update({ 
+            processed: true, 
+            processed_at: new Date().toISOString(),
+            error_message: 'User email not found'
+          })
+          .eq('id', webhookLogId);
+      }
       return new Response(
         JSON.stringify({ error: 'User email not found' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    if (!product) {
+      if (webhookLogId) {
+        await supabaseClient
+          .from('cakto_webhooks')
+          .update({ 
+            processed: true, 
+            processed_at: new Date().toISOString(),
+            error_message: `Unknown checkout_id: ${checkoutId}`
+          })
+          .eq('id', webhookLogId);
+      }
+      return new Response(
+        JSON.stringify({ error: `Unknown checkout_id: ${checkoutId}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Obter ou criar usuário
     let userId: string;
+    let existingUser: any = null;
     
     // Verificar se usuário já existe
-    const { data: existingUser } = await supabaseClient
+    const { data: userData } = await supabaseClient
       .from('users')
-      .select('id')
+      .select('id, username')
       .eq('email', userEmail)
       .single();
 
-    if (existingUser) {
-      userId = existingUser.id;
+    if (userData) {
+      userId = userData.id;
+      existingUser = userData;
     } else {
       // Criar novo usuário automaticamente
       // IMPORTANTE: Primeiro criar conta no Supabase Auth
@@ -132,6 +222,16 @@ serve(async (req) => {
 
       if (authError || !authUser) {
         console.error('Error creating auth user:', authError);
+        if (webhookLogId) {
+          await supabaseClient
+            .from('cakto_webhooks')
+            .update({ 
+              processed: true, 
+              processed_at: new Date().toISOString(),
+              error_message: 'Failed to create authentication account'
+            })
+            .eq('id', webhookLogId);
+        }
         return new Response(
           JSON.stringify({ error: 'Failed to create authentication account' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -140,6 +240,9 @@ serve(async (req) => {
 
       const newUserId = authUser.user.id;
       const username = userEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_');
+      
+      // Determinar plan_type baseado no produto (se for subscription)
+      const defaultPlanType = product.type === 'subscription' ? product.plan! : 'free';
       
       // Criar usuário básico na tabela users com o mesmo ID do Auth
       const { data: newUser, error: createError } = await supabaseClient
@@ -175,20 +278,30 @@ serve(async (req) => {
             securityNotifications: true,
           },
           access_blocked: false,
-          plan_type: planName, // Definir plano já aqui
-          subscription_status: 'active',
+          plan_type: defaultPlanType, // Definir plano baseado no produto
+          subscription_status: product.type === 'subscription' ? 'active' : 'inactive',
           voice_daily_limit_seconds: 900,
           voice_used_today_seconds: 0,
           voice_balance_upsell: 0,
           text_msg_count_today: 0,
         })
-        .select('id')
+        .select('id, username')
         .single();
 
       if (createError || !newUser) {
         console.error('Error creating user:', createError);
         // Se falhar, tentar deletar o usuário do Auth
         await supabaseClient.auth.admin.deleteUser(newUserId);
+        if (webhookLogId) {
+          await supabaseClient
+            .from('cakto_webhooks')
+            .update({ 
+              processed: true, 
+              processed_at: new Date().toISOString(),
+              error_message: 'Failed to create user account'
+            })
+            .eq('id', webhookLogId);
+        }
         return new Response(
           JSON.stringify({ error: 'Failed to create user account' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -196,6 +309,7 @@ serve(async (req) => {
       }
 
       userId = newUser.id;
+      existingUser = newUser;
       console.log('New user created:', userId);
       
       // Armazenar senha temporária para enviar no email
@@ -204,95 +318,48 @@ serve(async (req) => {
       (payload as any).username = username;
     }
 
-    // Obter ID do plano
-    const planId = PLAN_MAPPING[planName];
-    if (!planId) {
-      return new Response(
-        JSON.stringify({ error: 'Plan not found' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Processar baseado no tipo de produto
+    let result: any = { success: true };
+    
+    if (product.type === 'subscription') {
+      result = await processSubscription(supabaseClient, userId, product.plan!, data, userEmail, existingUser, payload);
+    } else if (product.type === 'recharge') {
+      result = await processRecharge(supabaseClient, userId, product.plan!, data, userEmail);
+    } else if (product.type === 'company') {
+      // TODO: Implementar processamento B2B
+      result = { success: false, error: 'B2B processing not yet implemented' };
+    } else if (product.type === 'personal') {
+      // TODO: Implementar processamento Personal
+      result = { success: false, error: 'Personal trainer processing not yet implemented' };
     }
 
-    // Cancelar assinaturas ativas anteriores
-    await supabaseClient
-      .from('user_subscriptions')
-      .update({ 
-        status: 'canceled',
-        canceled_at: new Date().toISOString(),
-      })
-      .eq('user_id', userId)
-      .eq('status', 'active');
+    // Atualizar webhook log com resultado
+    if (webhookLogId) {
+      await supabaseClient
+        .from('cakto_webhooks')
+        .update({ 
+          processed: true, 
+          processed_at: new Date().toISOString(),
+          subscription_id: result.subscription_id || null,
+          payment_id: result.payment_id || null,
+          error_message: result.error || null
+        })
+        .eq('id', webhookLogId);
+    }
 
-    // Criar nova assinatura
-    const now = new Date();
-    const periodEnd = new Date(now);
-    periodEnd.setMonth(periodEnd.getMonth() + 1); // Assinatura mensal
-
-    const { data: subscription, error: subError } = await supabaseClient
-      .from('user_subscriptions')
-      .insert({
-        user_id: userId,
-        plan_id: planId,
-        status: 'active',
-        billing_cycle: 'monthly',
-        current_period_start: now.toISOString(),
-        current_period_end: periodEnd.toISOString(),
-        payment_provider: 'cakto',
-      })
-      .select()
-      .single();
-
-    if (subError) {
-      console.error('Error creating subscription:', subError);
+    if (!result.success) {
       return new Response(
-        JSON.stringify({ error: 'Failed to create subscription' }),
+        JSON.stringify({ error: result.error }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Registrar pagamento
-    await supabaseClient
-      .from('payments')
-      .insert({
-        subscription_id: subscription.id,
-        user_id: userId,
-        amount: data.amount,
-        currency: data.currency || 'BRL',
-        status: 'succeeded',
-        payment_method: 'cakto',
-        payment_provider: 'cakto',
-        provider_payment_id: data.id,
-        paid_at: new Date().toISOString(),
-      });
-
-    // Gerar link de acesso
-    // Usar APP_URL do ambiente ou fallback para URL do Vercel
-    const envAppUrl = Deno.env.get('APP_URL');
-    const appUrl = envAppUrl || 'https://fit-coach-ia.vercel.app';
-    
-    // Obter senha temporária e username (se foi criado novo usuário)
-    const tempPassword = (payload as any).tempPassword;
-    const username = (payload as any).username || existingUser?.username || userEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_');
-    
-    // Gerar token de acesso também (para login automático opcional)
-    const token = generateAccessToken(userId);
-    const accessLink = `${appUrl}?token=${token}#/presentation`;
-    const loginLink = `${appUrl}#/login`;
-    
-    console.log('APP_URL from env:', envAppUrl || 'NOT SET (using fallback)');
-    console.log('Final APP_URL:', appUrl);
-    console.log('Generated access link:', accessLink);
-    console.log('Username:', username);
-    console.log('Has temp password:', !!tempPassword);
-
-    // Enviar email com link de acesso e credenciais
-    await sendAccessEmail(supabaseClient, userEmail, planName, accessLink, loginLink, username, tempPassword);
-
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Subscription created and email sent',
-        subscription_id: subscription.id 
+        message: result.message || 'Payment processed successfully',
+        subscription_id: result.subscription_id,
+        recharge_id: result.recharge_id
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -305,6 +372,229 @@ serve(async (req) => {
     );
   }
 });
+
+/**
+ * Processa assinatura (B2C)
+ */
+async function processSubscription(
+  supabase: any,
+  userId: string,
+  planName: string,
+  paymentData: any,
+  userEmail: string,
+  existingUser: any,
+  payload: any
+): Promise<{ success: boolean; subscription_id?: string; payment_id?: string; message?: string; error?: string }> {
+  try {
+    // Buscar plano na tabela subscription_plans pelo nome
+    const { data: plan, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('id, name, price_monthly, price_yearly')
+      .eq('name', planName)
+      .eq('is_active', true)
+      .single();
+
+    if (planError || !plan) {
+      return { success: false, error: `Plan ${planName} not found` };
+    }
+
+    // Determinar ciclo de faturamento (mensal ou anual)
+    const isAnnual = planName === 'annual_vip';
+    const billingCycle = isAnnual ? 'yearly' : 'monthly';
+
+    // Cancelar assinaturas ativas anteriores
+    await supabase
+      .from('user_subscriptions')
+      .update({ 
+        status: 'canceled',
+        canceled_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .eq('status', 'active');
+
+    // Criar nova assinatura
+    const now = new Date();
+    const periodEnd = new Date(now);
+    if (isAnnual) {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+
+    const { data: subscription, error: subError } = await supabase
+      .from('user_subscriptions')
+      .insert({
+        user_id: userId,
+        plan_id: plan.id,
+        status: 'active',
+        billing_cycle: billingCycle,
+        current_period_start: now.toISOString(),
+        current_period_end: periodEnd.toISOString(),
+        payment_provider: 'cakto',
+      })
+      .select()
+      .single();
+
+    if (subError) {
+      console.error('Error creating subscription:', subError);
+      return { success: false, error: 'Failed to create subscription' };
+    }
+
+    // Registrar pagamento
+    const { data: payment, error: paymentError } = await supabase
+      .from('payments')
+      .insert({
+        subscription_id: subscription.id,
+        user_id: userId,
+        amount: paymentData.amount,
+        currency: paymentData.currency || 'BRL',
+        status: 'succeeded',
+        payment_method: 'cakto',
+        payment_provider: 'cakto',
+        provider_payment_id: paymentData.id,
+        paid_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (paymentError) {
+      console.error('Error creating payment:', paymentError);
+    }
+
+    // Gerar link de acesso
+    const envAppUrl = Deno.env.get('APP_URL');
+    const appUrl = envAppUrl || 'https://fit-coach-ia.vercel.app';
+    
+    const tempPassword = (payload as any).tempPassword;
+    const username = (payload as any).username || existingUser?.username || userEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_');
+    
+    const token = generateAccessToken(userId);
+    const accessLink = `${appUrl}?token=${token}#/presentation`;
+    const loginLink = `${appUrl}#/login`;
+
+    // Enviar email com link de acesso e credenciais
+    await sendAccessEmail(supabase, userEmail, planName, accessLink, loginLink, username, tempPassword);
+
+    return { 
+      success: true, 
+      subscription_id: subscription.id,
+      payment_id: payment?.id,
+      message: 'Subscription created and email sent'
+    };
+  } catch (error: any) {
+    console.error('Error processing subscription:', error);
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}
+
+/**
+ * Processa recarga
+ */
+async function processRecharge(
+  supabase: any,
+  userId: string,
+  rechargeType: string,
+  paymentData: any,
+  userEmail: string
+): Promise<{ success: boolean; recharge_id?: string; payment_id?: string; message?: string; error?: string }> {
+  try {
+    const rechargeConfig: Record<string, { name: string; quantity: number; validUntilHours: number | null }> = {
+      turbo: { name: 'Sessão Turbo', quantity: 30, validUntilHours: 24 },
+      voice_bank: { name: 'Banco de Voz 100', quantity: 100, validUntilHours: null }, // Não expira
+      pass_libre: { name: 'Passe Livre 30 Dias', quantity: 30, validUntilHours: 30 * 24 }, // 30 dias
+    };
+
+    const config = rechargeConfig[rechargeType];
+    if (!config) {
+      return { success: false, error: `Unknown recharge type: ${rechargeType}` };
+    }
+
+    const validFrom = new Date();
+    const validUntil = config.validUntilHours
+      ? new Date(validFrom.getTime() + config.validUntilHours * 60 * 60 * 1000)
+      : null;
+    const expiresAt = rechargeType === 'pass_libre' ? validUntil : null;
+
+    // Criar recarga
+    const { data: recharge, error: rechargeError } = await supabase
+      .from('recharges')
+      .insert({
+        user_id: userId,
+        recharge_type: rechargeType,
+        recharge_name: config.name,
+        amount_paid: paymentData.amount,
+        quantity: config.quantity,
+        valid_from: validFrom.toISOString(),
+        valid_until: validUntil?.toISOString() || null,
+        expires_at: expiresAt?.toISOString() || null,
+        status: 'active',
+        cakto_transaction_id: paymentData.id,
+        cakto_checkout_id: extractCheckoutId(paymentData.payment_link),
+        payment_status: 'paid',
+      })
+      .select()
+      .single();
+
+    if (rechargeError) {
+      console.error('Error creating recharge:', rechargeError);
+      return { success: false, error: 'Failed to create recharge' };
+    }
+
+    // Aplicar recarga ao usuário
+    if (rechargeType === 'voice_bank') {
+      // Somar minutos ao voice_balance_upsell (em segundos)
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          voice_balance_upsell: supabase.raw(`COALESCE(voice_balance_upsell, 0) + ${config.quantity * 60}`)
+        })
+        .eq('id', userId);
+      
+      if (updateError) {
+        console.error('Error updating voice balance:', updateError);
+        // Continuar mesmo se falhar
+      }
+    } else if (rechargeType === 'pass_libre') {
+      // Marcar passe livre ativo (pode usar um campo na tabela users ou criar flag)
+      // Por enquanto, apenas registrar na recarga
+      // TODO: Implementar lógica para remover limite diário por 30 dias
+    }
+
+    // Registrar pagamento
+    const { data: payment, error: paymentError } = await supabase
+      .from('payments')
+      .insert({
+        user_id: userId,
+        amount: paymentData.amount,
+        currency: paymentData.currency || 'BRL',
+        status: 'succeeded',
+        payment_method: 'cakto',
+        payment_provider: 'cakto',
+        provider_payment_id: paymentData.id,
+        paid_at: new Date().toISOString(),
+        metadata: { recharge_id: recharge.id, recharge_type: rechargeType },
+      })
+      .select()
+      .single();
+
+    if (paymentError) {
+      console.error('Error creating payment:', paymentError);
+    }
+
+    // Enviar email de confirmação de recarga
+    await sendRechargeEmail(supabase, userEmail, config.name, recharge);
+
+    return { 
+      success: true, 
+      recharge_id: recharge.id,
+      payment_id: payment?.id,
+      message: 'Recharge created successfully'
+    };
+  } catch (error: any) {
+    console.error('Error processing recharge:', error);
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}
 
 /**
  * Gera token de acesso temporário
@@ -344,6 +634,8 @@ async function sendAccessEmail(
     'basic': 'Basic',
     'premium': 'Premium',
     'enterprise': 'Enterprise',
+    'monthly': 'Plano Mensal',
+    'annual_vip': 'Plano Anual VIP',
   };
 
   const emailSubject = `Bem-vindo ao FitCoach.IA ${planDisplayNames[planName]}!`;
@@ -447,6 +739,76 @@ async function sendAccessEmail(
       username: username,
       hasTempPassword: !!tempPassword
     });
+  }
+}
+
+/**
+ * Envia email de confirmação de recarga
+ */
+async function sendRechargeEmail(
+  supabase: any,
+  email: string,
+  rechargeName: string,
+  recharge: any
+): Promise<void> {
+  const emailSubject = `Recarga ${rechargeName} confirmada!`;
+  
+  const emailBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+        .button { display: inline-block; padding: 15px 30px; background: #10b981; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
+        .footer { text-align: center; margin-top: 20px; color: #6b7280; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>✅ Recarga Confirmada!</h1>
+        </div>
+        <div class="content">
+          <p>Olá!</p>
+          <p>Sua recarga <strong>${rechargeName}</strong> foi confirmada com sucesso!</p>
+          <p><strong>Detalhes:</strong></p>
+          <ul>
+            <li>Produto: ${rechargeName}</li>
+            <li>Quantidade: ${recharge.quantity} ${recharge.recharge_type === 'pass_libre' ? 'dias' : 'minutos'}</li>
+            <li>Valor pago: R$ ${recharge.amount_paid.toFixed(2).replace('.', ',')}</li>
+            ${recharge.valid_until ? `<li>Válido até: ${new Date(recharge.valid_until).toLocaleString('pt-BR')}</li>` : '<li>Não expira</li>'}
+          </ul>
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="${Deno.env.get('APP_URL') || 'https://fit-coach-ia.vercel.app'}#/" class="button">🚀 Acessar App</a>
+          </div>
+          <p>Bom treino!</p>
+        </div>
+        <div class="footer">
+          <p>FitCoach.IA - Seu assistente de treino inteligente</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    const { error } = await supabase.functions.invoke('send-email', {
+      body: {
+        to: email,
+        subject: emailSubject,
+        html: emailBody,
+      },
+    });
+
+    if (error) {
+      console.error('Error sending recharge email:', error);
+    }
+  } catch (error) {
+    console.error('Error invoking send-email function:', error);
   }
 }
 
