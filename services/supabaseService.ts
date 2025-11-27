@@ -646,3 +646,202 @@ export async function checkUsageLimit(limitType: string, currentUsage: number, u
   return currentUsage < limit;
 }
 
+// ============================================================================
+// SERVIÇOS DE CUPOM
+// ============================================================================
+
+/**
+ * Tipos de erro de validação de cupom
+ */
+export type CouponValidationError = 
+  | 'CUPOM_INEXISTENTE'
+  | 'CUPOM_INATIVO'
+  | 'CUPOM_ESGOTADO'
+  | 'CUPOM_EXPIRADO'
+  | 'CUPOM_NAO_VALIDO'
+  | 'LIMITE_CONTAS_ATINGIDO'
+  | 'PAGAMENTO_INATIVO';
+
+/**
+ * Resultado da validação de cupom
+ */
+export interface CouponValidationResult {
+  success: boolean;
+  error?: CouponValidationError;
+  message?: string;
+  couponId?: string;
+  planLinked?: string;
+  caktoCustomerId?: string | null;
+  linkedAccountsCount?: number;
+  maxLinkedAccounts?: number | null;
+  currentUses?: number;
+  maxUses?: number;
+}
+
+/**
+ * Serviço de cupons
+ */
+export const couponService = {
+  /**
+   * Valida um cupom e verifica se há acesso baseado em pagamento Cakto
+   */
+  async validateCoupon(couponCode: string): Promise<CouponValidationResult> {
+    const supabase = getSupabaseClient();
+
+    try {
+      // Chamar função SQL de validação
+      const { data, error } = await supabase.rpc('check_coupon_payment_access', {
+        coupon_code: couponCode.toUpperCase().trim(),
+      });
+
+      if (error) {
+        logger.error('Erro ao validar cupom', 'couponService', error);
+        return {
+          success: false,
+          error: 'CUPOM_INEXISTENTE',
+          message: 'Erro ao validar cupom',
+        };
+      }
+
+      if (!data || !data.success) {
+        return {
+          success: false,
+          error: data?.error || 'CUPOM_INEXISTENTE',
+          message: data?.message || 'Cupom inválido',
+        };
+      }
+
+      return {
+        success: true,
+        couponId: data.coupon_id,
+        planLinked: data.plan_linked,
+        caktoCustomerId: data.cakto_customer_id,
+        linkedAccountsCount: data.linked_accounts_count,
+        maxLinkedAccounts: data.max_linked_accounts,
+        currentUses: data.current_uses,
+        maxUses: data.max_uses,
+      };
+    } catch (error) {
+      logger.error('Erro ao validar cupom', 'couponService', error);
+      return {
+        success: false,
+        error: 'CUPOM_INEXISTENTE',
+        message: 'Erro ao validar cupom',
+      };
+    }
+  },
+};
+
+/**
+ * Serviço de fluxo de autenticação
+ */
+export const authFlowService = {
+  /**
+   * Registra um novo usuário com código de convite
+   */
+  async registerWithInvite(
+    username: string,
+    password: string,
+    userData: Partial<User>,
+    couponCode: string
+  ): Promise<{ user: User; couponId: string }> {
+    const supabase = getSupabaseClient();
+
+    // 1. Validar cupom
+    const couponValidation = await couponService.validateCoupon(couponCode);
+    if (!couponValidation.success) {
+      throw new Error(couponValidation.message || 'Cupom inválido');
+    }
+
+    // 2. Criar usuário no Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: userData.email || `${username}@fitcoach.ia`,
+      password: password,
+      options: {
+        data: {
+          username: username,
+          nome: userData.nome || username,
+        },
+      },
+    });
+
+    if (authError || !authData.user) {
+      logger.error('Erro ao criar usuário no Supabase Auth', 'authFlowService', authError);
+      throw new Error(authError?.message || 'Erro ao criar conta');
+    }
+
+    const userId = authData.user.id;
+
+    // 3. Criar registro na tabela users
+    const userSupabase = userToSupabase(
+      {
+        ...userData,
+        username,
+        planType: (couponValidation.planLinked as any) || 'free',
+        subscriptionStatus: 'active',
+        expiryDate: undefined, // Será definido pelo plano
+      },
+      userId
+    );
+
+    const { data: userRecord, error: userError } = await supabase
+      .from('users')
+      .insert(userSupabase)
+      .select()
+      .single();
+
+    if (userError || !userRecord) {
+      logger.error('Erro ao criar registro de usuário', 'authFlowService', userError);
+      // Tentar deletar o usuário do auth se falhou
+      await supabase.auth.admin.deleteUser(userId).catch(() => {});
+      throw new Error(userError?.message || 'Erro ao criar perfil');
+    }
+
+    // 4. Criar vínculo com cupom (trigger incrementará contadores automaticamente)
+    const { error: linkError } = await supabase
+      .from('user_coupon_links')
+      .insert({
+        user_id: userId,
+        coupon_id: couponValidation.couponId!,
+      });
+
+    if (linkError) {
+      logger.error('Erro ao vincular cupom', 'authFlowService', linkError);
+      // Não falhar o registro, apenas logar o erro
+      logger.warn('Usuário criado mas vínculo com cupom falhou', 'authFlowService');
+    }
+
+    // 5. Retornar usuário
+    const user = supabaseToUser(userRecord);
+    return {
+      user,
+      couponId: couponValidation.couponId!,
+    };
+  },
+};
+
+/**
+ * Serviço de autenticação
+ */
+export const authService = {
+  /**
+   * Obtém o perfil completo do usuário atual
+   */
+  async getCurrentUserProfile(): Promise<User | null> {
+    const supabase = getSupabaseClient();
+
+    try {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !authUser) {
+        return null;
+      }
+
+      return await getUserFromSupabase(authUser.id);
+    } catch (error) {
+      logger.error('Erro ao obter perfil do usuário', 'authService', error);
+      return null;
+    }
+  },
+};
+

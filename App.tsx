@@ -10,6 +10,9 @@ import { useUser } from './context/UserContext';
 import { useDeviceContext } from './context/DeviceContext';
 import { usePermissions } from './hooks/usePermissions';
 import { getCurrentUsername } from './services/databaseService';
+import { InviteCodeEntry } from './components/InviteCodeEntry';
+import { LoginOrRegister } from './components/LoginOrRegister';
+import { authService } from './services/supabaseService';
 
 // Lazy load das páginas para reduzir o bundle inicial
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -108,7 +111,7 @@ const applyDeviceOptimizations = (device: ReturnType<typeof useDeviceContext>) =
 
 const App: React.FC = () => {
     const { path } = useRouter();
-    const { user } = useUser();
+    const { user, setUser } = useUser();
     const permissions = usePermissions();
     const device = useDeviceContext();
     const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
@@ -117,6 +120,10 @@ const App: React.FC = () => {
     const PRESENTATION_SEEN_KEY = 'fitcoach.presentation.seen';
     const [hasSeenPresentation, setHasSeenPresentation] = useState<boolean | null>(null);
     const [isInitialized, setIsInitialized] = useState(false);
+
+    // Estados para fluxo de cupom
+    const [inviteFlowState, setInviteFlowState] = useState<'code' | 'register' | null>(null);
+    const [validatedCouponCode, setValidatedCouponCode] = useState<string | null>(null);
 
     // Rotas públicas (não requerem autenticação)
     const publicRoutes = ['/premium', '/presentation', '/login'];
@@ -178,6 +185,16 @@ const App: React.FC = () => {
         // Verificar se usuário está realmente logado
         const checkLogin = async () => {
             try {
+                // Primeiro tentar verificar no Supabase Auth
+                const supabaseUser = await authService.getCurrentUserProfile();
+                if (supabaseUser) {
+                    setUser(supabaseUser);
+                    setIsLoggedIn(true);
+                    setIsInitialized(true);
+                    return;
+                }
+
+                // Fallback para IndexedDB
                 const currentUsername = await getCurrentUsername();
                 setIsLoggedIn(!!currentUsername && currentUsername.trim() !== '');
             } catch (error) {
@@ -201,15 +218,20 @@ const App: React.FC = () => {
         return <PageLoader />;
     }
 
-    // Se path está vazio (sem hash), decidir baseado na flag de apresentação
+    // Se path está vazio (sem hash), decidir baseado na flag de apresentação e login
     if (!path || path === '') {
         if (!hasSeenPresentation) {
             // Primeiro acesso: redirecionar para apresentação
             window.location.hash = '#/presentation';
             return <PageLoader />;
+        } else if (!isLoggedIn) {
+            // Já viu apresentação mas não está logado: iniciar fluxo de cupom
+            if (inviteFlowState === null) {
+                setInviteFlowState('code');
+            }
         } else {
-            // Já viu apresentação: redirecionar para login
-            window.location.hash = '#/login';
+            // Logado: redirecionar para home
+            window.location.hash = '#/';
             return <PageLoader />;
         }
     }
@@ -317,6 +339,52 @@ const App: React.FC = () => {
                 <VideoPresentationPage />
             </Suspense>
         );
+    }
+
+    // Fluxo de cupom de acesso (primeiro acesso sem login)
+    if (!isLoggedIn && inviteFlowState !== null && path !== '/login' && path !== '/presentation') {
+        if (inviteFlowState === 'code') {
+            return (
+                <ToastProvider>
+                    <InviteCodeEntry
+                        onCodeValidated={(code) => {
+                            setValidatedCouponCode(code);
+                            setInviteFlowState('register');
+                        }}
+                        onSkip={() => {
+                            window.location.hash = '#/login';
+                        }}
+                    />
+                </ToastProvider>
+            );
+        } else if (inviteFlowState === 'register' && validatedCouponCode) {
+            return (
+                <ToastProvider>
+                    <LoginOrRegister
+                        couponCode={validatedCouponCode}
+                        onSuccess={async () => {
+                            // Verificar se usuário tem perfil completo
+                            const userProfile = await authService.getCurrentUserProfile();
+                            if (userProfile) {
+                                setUser(userProfile);
+                                setIsLoggedIn(true);
+                                setInviteFlowState(null);
+                                // Verificar se precisa de onboarding
+                                if (!userProfile.nome || userProfile.nome === 'Usuário Padrão') {
+                                    window.location.hash = '#/welcome-survey';
+                                } else {
+                                    window.location.hash = '#/';
+                                }
+                            }
+                        }}
+                        onBack={() => {
+                            setInviteFlowState('code');
+                            setValidatedCouponCode(null);
+                        }}
+                    />
+                </ToastProvider>
+            );
+        }
     }
 
     if (path === '/login') {
