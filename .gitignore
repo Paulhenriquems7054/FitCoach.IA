@@ -25,3 +25,6 @@ dist-ssr
 
 # Backend folder (separate project)
 backend/
+
+# Pasta fonte de GIFs (não versionada - usar apenas public/GIFS)
+Gifs Animados/

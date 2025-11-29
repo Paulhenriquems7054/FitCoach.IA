@@ -1,7 +1,14 @@
-# Script para atualizar GIFs do sistema
+# ⚠️ SCRIPT OBSOLETO ⚠️
+# Este script não é mais necessário.
+# Os GIFs agora são adicionados diretamente em public/GIFS
+# 
+# Script para atualizar GIFs do sistema (OBSOLETO)
 # Copia os GIFs da pasta "Gifs Animados" para "public/GIFS" mantendo a estrutura
+# 
+# NOTA: A pasta "Gifs Animados" foi removida.
+# Adicione novos GIFs diretamente em public/GIFS/[Grupo]-[timestamp]/[Grupo]/
 
-$sourcePath = "D:\FitCoach.IA\Gifs Animados"
+$sourcePath = "D:\FitCoach.IA\Gifs Animados"  # ⚠️ Pasta não existe mais
 $targetPath = "D:\FitCoach.IA\public\GIFS"
 
 Write-Host "=== Atualizando GIFs ===" -ForegroundColor Cyan
@@ -34,23 +41,63 @@ Get-ChildItem -Path $sourcePath -Directory | ForEach-Object {
     }
     
     # Determinar estrutura de destino
-    # Se há uma subpasta com o mesmo nome do grupo + número, usar essa estrutura
-    $subFolders = Get-ChildItem -Path $_.FullName -Directory
+    # Primeiro, tentar encontrar pasta existente em public/GIFS que corresponda ao grupo
+    $existingFolders = Get-ChildItem -Path $targetPath -Directory -ErrorAction SilentlyContinue
     $targetGroupPath = $null
     
-    if ($subFolders.Count -gt 0) {
-        # Usar a primeira subpasta encontrada (ex: "Abdômen (18)")
-        $subFolder = $subFolders[0]
-        $targetGroupPath = Join-Path $targetPath "$($subFolder.Name)-20241202T155424Z-001\$($subFolder.Name)"
-    } else {
-        # Se não há subpasta, criar estrutura simples
-        $targetGroupPath = Join-Path $targetPath $groupName
+    # Mapear nomes de grupos da fonte para padrões de busca em public/GIFS
+    $groupPatterns = @{
+        'Abdômen' = 'Abdômen'
+        'Antebraço' = 'Antebraço'
+        'Bíceps' = 'Bíceps'
+        'CALISTENIA' = 'GIFS CALISTENIA'
+        'Costas' = 'Costas'
+        'CROSSFIT' = 'GIFS CROSSFIT'
+        'Cárdio Academia' = 'Cárdio Academia'
+        'ERETORES DA ESPINHA' = 'ERETORES DA ESPINHA'
+        'Glúteo' = 'Glúteo'
+        'MOBILIDADE ALONGAMENTO LIBERAÇÃO' = 'MOBILIDADE ALONGAMENTO LIBERAÇÃO'
+        'Ombro' = 'Ombro'
+        'Panturrilha' = 'Panturrilha'
+        'Peitoral' = 'Peitoral'
+        'Pernas' = 'Pernas'
+        'Trapézio' = 'Trapézio'
+        'TREINAMENTO FUNCIONAL' = 'GIFS TREINAMENTO FUNCIONAL'
+        'Tríceps' = 'Tríceps'
     }
     
-    # Criar pasta de destino
-    if (-not (Test-Path $targetGroupPath)) {
-        New-Item -ItemType Directory -Path $targetGroupPath -Force | Out-Null
-        Write-Host "  Pasta criada: $targetGroupPath" -ForegroundColor Green
+    $searchPattern = if ($groupPatterns.ContainsKey($groupName)) { $groupPatterns[$groupName] } else { $groupName }
+    
+    # Procurar pasta existente que corresponda ao padrão
+    $matchedFolder = $existingFolders | Where-Object { $_.Name -like "$searchPattern*" } | Select-Object -First 1
+    
+    if ($matchedFolder) {
+        # Usar pasta existente - encontrar a subpasta interna
+        $innerFolder = Get-ChildItem -Path $matchedFolder.FullName -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($innerFolder) {
+            $targetGroupPath = $innerFolder.FullName
+        } else {
+            # Se não há subpasta interna, usar a própria pasta
+            $targetGroupPath = $matchedFolder.FullName
+        }
+        Write-Host "  Usando pasta existente: $($matchedFolder.Name)" -ForegroundColor Cyan
+    } else {
+        # Se não encontrou pasta existente, criar nova estrutura
+        $subFolders = Get-ChildItem -Path $_.FullName -Directory
+        if ($subFolders.Count -gt 0) {
+            $subFolder = $subFolders[0]
+            # Usar timestamp atual para nova pasta
+            $timestamp = Get-Date -Format "yyyyMMddTHHmmssZ"
+            $targetGroupPath = Join-Path $targetPath "$($subFolder.Name)-$timestamp\$($subFolder.Name)"
+        } else {
+            $targetGroupPath = Join-Path $targetPath $groupName
+        }
+        
+        # Criar pasta de destino
+        if (-not (Test-Path $targetGroupPath)) {
+            New-Item -ItemType Directory -Path $targetGroupPath -Force | Out-Null
+            Write-Host "  Pasta criada: $targetGroupPath" -ForegroundColor Green
+        }
     }
     
     # Copiar cada GIF
