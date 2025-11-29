@@ -24,7 +24,7 @@ export interface User {
   subscription: 'free' | 'premium';
   
   // Controle de Plano
-  planType?: 'free' | 'monthly' | 'annual' | 'academy_starter' | 'academy_growth' | 'personal_team';
+  planType?: 'free' | 'monthly' | 'annual_vip' | 'academy_starter' | 'academy_growth' | 'academy_pro' | 'personal_team_5' | 'personal_team_15';
   subscriptionStatus?: 'active' | 'inactive' | 'expired';
   expiryDate?: string; // ISO date string
   
@@ -291,7 +291,7 @@ export interface Patient {
 export interface Coupon {
     id?: string;
     code: string; // Código único do cupom (ex: ACADEMIA-VIP)
-    planLinked: 'free' | 'monthly' | 'annual' | 'academy_starter' | 'academy_growth' | 'personal_team';
+    planLinked: 'free' | 'monthly' | 'annual_vip' | 'academy_starter' | 'academy_growth' | 'academy_pro' | 'personal_team_5' | 'personal_team_15';
     maxUses: number; // Quantas pessoas podem usar
     currentUses: number; // Contador atual
     isActive: boolean;

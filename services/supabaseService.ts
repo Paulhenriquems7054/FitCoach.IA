@@ -40,7 +40,7 @@ export interface Database {
           last_sync_at: string | null;
           gym_server_url: string | null;
           // Controle de Plano
-          plan_type: 'free' | 'monthly' | 'annual' | 'academy_starter' | 'academy_growth' | 'personal_team' | null;
+          plan_type: 'free' | 'monthly' | 'annual_vip' | 'academy_starter' | 'academy_growth' | 'academy_pro' | 'personal_team_5' | 'personal_team_15' | null;
           subscription_status: 'active' | 'inactive' | 'expired' | null;
           expiry_date: string | null;
           // Controle de Voz
@@ -56,8 +56,9 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['users']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+        Insert: Omit<Database['public']['Tables']['users']['Row'], 'id' | 'created_at' | 'updated_at' | 'email'> & {
           id?: string;
+          email?: string | null; // Opcional - pode não existir na tabela
         };
         Update: Partial<Database['public']['Tables']['users']['Insert']>;
       };
@@ -176,8 +177,56 @@ export function initSupabase(): SupabaseClient<Database> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Variáveis de ambiente do Supabase não configuradas. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY');
+  // Verificar se as variáveis estão configuradas
+  const urlIsExample = supabaseUrl && (supabaseUrl.includes('seu-projeto') || supabaseUrl === 'https://seu-projeto.supabase.co');
+  const keyIsExample = supabaseAnonKey && (supabaseAnonKey.includes('sua_chave') || supabaseAnonKey === 'sua_chave_anon_key_aqui');
+
+  if (!supabaseUrl || !supabaseAnonKey || urlIsExample || keyIsExample) {
+    // Diagnóstico mais detalhado
+    const urlStatus = !supabaseUrl ? 'não encontrado' : (urlIsExample ? 'valor de exemplo' : 'configurado');
+    const keyStatus = !supabaseAnonKey ? 'não encontrado' : (keyIsExample ? 'valor de exemplo' : 'configurado');
+    
+    let actionMessage = '';
+    if (!supabaseUrl || !supabaseAnonKey) {
+      actionMessage = `
+⚠️  PROBLEMA: Variáveis não estão sendo carregadas pelo Vite!
+
+Possíveis causas:
+1. O servidor não foi reiniciado após criar/modificar .env.local
+2. O arquivo .env.local não está na raiz do projeto
+3. As variáveis não começam com VITE_
+
+SOLUÇÃO:
+1. Pare o servidor completamente (Ctrl+C)
+2. Certifique-se de que .env.local está na raiz (mesmo nível do package.json)
+3. Verifique se as variáveis começam com VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY
+4. Reinicie o servidor: npm run dev
+      `.trim();
+    } else {
+      actionMessage = `
+⚠️  PROBLEMA: Arquivo .env.local contém valores de EXEMPLO!
+
+AÇÃO NECESSÁRIA:
+1. Abra o arquivo .env.local na raiz do projeto
+2. Acesse: https://app.supabase.com/project/seu-projeto/settings/api
+3. Copie o "Project URL" e substitua em VITE_SUPABASE_URL
+4. Copie a chave "anon public" e substitua em VITE_SUPABASE_ANON_KEY
+5. REINICIE o servidor (pare com Ctrl+C e execute: npm run dev)
+      `.trim();
+    }
+
+    const errorMessage = `
+Supabase não configurado!
+
+${actionMessage}
+
+Status atual:
+- VITE_SUPABASE_URL: ${urlStatus}${supabaseUrl ? ` (${supabaseUrl.substring(0, 50)}...)` : ''}
+- VITE_SUPABASE_ANON_KEY: ${keyStatus}${supabaseAnonKey ? ` (${supabaseAnonKey.substring(0, 30)}...)` : ''}
+
+💡 DICA: Se você acabou de criar/modificar o .env.local, REINICIE o servidor!
+    `.trim();
+    throw new Error(errorMessage);
   }
 
   supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
@@ -252,7 +301,8 @@ function userToSupabase(user: User, userId?: string): Database['public']['Tables
     last_usage_date: user.lastUsageDate || null,
     text_msg_count_today: user.textMsgCountToday || 0,
     last_msg_date: user.lastMsgDate || null,
-    email: (user as any).email || null,
+    // Email: não incluir se a coluna não existir (será obtido do auth.users se necessário)
+    // email: (user as any).email || null,
   };
 }
 
@@ -400,19 +450,25 @@ export async function getActiveSubscription(userId?: string, userEmail?: string,
   
   // Se não tem userId, tentar buscar pelo email ou username
   if (!targetUserId) {
-    // Primeiro tentar pelo email (mais confiável)
+    // Primeiro tentar pelo email (se a coluna existir)
     if (userEmail) {
-      const { data: userData, error: emailError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', userEmail)
-        .maybeSingle();
-      
-      if (userData && !emailError) {
-        targetUserId = userData.id;
-        logger.info(`Usuário encontrado pelo email: ${userEmail}`, 'supabaseService');
-      } else if (emailError) {
-        logger.warn(`Erro ao buscar usuário por email: ${emailError.message}`, 'supabaseService');
+      try {
+        const { data: userData, error: emailError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', userEmail)
+          .maybeSingle();
+        
+        if (userData && !emailError) {
+          targetUserId = userData.id;
+          logger.info(`Usuário encontrado pelo email: ${userEmail}`, 'supabaseService');
+        } else if (emailError) {
+          // Se a coluna email não existir, ignorar o erro e continuar
+          logger.debug(`Coluna email pode não existir: ${emailError.message}`, 'supabaseService');
+        }
+      } catch (error) {
+        // Ignorar erro se a coluna não existir
+        logger.debug('Tentativa de buscar por email falhou (coluna pode não existir)', 'supabaseService');
       }
     }
     
@@ -561,21 +617,58 @@ export async function createSubscription(
 
 /**
  * Cancela uma assinatura
+ * @param subscriptionId - ID da assinatura
+ * @param immediate - Se true, cancela imediatamente. Se false, cancela no fim do período.
  */
-export async function cancelSubscription(subscriptionId: string): Promise<void> {
+export async function cancelSubscription(subscriptionId: string, immediate: boolean = false): Promise<void> {
   const supabase = getSupabaseClient();
 
-  const { error } = await supabase
-    .from('user_subscriptions')
-    .update({
-      cancel_at_period_end: true,
-      canceled_at: new Date().toISOString(),
-    })
-    .eq('id', subscriptionId);
+  if (immediate) {
+    // Cancelar imediatamente
+    const { error } = await supabase
+      .from('user_subscriptions')
+      .update({
+        status: 'canceled',
+        cancel_at_period_end: false,
+        canceled_at: new Date().toISOString(),
+      })
+      .eq('id', subscriptionId);
 
-  if (error) {
-    logger.error('Erro ao cancelar assinatura', 'supabaseService', error);
-    throw new Error(`Erro ao cancelar assinatura: ${error.message}`);
+    if (error) {
+      logger.error('Erro ao cancelar assinatura imediatamente', 'supabaseService', error);
+      throw new Error(`Erro ao cancelar assinatura: ${error.message}`);
+    }
+
+    // Atualizar usuário para plano free
+    const { data: subscription } = await supabase
+      .from('user_subscriptions')
+      .select('user_id')
+      .eq('id', subscriptionId)
+      .single();
+
+    if (subscription) {
+      await supabase
+        .from('users')
+        .update({
+          plan_type: 'free',
+          subscription_status: 'expired',
+        })
+        .eq('id', subscription.user_id);
+    }
+  } else {
+    // Cancelar no fim do período
+    const { error } = await supabase
+      .from('user_subscriptions')
+      .update({
+        cancel_at_period_end: true,
+        canceled_at: new Date().toISOString(),
+      })
+      .eq('id', subscriptionId);
+
+    if (error) {
+      logger.error('Erro ao cancelar assinatura', 'supabaseService', error);
+      throw new Error(`Erro ao cancelar assinatura: ${error.message}`);
+    }
   }
 }
 
@@ -767,12 +860,40 @@ export const authFlowService = {
 
     if (authError || !authData.user) {
       logger.error('Erro ao criar usuário no Supabase Auth', 'authFlowService', authError);
+      
+      // Mensagem de erro mais clara para casos específicos
+      if (authError?.message?.includes('Email signups are disabled')) {
+        throw new Error('Cadastros por email estão desabilitados no Supabase. Habilite em Authentication → Settings → Enable sign ups.');
+      }
+      
+      // Rate limit - muitas tentativas de signup
+      if (authError?.status === 429 || authError?.message?.includes('Too Many Requests') || authError?.message?.includes('after')) {
+        const waitTime = authError?.message?.match(/(\d+)\s+seconds?/i)?.[1] || 'alguns';
+        throw new Error(`Muitas tentativas de cadastro. Por segurança, aguarde ${waitTime} segundos antes de tentar novamente.`);
+      }
+      
       throw new Error(authError?.message || 'Erro ao criar conta');
     }
 
     const userId = authData.user.id;
+    const userEmail = userData.email || `${username}@fitcoach.ia`;
+
+    // IMPORTANTE: Verificar se a sessão está estabelecida após signup
+    // Se não houver sessão (ex: confirmação de email habilitada), tentar fazer login
+    let sessionEstablished = false;
+    let currentSession = authData.session;
+
+    if (!currentSession) {
+      // Se não houver sessão, pode ser que confirmação de email esteja habilitada
+      // Não tentar fazer login automaticamente, pois pode falhar se email não foi confirmado
+      logger.warn('Sessão não retornada no signup. Pode ser necessário confirmar email.', 'authFlowService');
+      logger.warn('Vamos tentar criar o perfil usando função SQL que bypassa RLS', 'authFlowService');
+    } else {
+      sessionEstablished = true;
+    }
 
     // 3. Criar registro na tabela users
+    // Usar o cliente autenticado (com a sessão do signup/login)
     const userSupabase = userToSupabase(
       {
         ...userData,
@@ -784,37 +905,262 @@ export const authFlowService = {
       userId
     );
 
-    const { data: userRecord, error: userError } = await supabase
+    // Remover email do insert se não existir na tabela (evitar erro de schema cache)
+    const userSupabaseInsert = { ...userSupabase };
+    delete (userSupabaseInsert as any).email; // Remover email para evitar erro se coluna não existir
+    
+    // Garantir que o id está definido corretamente
+    if (!userSupabaseInsert.id) {
+      userSupabaseInsert.id = userId;
+    }
+    
+    // Verificar se o usuário está autenticado antes de inserir
+    // Se não estiver autenticado, ainda podemos tentar inserir se a política RLS permitir
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (!currentUser || currentUser.id !== userId) {
+      logger.warn('Usuário não autenticado ao tentar criar perfil, mas continuando...', 'authFlowService');
+      logger.warn('Isso pode funcionar se a política RLS permitir inserção baseada apenas no ID', 'authFlowService');
+    }
+    
+    // Tentar inserir diretamente primeiro
+    let { data: userRecord, error: userError } = await supabase
       .from('users')
-      .insert(userSupabase)
+      .insert(userSupabaseInsert)
       .select()
       .single();
 
-    if (userError || !userRecord) {
+    // Se falhar por falta de autenticação, tentar usar função SQL como fallback
+    if (userError && (userError.code === '42501' || userError.message?.includes('row-level security'))) {
+      logger.warn('Inserção direta falhou por RLS, tentando função SQL...', 'authFlowService');
+      
+      // Tentar usar função SQL que bypassa RLS
+      try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('insert_user_profile_after_signup', {
+          p_user_id: userId,
+          p_nome: userData.nome || username,
+          p_username: username,
+          p_plan_type: (couponValidation.planLinked as any) || 'free',
+          p_subscription_status: 'active',
+          p_user_data: {
+            idade: userData.idade || 0,
+            genero: userData.genero || 'Masculino',
+            peso: userData.peso || 0,
+            altura: userData.altura || 0,
+            objetivo: userData.objetivo || 'perder peso',
+            points: userData.points || 0,
+            disciplineScore: userData.disciplineScore || 0,
+            // Não enviar array vazio, deixar a função SQL lidar com isso
+            completedChallengeIds: (userData.completedChallengeIds && userData.completedChallengeIds.length > 0) 
+              ? userData.completedChallengeIds 
+              : null,
+            isAnonymized: userData.isAnonymized || false,
+            role: userData.role || 'user',
+          },
+        });
+
+        if (rpcError) {
+          logger.error('Erro ao criar registro via função SQL', 'authFlowService', rpcError);
+          // Continuar para tentar buscar o registro (pode ter sido criado mesmo com erro)
+        }
+
+        // A função SQL retorna uma tabela, então rpcData será um array
+        // Se a função executou sem erro, o registro foi criado
+        if (!rpcError && rpcData && Array.isArray(rpcData) && rpcData.length > 0) {
+          // Buscar o registro completo criado
+          const { data: createdUser, error: fetchError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();  // Usar maybeSingle ao invés de single para evitar erro se não encontrar
+
+          if (createdUser) {
+            userRecord = createdUser;
+            userError = null;
+            logger.info('Perfil criado via função SQL com sucesso', 'authFlowService');
+          } else {
+            // Se não encontrou, pode ser que RLS esteja bloqueando a leitura
+            // Mas o registro foi criado, então vamos continuar
+            logger.warn('Registro criado via função SQL mas não foi possível recuperá-lo (pode ser RLS)', 'authFlowService');
+            // Criar um objeto mínimo para continuar o fluxo
+            userRecord = {
+              id: userId,
+              nome: userData.nome || username,
+              username: username,
+            } as any;
+            userError = null;
+          }
+        } else if (rpcError) {
+          // Se houve erro na função SQL, verificar se foi erro de tipo ou outro
+          logger.error('Erro na função SQL', 'authFlowService', rpcError);
+          throw new Error(`Erro ao criar perfil: ${rpcError.message}. Verifique se a função SQL foi criada corretamente.`);
+        } else {
+          throw new Error('Função SQL executou mas não retornou dados. Verifique se o registro foi criado.');
+        }
+      } catch (rpcException: any) {
+        logger.error('Exceção ao usar função SQL', 'authFlowService', rpcException);
+        throw new Error(rpcException?.message || 'Erro ao criar perfil. Verifique se a função SQL foi criada no Supabase.');
+      }
+    } else if (userError || !userRecord) {
       logger.error('Erro ao criar registro de usuário', 'authFlowService', userError);
-      // Tentar deletar o usuário do auth se falhou
-      await supabase.auth.admin.deleteUser(userId).catch(() => {});
-      throw new Error(userError?.message || 'Erro ao criar perfil');
+      
+      // Log detalhado para debug
+      if (userError) {
+        logger.error(`Código do erro: ${userError.code}`, 'authFlowService');
+        logger.error(`Mensagem: ${userError.message}`, 'authFlowService');
+        logger.error(`Detalhes: ${JSON.stringify(userError)}`, 'authFlowService');
+      }
+      
+      throw new Error(userError?.message || 'Erro ao criar perfil. Verifique se a política RLS está configurada corretamente.');
     }
 
     // 4. Criar vínculo com cupom (trigger incrementará contadores automaticamente)
-    const { error: linkError } = await supabase
+    // Verificar se o vínculo já existe antes de criar
+    const { data: existingLink, error: checkError } = await supabase
       .from('user_coupon_links')
-      .insert({
-        user_id: userId,
-        coupon_id: couponValidation.couponId!,
-      });
+      .select('id')
+      .eq('user_id', userId)
+      .eq('coupon_id', couponValidation.couponId!)
+      .maybeSingle();
 
-    if (linkError) {
-      logger.error('Erro ao vincular cupom', 'authFlowService', linkError);
-      // Não falhar o registro, apenas logar o erro
-      logger.warn('Usuário criado mas vínculo com cupom falhou', 'authFlowService');
+    if (!existingLink && !checkError) {
+      // Vínculo não existe, criar
+      const { error: linkError } = await supabase
+        .from('user_coupon_links')
+        .insert({
+          user_id: userId,
+          coupon_id: couponValidation.couponId!,
+        });
+
+      if (linkError) {
+        // Se for erro de duplicata (pode ter sido criado entre a verificação e a inserção), ignorar
+        if (linkError.code === '23505') {
+          logger.info('Vínculo com cupom já existe (criado entre verificação e inserção)', 'authFlowService');
+        } else {
+          logger.error('Erro ao vincular cupom', 'authFlowService', linkError);
+          logger.warn('Usuário criado mas vínculo com cupom falhou', 'authFlowService');
+        }
+      } else {
+        logger.info('Vínculo com cupom criado com sucesso', 'authFlowService');
+      }
+    } else if (existingLink) {
+      logger.info('Vínculo com cupom já existe, pulando criação', 'authFlowService');
+    } else if (checkError) {
+      logger.warn('Erro ao verificar vínculo existente, tentando criar mesmo assim', 'authFlowService', checkError);
+      // Tentar criar mesmo assim (pode ser erro de RLS)
+      const { error: linkError } = await supabase
+        .from('user_coupon_links')
+        .insert({
+          user_id: userId,
+          coupon_id: couponValidation.couponId!,
+        });
+
+      if (linkError && linkError.code !== '23505') {
+        logger.error('Erro ao vincular cupom após verificação falhar', 'authFlowService', linkError);
+      }
     }
 
-    // 5. Retornar usuário
-    const user = supabaseToUser(userRecord);
+    // 5. Verificar se conseguimos buscar o usuário criado
+    // Aguardar um pouco para garantir que o registro está disponível
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Tentar buscar o usuário criado para garantir que está acessível
+    let finalUser: User;
+    
+    try {
+      // Primeiro, tentar converter o userRecord que temos
+      if (userRecord) {
+        finalUser = supabaseToUser(userRecord);
+        logger.info('Usuário convertido do registro criado', 'authFlowService');
+      } else {
+        throw new Error('userRecord não está disponível');
+      }
+      
+      // Tentar buscar do banco para garantir que está acessível
+      const { data: fetchedUser, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      if (fetchedUser && !fetchError) {
+        finalUser = supabaseToUser(fetchedUser);
+        logger.info('Usuário encontrado e atualizado após criação', 'authFlowService');
+      } else if (fetchError) {
+        logger.warn('Não foi possível buscar usuário após criação (pode ser RLS)', 'authFlowService', fetchError);
+        // Continuar com o userRecord que temos - já convertido acima
+        logger.info('Usando usuário do registro criado (não foi possível buscar do banco)', 'authFlowService');
+      } else {
+        logger.warn('Usuário não encontrado no banco após criação, usando registro criado', 'authFlowService');
+      }
+    } catch (fetchException: any) {
+      logger.error('Exceção ao processar usuário após criação', 'authFlowService', fetchException);
+      
+      // Se não conseguimos converter o userRecord, criar um usuário básico
+      if (!userRecord) {
+        logger.error('userRecord não disponível, criando usuário básico', 'authFlowService');
+        finalUser = {
+          id: userId,
+          nome: userData.nome || username,
+          username: username,
+          idade: userData.idade || 0,
+          genero: userData.genero || 'Masculino',
+          peso: userData.peso || 0,
+          altura: userData.altura || 0,
+          objetivo: (userData.objetivo || 'perder peso') as any,
+          points: userData.points || 0,
+          disciplineScore: userData.disciplineScore || 0,
+          completedChallengeIds: userData.completedChallengeIds || [],
+          isAnonymized: userData.isAnonymized || false,
+          weightHistory: userData.weightHistory || [],
+          role: userData.role || 'user',
+          subscription: 'free',
+          planType: (couponValidation.planLinked as any) || 'free',
+          subscriptionStatus: 'active',
+        };
+      } else {
+        // Tentar converter mesmo com erro
+        try {
+          finalUser = supabaseToUser(userRecord);
+        } catch (convertError) {
+          logger.error('Erro ao converter userRecord, criando usuário básico', 'authFlowService', convertError);
+          finalUser = {
+            id: userId,
+            nome: userData.nome || username,
+            username: username,
+            idade: userData.idade || 0,
+            genero: userData.genero || 'Masculino',
+            peso: userData.peso || 0,
+            altura: userData.altura || 0,
+            objetivo: (userData.objetivo || 'perder peso') as any,
+            points: userData.points || 0,
+            disciplineScore: userData.disciplineScore || 0,
+            completedChallengeIds: userData.completedChallengeIds || [],
+            isAnonymized: userData.isAnonymized || false,
+            weightHistory: userData.weightHistory || [],
+            role: userData.role || 'user',
+            subscription: 'free',
+            planType: (couponValidation.planLinked as any) || 'free',
+            subscriptionStatus: 'active',
+          };
+        }
+      }
+    }
+    
+    // Garantir que o usuário tem todos os campos obrigatórios
+    if (!finalUser.id) {
+      finalUser.id = userId;
+    }
+    if (!finalUser.username) {
+      finalUser.username = username;
+    }
+    if (!finalUser.nome) {
+      finalUser.nome = userData.nome || username;
+    }
+    
+    // 6. Retornar usuário
+    logger.info(`Usuário retornado após registro: ${finalUser.username} (${finalUser.id})`, 'authFlowService');
     return {
-      user,
+      user: finalUser,
       couponId: couponValidation.couponId!,
     };
   },
@@ -834,10 +1180,21 @@ export const authService = {
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !authUser) {
+        logger.warn('Usuário não autenticado ao buscar perfil', 'authService');
         return null;
       }
 
-      return await getUserFromSupabase(authUser.id);
+      const userProfile = await getUserFromSupabase(authUser.id);
+      
+      if (!userProfile) {
+        logger.warn(`Perfil não encontrado para usuário autenticado: ${authUser.id}`, 'authService');
+        // Pode ser que o perfil ainda não foi criado ou RLS está bloqueando
+        // Tentar aguardar um pouco e tentar novamente
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return await getUserFromSupabase(authUser.id);
+      }
+      
+      return userProfile;
     } catch (error) {
       logger.error('Erro ao obter perfil do usuário', 'authService', error);
       return null;

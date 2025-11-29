@@ -411,35 +411,80 @@ const LoginPage: React.FC = () => {
             // Criar usuário no banco local (IndexedDB)
             const newUser = await registerUser(username, signupPassword, userData);
 
-            // Criar usuário no Supabase
-            const { error: userError } = await supabase
-                .from('users')
-                .insert({
-                    id: userId,
-                    nome: userData.nome,
-                    username: userData.username,
-                    email: sanitizedEmail,
-                    idade: userData.idade,
-                    genero: userData.genero,
-                    peso: userData.peso,
-                    altura: userData.altura,
-                    objetivo: userData.objetivo,
-                    points: userData.points,
-                    discipline_score: userData.disciplineScore,
-                    completed_challenge_ids: userData.completedChallengeIds,
-                    is_anonymized: userData.isAnonymized,
-                    role: userData.role,
-                    plan_type: userData.planType,
-                    subscription_status: userData.subscriptionStatus,
-                    voice_daily_limit_seconds: 900,
-                    voice_used_today_seconds: 0,
-                    voice_balance_upsell: 0,
-                    text_msg_count_today: 0,
-                });
+            // Criar usuário no Supabase usando função RPC segura
+            // Primeiro tentar inserir diretamente, se falhar usar função RPC
+            let userError = null;
+            try {
+                const { error: directInsertError } = await supabase
+                    .from('users')
+                    .insert({
+                        id: userId,
+                        nome: userData.nome,
+                        username: userData.username,
+                        email: sanitizedEmail,
+                        idade: userData.idade,
+                        genero: userData.genero,
+                        peso: userData.peso,
+                        altura: userData.altura,
+                        objetivo: userData.objetivo,
+                        points: userData.points,
+                        discipline_score: userData.disciplineScore,
+                        completed_challenge_ids: userData.completedChallengeIds && userData.completedChallengeIds.length > 0 
+                            ? userData.completedChallengeIds 
+                            : null,
+                        is_anonymized: userData.isAnonymized,
+                        role: userData.role,
+                        plan_type: userData.planType,
+                        subscription_status: userData.subscriptionStatus,
+                        voice_daily_limit_seconds: 900,
+                        voice_used_today_seconds: 0,
+                        voice_balance_upsell: 0,
+                        text_msg_count_today: 0,
+                    });
+
+                userError = directInsertError;
+            } catch (directError) {
+                // Se inserção direta falhar (RLS), usar função RPC
+                console.warn('Inserção direta falhou, tentando função RPC', directError);
+                
+                try {
+                    // Preparar dados do usuário em JSONB conforme a função espera
+                    const userDataJsonb = {
+                        idade: userData.idade,
+                        genero: userData.genero,
+                        peso: userData.peso,
+                        altura: userData.altura,
+                        objetivo: userData.objetivo,
+                        points: userData.points,
+                        disciplineScore: userData.disciplineScore,
+                        completedChallengeIds: userData.completedChallengeIds && userData.completedChallengeIds.length > 0 
+                            ? userData.completedChallengeIds 
+                            : [],
+                        isAnonymized: userData.isAnonymized,
+                        role: userData.role,
+                    };
+
+                    const { error: rpcError } = await supabase.rpc('insert_user_profile_after_signup', {
+                        p_user_id: userId,
+                        p_nome: userData.nome,
+                        p_username: userData.username,
+                        p_plan_type: userData.planType || 'free',
+                        p_subscription_status: userData.subscriptionStatus || 'active',
+                        p_user_data: userDataJsonb,
+                    });
+
+                    userError = rpcError;
+                } catch (rpcError) {
+                    console.error('Erro ao criar usuário via função RPC', rpcError);
+                    userError = rpcError as any;
+                }
+            }
 
             if (userError) {
-                console.error('Erro ao criar usuário no Supabase:', userError);
-                // Continuar mesmo se houver erro no Supabase
+                // Log do erro mas não bloquear o cadastro
+                // O usuário pode fazer login depois e o perfil será criado
+                console.warn('Erro ao criar perfil no Supabase (usuário pode fazer login depois):', userError);
+                // Não lançar erro - permitir que o cadastro continue
             }
 
             // Aplicar cupom (obrigatório neste fluxo)
@@ -496,11 +541,157 @@ const LoginPage: React.FC = () => {
                 return;
             }
 
-            const credentials: LoginCredentials = { 
-                username: sanitizedUsername, 
-                password: sanitizedPassword 
-            };
-            const user = await loginUser(credentials);
+            let user: any = null;
+            let loginMethod = '';
+
+            // Tentar login no Supabase primeiro (usuários criados com cupom)
+            try {
+                const supabase = getSupabaseClient();
+                
+                // Primeiro, tentar buscar o email do usuário na tabela users pelo username
+                let emailFromDB: string | null = null;
+                try {
+                    const { data: userData } = await supabase
+                        .from('users')
+                        .select('id, username, email')
+                        .eq('username', sanitizedUsername)
+                        .maybeSingle();
+                    
+                    if (userData && userData.id) {
+                        // Se encontrou o usuário, tentar buscar o email no auth.users
+                        try {
+                            // Usar Admin API ou buscar via RPC se disponível
+                            // Por enquanto, tentar usar o email da tabela users se disponível
+                            if (userData.email) {
+                                emailFromDB = userData.email;
+                            }
+                        } catch (e) {
+                            // Ignorar erro ao buscar email
+                        }
+                    }
+                } catch (e) {
+                    // Ignorar erro ao buscar usuário
+                }
+                
+                // Tentar múltiplas variações de email
+                const emailAttempts = [
+                    // Se encontrou email no banco, tentar primeiro
+                    emailFromDB,
+                    // Se username parece email, usar diretamente
+                    sanitizedUsername.includes('@') ? sanitizedUsername : null,
+                    // Tentar username@fitcoach.ia (padrão usado no cadastro)
+                    `${sanitizedUsername}@fitcoach.ia`,
+                    // Última tentativa: username direto (pode funcionar se email = username)
+                    sanitizedUsername,
+                ].filter(Boolean) as string[];
+
+                for (const email of emailAttempts) {
+                    try {
+                        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+                            email: email,
+                            password: sanitizedPassword,
+                        });
+
+                        if (authData?.user && !authError) {
+                            // Login no Supabase bem-sucedido
+                            loginMethod = 'supabase';
+                            
+                            // Buscar perfil do usuário
+                            const { authService } = await import('../services/supabaseService');
+                            const userProfile = await authService.getCurrentUserProfile();
+                            
+                            if (userProfile) {
+                                user = userProfile;
+                                break;
+                            } else {
+                                // Se não encontrou perfil, tentar buscar da tabela users
+                                const { data: userData } = await supabase
+                                    .from('users')
+                                    .select('*')
+                                    .eq('id', authData.user.id)
+                                    .maybeSingle();
+                                
+                                if (userData) {
+                                    // Converter dados do Supabase para formato User manualmente
+                                    user = {
+                                        id: userData.id,
+                                        nome: userData.nome || sanitizedUsername,
+                                        username: userData.username || sanitizedUsername,
+                                        email: userData.email || email,
+                                        idade: userData.idade || 0,
+                                        genero: userData.genero || 'Masculino',
+                                        peso: userData.peso || 0,
+                                        altura: userData.altura || 0,
+                                        objetivo: (userData.objetivo || 'perder peso') as any,
+                                        points: userData.points || 0,
+                                        disciplineScore: userData.discipline_score || 0,
+                                        completedChallengeIds: userData.completed_challenge_ids || [],
+                                        isAnonymized: userData.is_anonymized || false,
+                                        weightHistory: [],
+                                        role: userData.role || 'user',
+                                        subscription: 'free',
+                                        planType: (userData.plan_type as any) || 'free',
+                                        subscriptionStatus: (userData.subscription_status as any) || 'active',
+                                    };
+                                    break;
+                                }
+                            }
+                        } else if (authError) {
+                            // Verificar tipo de erro específico
+                            const errorMsg = authError.message || '';
+                            
+                            if (errorMsg.includes('Invalid login credentials') || 
+                                errorMsg.includes('invalid login')) {
+                                // Credenciais inválidas - continuar para próxima tentativa de email
+                                continue;
+                            } else if (errorMsg.includes('Email not confirmed') || 
+                                      errorMsg.includes('email not confirmed') ||
+                                      errorMsg.includes('email_not_confirmed')) {
+                                // Email não confirmado
+                                throw new Error('Seu email ainda não foi confirmado. Verifique sua caixa de entrada e clique no link de confirmação antes de fazer login.');
+                            } else if (errorMsg.includes('rate limit') || 
+                                      errorMsg.includes('For security purposes') ||
+                                      errorMsg.includes('Too Many Requests')) {
+                                // Rate limit - propagar erro
+                                throw authError;
+                            } else {
+                                // Outro erro - continuar para próxima tentativa
+                                continue;
+                            }
+                        }
+                    } catch (supabaseError) {
+                        // Continuar para próxima tentativa ou fallback
+                        if (supabaseError instanceof Error && 
+                            (supabaseError.message.includes('rate limit') || 
+                             supabaseError.message.includes('For security purposes'))) {
+                            throw supabaseError;
+                        }
+                        continue;
+                    }
+                }
+            } catch (supabaseError) {
+                // Se for rate limit ou outro erro crítico, propagar
+                if (supabaseError instanceof Error && 
+                    (supabaseError.message.includes('rate limit') || 
+                     supabaseError.message.includes('For security purposes'))) {
+                    const match = supabaseError.message.match(/(\d+)\s*seconds?/i);
+                    const seconds = match ? match[1] : 'alguns';
+                    throw new Error(`Muitas tentativas de login. Por segurança, aguarde ${seconds} segundos antes de tentar novamente.`);
+                }
+                // Se não for erro crítico, continuar para login local
+            }
+
+            // Se não conseguiu login no Supabase, tentar login local (IndexedDB)
+            if (!user) {
+                const credentials: LoginCredentials = { 
+                    username: sanitizedUsername, 
+                    password: sanitizedPassword 
+                };
+                user = await loginUser(credentials);
+                if (user) {
+                    loginMethod = 'local';
+                }
+            }
 
             if (user) {
                 // Para alunos, sincronizar status com servidor antes de verificar bloqueio
@@ -574,9 +765,22 @@ const LoginPage: React.FC = () => {
                     window.location.hash = redirectPath;
                 }, 1000);
             } else {
-                const errorMsg = 'Nome de usuário ou senha incorretos';
+                // Mensagem de erro mais clara
+                let errorMsg = 'Nome de usuário ou senha incorretos.';
+                
+                // Adicionar dicas baseadas no que foi tentado
+                if (sanitizedUsername.includes('@')) {
+                    errorMsg += '\n\n💡 Dica: Verifique se você está usando o email correto que foi usado no cadastro.';
+                } else {
+                    errorMsg += '\n\n💡 Dicas:';
+                    errorMsg += '\n• Se você criou a conta com código de convite, use o EMAIL (não o username)';
+                    errorMsg += '\n• Se não forneceu email no cadastro, tente: seuusuario@fitcoach.ia';
+                    errorMsg += '\n• Verifique se a senha está correta';
+                    errorMsg += '\n• Se você criou a conta localmente (sem código), use o username';
+                }
+                
                 setError(errorMsg);
-                showError(errorMsg);
+                showError('Credenciais inválidas. Verifique seu email/username e senha.');
             }
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Erro ao fazer login. Tente novamente.';

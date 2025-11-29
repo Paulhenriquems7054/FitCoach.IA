@@ -83,17 +83,25 @@ interface DBAppSetting {
 }
 
 let dbInstance: IDBDatabase | null = null;
+let initPromise: Promise<IDBDatabase> | null = null;
 
 /**
  * Inicializa o banco de dados IndexedDB
  */
 export async function initDatabase(): Promise<IDBDatabase> {
-    if (dbInstance) {
+    // Se já está inicializado e não está fechado, retornar
+    if (dbInstance && dbInstance.objectStoreNames.length > 0) {
         return dbInstance;
     }
 
-    return new Promise((resolve, reject) => {
+    // Se já está sendo inicializado, aguardar a inicialização existente
+    if (initPromise) {
+        return initPromise;
+    }
+
+    initPromise = new Promise((resolve, reject) => {
         if (typeof window === 'undefined' || !window.indexedDB) {
+            initPromise = null;
             reject(new Error('IndexedDB não está disponível neste ambiente'));
             return;
         }
@@ -102,12 +110,28 @@ export async function initDatabase(): Promise<IDBDatabase> {
 
         request.onerror = () => {
             logger.error('Erro ao abrir banco de dados', 'databaseService', request.error);
+            initPromise = null;
+            dbInstance = null;
             reject(request.error);
         };
 
         request.onsuccess = () => {
             dbInstance = request.result;
+            
+            // Adicionar listener para quando o banco for fechado
+            dbInstance.onclose = () => {
+                logger.warn('Conexão com banco de dados foi fechada', 'databaseService');
+                dbInstance = null;
+                initPromise = null;
+            };
+            
+            // Adicionar listener para erros
+            dbInstance.onerror = (event) => {
+                logger.error('Erro no banco de dados', 'databaseService', event);
+            };
+            
             logger.info('Banco de dados inicializado com sucesso', 'databaseService');
+            initPromise = null;
             resolve(dbInstance);
         };
 
@@ -216,10 +240,86 @@ export async function initDatabase(): Promise<IDBDatabase> {
  * Obtém instância do banco de dados (inicializa se necessário)
  */
 export async function getDB(): Promise<IDBDatabase> {
-    if (!dbInstance) {
+    // Verificar se o banco está fechado ou não existe
+    if (!dbInstance || dbInstance.objectStoreNames.length === 0) {
         return await initDatabase();
     }
+    
+    // Verificar se o banco ainda está aberto
+    try {
+        // Tentar acessar objectStoreNames para verificar se está aberto
+        const storeNames = dbInstance.objectStoreNames;
+        if (storeNames.length === 0) {
+            // Banco foi fechado, reinicializar
+            dbInstance = null;
+            return await initDatabase();
+        }
+    } catch (error) {
+        // Banco foi fechado, reinicializar
+        logger.warn('Banco de dados foi fechado, reinicializando...', 'databaseService');
+        dbInstance = null;
+        return await initDatabase();
+    }
+    
     return dbInstance;
+}
+
+/**
+ * Cria uma transação de forma segura, reinicializando o banco se necessário
+ */
+async function createTransaction(
+    storeNames: string | string[],
+    mode: IDBTransactionMode = 'readonly'
+): Promise<IDBTransaction> {
+    const stores = Array.isArray(storeNames) ? storeNames : [storeNames];
+    let db = await getDB();
+    
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+        try {
+            // Verificar se o banco ainda está aberto
+            if (!db || db.objectStoreNames.length === 0) {
+                throw new Error('Banco de dados fechado');
+            }
+            
+            const transaction = db.transaction(stores, mode);
+            
+            // Verificar se a transação foi criada com sucesso
+            if (transaction) {
+                return transaction;
+            }
+            
+            throw new Error('Falha ao criar transação');
+        } catch (error: any) {
+            attempts++;
+            
+            // Se o erro indica que o banco está fechando, reinicializar
+            if (error?.message?.includes('closing') || 
+                error?.message?.includes('fechado') ||
+                error?.name === 'InvalidStateError') {
+                
+                logger.warn(`Banco fechando detectado (tentativa ${attempts}/${maxAttempts}), reinicializando...`, 'databaseService');
+                dbInstance = null;
+                initPromise = null;
+                
+                // Aguardar um pouco antes de tentar novamente
+                await new Promise(resolve => setTimeout(resolve, 100 * attempts));
+                
+                db = await initDatabase();
+                
+                if (attempts >= maxAttempts) {
+                    throw new Error('Não foi possível criar transação após múltiplas tentativas. O banco de dados pode estar em uso.');
+                }
+            } else {
+                // Outro tipo de erro, propagar
+                throw error;
+            }
+        }
+    }
+    
+    throw new Error('Não foi possível criar transação');
 }
 
 // ==================== USERS ====================
@@ -229,56 +329,56 @@ export async function getDB(): Promise<IDBDatabase> {
  * IMPORTANTE: Preserva a senha existente se não for fornecida
  */
 export async function saveUser(user: User): Promise<void> {
-    const db = await getDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(['users'], 'readwrite');
-        const store = transaction.objectStore('users');
-        
-        // Buscar usuário existente - tentar por username primeiro, depois por ID, depois primeiro usuário
-        const findUser = async (): Promise<DBUser | null> => {
-            return new Promise((resolveFind, rejectFind) => {
-                // Se o usuário tem username, tentar buscar por username
-                if (user.username) {
-                    if (store.indexNames.contains('username')) {
-                        const index = store.index('username');
-                        const request = index.get(user.username);
-                        request.onsuccess = () => {
-                            if (request.result) {
-                                resolveFind(request.result);
-                                return;
-                            }
-                            // Se não encontrou por username, continuar para buscar geral
-                            const getAllRequest = store.getAll();
-                            getAllRequest.onsuccess = () => {
-                                const users = getAllRequest.result;
-                                resolveFind(users.length > 0 ? users[0] : null);
+    return new Promise(async (resolve, reject) => {
+        try {
+            const transaction = await createTransaction(['users'], 'readwrite');
+            const store = transaction.objectStore('users');
+            
+            // Buscar usuário existente - tentar por username primeiro, depois por ID, depois primeiro usuário
+            const findUser = async (): Promise<DBUser | null> => {
+                return new Promise((resolveFind, rejectFind) => {
+                    // Se o usuário tem username, tentar buscar por username
+                    if (user.username) {
+                        if (store.indexNames.contains('username')) {
+                            const index = store.index('username');
+                            const request = index.get(user.username);
+                            request.onsuccess = () => {
+                                if (request.result) {
+                                    resolveFind(request.result);
+                                    return;
+                                }
+                                // Se não encontrou por username, continuar para buscar geral
+                                const getAllRequest = store.getAll();
+                                getAllRequest.onsuccess = () => {
+                                    const users = getAllRequest.result;
+                                    resolveFind(users.length > 0 ? users[0] : null);
+                                };
+                                getAllRequest.onerror = () => rejectFind(getAllRequest.error);
                             };
-                            getAllRequest.onerror = () => rejectFind(getAllRequest.error);
-                        };
-                        request.onerror = () => {
-                            // Se índice falhar, buscar geral
-                            const getAllRequest = store.getAll();
-                            getAllRequest.onsuccess = () => {
-                                const users = getAllRequest.result;
-                                resolveFind(users.length > 0 ? users[0] : null);
+                            request.onerror = () => {
+                                // Se índice falhar, buscar geral
+                                const getAllRequest = store.getAll();
+                                getAllRequest.onsuccess = () => {
+                                    const users = getAllRequest.result;
+                                    resolveFind(users.length > 0 ? users[0] : null);
+                                };
+                                getAllRequest.onerror = () => rejectFind(getAllRequest.error);
                             };
-                            getAllRequest.onerror = () => rejectFind(getAllRequest.error);
-                        };
-                        return;
+                            return;
+                        }
                     }
-                }
-                
-                // Buscar todos os usuários
-                const getAllRequest = store.getAll();
-                getAllRequest.onsuccess = () => {
-                    const users = getAllRequest.result;
-                    resolveFind(users.length > 0 ? users[0] : null);
-                };
-                getAllRequest.onerror = () => rejectFind(getAllRequest.error);
-            });
-        };
-        
-        findUser().then((existingUser) => {
+                    
+                    // Buscar todos os usuários
+                    const getAllRequest = store.getAll();
+                    getAllRequest.onsuccess = () => {
+                        const users = getAllRequest.result;
+                        resolveFind(users.length > 0 ? users[0] : null);
+                    };
+                    getAllRequest.onerror = () => rejectFind(getAllRequest.error);
+                });
+            };
+            
+            findUser().then((existingUser) => {
             if (existingUser) {
                 // Atualizar usuário existente - preservar senha se não fornecida
                 const dbUser: DBUser = {
@@ -358,6 +458,10 @@ export async function saveUser(user: User): Promise<void> {
         }).catch((error) => {
             reject(error);
         });
+        } catch (error) {
+            logger.error('Erro ao salvar usuário', 'databaseService', error);
+            reject(error);
+        }
     });
 }
 
@@ -599,56 +703,59 @@ export async function registerUser(username: string, password: string, userData:
  * Para alunos, também permite login por nome (username será o nome)
  */
 export async function loginUser(credentials: LoginCredentials): Promise<User | null> {
-    const db = await getDB();
-    
     // Hash da senha fornecida
     const hashedPassword = await hashPassword(credentials.password);
 
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(['users'], 'readonly');
-        const store = transaction.objectStore('users');
-        
-        // Buscar todos os usuários para permitir login por nome para alunos
-        const request = store.getAll();
-        request.onsuccess = () => {
-            const users = request.result;
+    return new Promise(async (resolve, reject) => {
+        try {
+            const transaction = await createTransaction(['users'], 'readonly');
+            const store = transaction.objectStore('users');
             
-            // Debug: listar todos os usernames disponíveis
-            const allUsernames = users.map((u: DBUser) => u.username);
-            logger.debug(`Tentativa de login com username: ${credentials.username}. Usernames disponíveis: ${allUsernames.join(', ')}`, 'databaseService');
-            
-            // Primeiro, tentar encontrar por username exato
-            let dbUser = users.find((u: DBUser) => u.username === credentials.username);
-            
-            // Se não encontrou por username e é aluno, tentar por nome
-            if (!dbUser) {
-                dbUser = users.find((u: DBUser) => 
-                    u.gymRole === 'student' && 
-                    u.nome === credentials.username
-                );
-            }
-            
-            if (!dbUser) {
-                logger.warn(`Usuário não encontrado: ${credentials.username}`, 'databaseService');
-                resolve(null); // Usuário não encontrado
-                return;
-            }
+            // Buscar todos os usuários para permitir login por nome para alunos
+            const request = store.getAll();
+            request.onsuccess = () => {
+                const users = request.result;
+                
+                // Debug: listar todos os usernames disponíveis
+                const allUsernames = users.map((u: DBUser) => u.username);
+                logger.debug(`Tentativa de login com username: ${credentials.username}. Usernames disponíveis: ${allUsernames.join(', ')}`, 'databaseService');
+                
+                // Primeiro, tentar encontrar por username exato
+                let dbUser = users.find((u: DBUser) => u.username === credentials.username);
+                
+                // Se não encontrou por username e é aluno, tentar por nome
+                if (!dbUser) {
+                    dbUser = users.find((u: DBUser) => 
+                        u.gymRole === 'student' && 
+                        u.nome === credentials.username
+                    );
+                }
+                
+                if (!dbUser) {
+                    logger.warn(`Usuário não encontrado: ${credentials.username}`, 'databaseService');
+                    resolve(null); // Usuário não encontrado
+                    return;
+                }
 
-            // Verificar senha
-            if (dbUser.password === hashedPassword) {
-                logger.info(`Login bem-sucedido para usuário: ${credentials.username}`, 'databaseService');
-                // Remover campos internos e senha
-                const { id, updatedAt, password: _, ...user } = dbUser;
-                resolve(user as User);
-            } else {
-                logger.warn(`Senha incorreta para usuário: ${credentials.username}`, 'databaseService');
-                resolve(null); // Senha incorreta
-            }
-        };
-        request.onerror = () => {
-            logger.error('Erro ao buscar usuários para login', 'databaseService', request.error);
-            reject(request.error);
-        };
+                // Verificar senha
+                if (dbUser.password === hashedPassword) {
+                    logger.info(`Login bem-sucedido para usuário: ${credentials.username}`, 'databaseService');
+                    // Remover campos internos e senha
+                    const { id, updatedAt, password: _, ...user } = dbUser;
+                    resolve(user as User);
+                } else {
+                    logger.warn(`Senha incorreta para usuário: ${credentials.username}`, 'databaseService');
+                    resolve(null); // Senha incorreta
+                }
+            };
+            request.onerror = () => {
+                logger.error('Erro ao buscar usuários para login', 'databaseService', request.error);
+                reject(request.error);
+            };
+        } catch (error) {
+            logger.error('Erro ao fazer login', 'databaseService', error);
+            reject(error);
+        }
     });
 }
 

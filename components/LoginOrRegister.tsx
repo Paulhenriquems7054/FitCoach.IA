@@ -8,6 +8,7 @@ import { useToast } from './ui/Toast';
 import { EyeIcon } from './icons/EyeIcon';
 import { EyeSlashIcon } from './icons/EyeSlashIcon';
 import { useRouter } from '../hooks/useRouter';
+import { logger } from '../utils/logger';
 
 interface LoginOrRegisterProps {
   couponCode: string;
@@ -64,22 +65,100 @@ export const LoginOrRegister: React.FC<LoginOrRegisterProps> = ({
         authData = result.data;
         authError = result.error;
       } else {
-        // Tentar buscar usuário por username e usar o email
-        const { data: userData } = await supabase
-          .from('users')
-          .select('email, username')
-          .eq('username', username)
-          .maybeSingle();
+        // Tentar múltiplas estratégias para login com username
         
-        if (userData && userData.email) {
-          const result = await supabase.auth.signInWithPassword({
-            email: userData.email,
-            password: password,
-          });
-          authData = result.data;
-          authError = result.error;
-        } else {
-          throw new Error('Usuário não encontrado');
+        // Estratégia 1: Tentar username@fitcoach.ia (padrão usado no cadastro)
+        let loginAttempts = [
+          { email: `${username}@fitcoach.ia`, description: 'username@fitcoach.ia' },
+          { email: username, description: 'username direto' },
+        ];
+        
+        // Estratégia 2: Buscar usuário na tabela users para obter email real
+        try {
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id, username')
+            .eq('username', username)
+            .maybeSingle();
+          
+          if (userData && userData.id) {
+            // Usuário encontrado na tabela, tentar fazer login
+            // Primeiro tentar com o padrão username@fitcoach.ia
+            for (const attempt of loginAttempts) {
+              try {
+                const result = await supabase.auth.signInWithPassword({
+                  email: attempt.email,
+                  password: password,
+                });
+                
+                if (result.data && result.data.user) {
+                  authData = result.data;
+                  authError = null;
+                  logger.info(`Login bem-sucedido usando: ${attempt.description}`, 'LoginOrRegister');
+                  break;
+                } else if (result.error) {
+                  authError = result.error;
+                  // Continuar para próxima tentativa
+                }
+              } catch (e) {
+                // Continuar para próxima tentativa
+                continue;
+              }
+            }
+          } else {
+            // Usuário não encontrado na tabela, mas pode estar no Auth
+            // Tentar fazer login mesmo assim
+            logger.warn(`Usuário não encontrado na tabela users, tentando login direto: ${username}`, 'LoginOrRegister');
+            
+            for (const attempt of loginAttempts) {
+              try {
+                const result = await supabase.auth.signInWithPassword({
+                  email: attempt.email,
+                  password: password,
+                });
+                
+                if (result.data && result.data.user) {
+                  authData = result.data;
+                  authError = null;
+                  logger.info(`Login bem-sucedido usando: ${attempt.description}`, 'LoginOrRegister');
+                  break;
+                } else if (result.error) {
+                  authError = result.error;
+                }
+              } catch (e) {
+                continue;
+              }
+            }
+          }
+        } catch (searchError) {
+          logger.warn('Erro ao buscar usuário na tabela, tentando login direto', 'LoginOrRegister', searchError);
+          // Tentar login direto mesmo com erro na busca
+          for (const attempt of loginAttempts) {
+            try {
+              const result = await supabase.auth.signInWithPassword({
+                email: attempt.email,
+                password: password,
+              });
+              
+              if (result.data && result.data.user) {
+                authData = result.data;
+                authError = null;
+                break;
+              } else if (result.error) {
+                authError = result.error;
+              }
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+        
+        // Se ainda não conseguiu fazer login
+        if (!authData || !authData.user) {
+          if (authError?.message?.includes('Invalid login credentials') || authError?.message?.includes('Email not confirmed')) {
+            throw new Error(authError.message);
+          }
+          throw new Error('Usuário não encontrado ou credenciais inválidas. Verifique se você usou o email correto no cadastro.');
         }
       }
 
@@ -90,14 +169,37 @@ export const LoginOrRegister: React.FC<LoginOrRegisterProps> = ({
       // Buscar perfil do usuário
       const userProfile = await authService.getCurrentUserProfile();
       if (!userProfile) {
-        throw new Error('Erro ao carregar perfil do usuário');
+        // Se não encontrou o perfil, pode ser que ainda não foi criado
+        // Tentar aguardar e buscar novamente
+        logger.warn('Perfil não encontrado imediatamente após login, aguardando...', 'LoginOrRegister');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const retryProfile = await authService.getCurrentUserProfile();
+        
+        if (!retryProfile) {
+          throw new Error('Perfil do usuário não encontrado. O perfil pode ainda estar sendo criado. Tente novamente em alguns segundos.');
+        }
+        
+        setUser(retryProfile);
+      } else {
+        setUser(userProfile);
       }
-
-      setUser(userProfile);
+      
       showToast('Login realizado com sucesso!', 'success');
       onSuccess();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro ao fazer login';
+      let errorMessage = 'Erro ao fazer login';
+      
+      if (err instanceof Error) {
+        // Tratar rate limiting do Supabase
+        if (err.message.includes('For security purposes') || err.message.includes('rate limit') || err.message.includes('seconds')) {
+          const match = err.message.match(/(\d+)\s*seconds?/);
+          const seconds = match ? match[1] : 'alguns';
+          errorMessage = `Muitas tentativas. Aguarde ${seconds} segundos antes de tentar novamente.`;
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
       setError(errorMessage);
       showToast(errorMessage, 'error');
     } finally {
@@ -165,13 +267,56 @@ export const LoginOrRegister: React.FC<LoginOrRegisterProps> = ({
         couponCode
       );
 
+      // Validar se o usuário foi retornado corretamente
+      if (!result || !result.user) {
+        throw new Error('Erro ao criar conta: usuário não foi retornado');
+      }
+
+      // Validar campos obrigatórios do usuário
+      if (!result.user.id || !result.user.nome) {
+        throw new Error('Erro ao criar conta: dados do usuário incompletos');
+      }
+
+      // Definir o usuário no contexto
       setUser(result.user);
       showToast('Conta criada com sucesso!', 'success');
+      
+      // Aguardar um pouco antes de chamar onSuccess para garantir que o usuário foi definido
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       onSuccess();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro ao criar conta';
+      let errorMessage = 'Erro ao criar conta';
+      let showWaitMessage = false;
+      let waitSeconds = 0;
+      
+      if (err instanceof Error) {
+        // Tratar rate limiting do Supabase
+        if (err.message.includes('For security purposes') || err.message.includes('rate limit') || err.message.includes('seconds') || err.message.includes('after')) {
+          const match = err.message.match(/(\d+)\s*seconds?/i);
+          waitSeconds = match ? parseInt(match[1], 10) : 10;
+          showWaitMessage = true;
+          errorMessage = `⏱️ Muitas tentativas de cadastro detectadas.\n\nPor segurança, o Supabase bloqueou temporariamente novos cadastros.\n\n⏳ Aguarde ${waitSeconds} segundos antes de tentar novamente.\n\n💡 Dica: Se você já criou uma conta, tente fazer login ao invés de criar uma nova.`;
+        } else if (err.message.includes('User already registered') || err.message.includes('already registered')) {
+          errorMessage = '✅ Este email já está cadastrado!\n\nTente fazer login ao invés de criar uma nova conta.';
+        } else if (err.message.includes('Password') || err.message.includes('password')) {
+          errorMessage = 'A senha deve ter pelo menos 6 caracteres.';
+        } else if (err.message.includes('Email signups are disabled')) {
+          errorMessage = '⚠️ Cadastros por email estão desabilitados no Supabase.\n\nEntre em contato com o suporte ou tente fazer login se já tiver uma conta.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
       setError(errorMessage);
       showToast(errorMessage, 'error');
+      
+      // Se for rate limit, mostrar mensagem adicional após alguns segundos
+      if (showWaitMessage && waitSeconds > 0) {
+        setTimeout(() => {
+          showToast(`⏳ Você pode tentar novamente em ${Math.max(0, waitSeconds - 5)} segundos...`, 'info');
+        }, 5000);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -345,13 +490,20 @@ export const LoginOrRegister: React.FC<LoginOrRegisterProps> = ({
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading || !name.trim() || !username.trim() || !email.trim() || !password.trim() || password !== confirmPassword}
-              >
-                {isLoading ? 'Criando conta...' : 'Criar Conta'}
-              </Button>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading || !name.trim() || !username.trim() || !email.trim() || !password.trim() || password !== confirmPassword}
+              onClick={(e) => {
+                // Prevenir múltiplos cliques
+                if (isLoading) {
+                  e.preventDefault();
+                  return;
+                }
+              }}
+            >
+              {isLoading ? 'Criando conta...' : 'Criar Conta'}
+            </Button>
             </form>
           )}
 

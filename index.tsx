@@ -46,8 +46,18 @@ if ('serviceWorker' in navigator) {
     // Override service worker registration in dev mode to prevent any registration
     const originalRegister = navigator.serviceWorker.register;
     navigator.serviceWorker.register = function() {
-      console.log('[SW] Service worker registration blocked in dev mode');
+      // Silently ignore in development - return a rejected promise that won't log errors
       return Promise.reject(new Error('Service workers disabled in development'));
+    };
+    
+    // Suppress console errors for service worker in development
+    const originalError = console.error;
+    console.error = function(...args: any[]) {
+      // Filter out service worker errors in development
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('[SW]')) {
+        return; // Don't log service worker errors in dev
+      }
+      originalError.apply(console, args);
     };
   } else if (import.meta.env.PROD) {
     // Production: Register service worker
@@ -91,7 +101,12 @@ if ('serviceWorker' in navigator) {
             }, 300000);
           })
           .catch((registrationError) => {
-            console.error('[SW] Registration failed:', registrationError);
+            // Silently ignore service worker errors in development
+            // Only log errors in production
+            if (import.meta.env.PROD) {
+              console.error('[SW] Registration failed:', registrationError);
+            }
+            // In development, do nothing - service workers are disabled
           });
       }, 100);
     });

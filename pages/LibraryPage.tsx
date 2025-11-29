@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Card } from '../components/ui/Card';
 import { getAvailableExercisesByGroup, getExerciseGif } from '../services/exerciseGifService';
 import { BookOpenIcon } from '../components/icons/BookOpenIcon';
+import { GifLoader } from '../components/ui/GifLoader';
 
 interface ExerciseInfo {
     name: string;
@@ -95,23 +96,26 @@ const ExerciseCard: React.FC<{ exercise: ExerciseInfo }> = ({ exercise }) => {
                     {getExerciseDescription(exercise.name)}
                 </p>
 
-                {exercise.gifPath && showGif && !imageError && (
-                    <div className="mt-4 rounded-lg overflow-hidden border-2 border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-900 shadow-lg">
-                        <img
+                {exercise.gifPath && showGif && (
+                    <div 
+                        className="mt-4 rounded-lg overflow-hidden border-2 border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-900 shadow-lg"
+                        style={{
+                            willChange: 'contents',
+                            contain: 'layout style paint',
+                        }}
+                    >
+                        <GifLoader
                             src={exercise.gifPath}
                             alt={`Demonstração de ${exercise.name}`}
                             className="w-full h-auto max-h-[300px] object-contain"
-                            loading="lazy"
-                            onError={() => {
-                                setImageError(true);
-                            }}
+                            onError={() => setImageError(true)}
                         />
                     </div>
                 )}
 
                 {imageError && exercise.gifPath && (
                     <div className="mt-4 p-3 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs text-slate-500 dark:text-slate-400 text-center">
-                        GIF não disponível no momento
+                        GIF não disponível: {exercise.gifPath}
                     </div>
                 )}
             </div>

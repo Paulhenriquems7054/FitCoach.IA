@@ -120,6 +120,38 @@ body {
   top: 0;
 }
 
+/* Otimizações de performance para GIFs animados */
+img[src$=".gif"] {
+  /* Forçar aceleração de hardware */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
+  
+  /* Otimizações de renderização */
+  will-change: transform;
+  contain: layout style paint;
+  isolation: isolate;
+  
+  /* Melhorar qualidade de renderização */
+  image-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  /* Evitar reflows */
+  vertical-align: middle;
+}
+
+/* Container de GIFs - otimizações adicionais */
+.gif-container {
+  will-change: contents;
+  contain: layout style paint;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
 /* FIX CRÍTICO: Garantir que o botão CTA da página de apresentação exiba texto completo */
 #presentation-cta-button {
   min-width: 280px !important;

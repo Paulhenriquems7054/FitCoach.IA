@@ -78,7 +78,7 @@
           if (isDev) {
             var originalRegister = navigator.serviceWorker.register;
             navigator.serviceWorker.register = function() {
-              console.log('[SW] Registration blocked in development');
+              // Silently ignore in development - no need to log
               return Promise.reject(new Error('Service workers disabled in development'));
             };
           }

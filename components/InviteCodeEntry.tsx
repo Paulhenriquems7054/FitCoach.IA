@@ -51,7 +51,22 @@ export const InviteCodeEntry: React.FC<InviteCodeEntryProps> = ({ onCodeValidate
         showToast(errorMessage, 'error');
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro ao validar código';
+      let errorMessage = 'Erro ao validar código';
+      
+      if (err instanceof Error) {
+        // Verificar se é erro de configuração do Supabase
+        if (err.message.includes('Variáveis de ambiente do Supabase')) {
+          errorMessage = 'Supabase não configurado. Verifique o arquivo .env.local com VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY';
+        } else if (err.message.includes('For security purposes') || err.message.includes('rate limit') || err.message.includes('seconds')) {
+          // Tratar rate limiting
+          const match = err.message.match(/(\d+)\s*seconds?/);
+          const seconds = match ? match[1] : 'alguns';
+          errorMessage = `Muitas tentativas. Aguarde ${seconds} segundos antes de tentar novamente.`;
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
       setError(errorMessage);
       showToast(errorMessage, 'error');
     } finally {

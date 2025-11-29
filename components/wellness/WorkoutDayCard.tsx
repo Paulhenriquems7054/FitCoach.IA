@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card } from '../ui/Card';
 import type { WorkoutDay, Exercise } from '../../types';
 import { getExerciseGif } from '../../services/exerciseGifService';
+import { useGifPreloader } from '../../hooks/useGifPreloader';
+import { GifLoader } from '../ui/GifLoader';
 
 interface WorkoutDayCardProps {
     workoutDay: WorkoutDay;
@@ -37,16 +39,6 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
         setExpandedExercises(newExpanded);
     };
 
-    // Verificar se exercícios são do tipo Exercise[] ou string[]
-    const exercises = workoutDay.exercicios;
-    
-    // Verificar se é array de objetos (Exercise[]) - suporta múltiplos formatos
-    const hasDetailedExercises = exercises.length > 0 && 
-        typeof exercises[0] === 'object' && 
-        exercises[0] !== null &&
-        !Array.isArray(exercises[0]) &&
-        ('name' in exercises[0] || 'nome' in exercises[0]);
-    
     // Função auxiliar para normalizar exercício (suporta formatos diferentes da IA)
     const normalizeExercise = (ex: any): Exercise => {
         if (typeof ex === 'string') {
@@ -63,6 +55,29 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
             rest: ex.rest || ex.descanso || ex.restTime,
         };
     };
+
+    // Verificar se exercícios são do tipo Exercise[] ou string[]
+    const exercises = workoutDay.exercicios;
+    
+    // Verificar se é array de objetos (Exercise[]) - suporta múltiplos formatos
+    const hasDetailedExercises = exercises.length > 0 && 
+        typeof exercises[0] === 'object' && 
+        exercises[0] !== null &&
+        !Array.isArray(exercises[0]) &&
+        ('name' in exercises[0] || 'nome' in exercises[0]);
+
+    // Precarregar GIFs dos exercícios em background
+    const gifPaths = useMemo(() => {
+        return exercises.map((ex: any) => {
+            if (typeof ex === 'string') {
+                return getExerciseGif(ex);
+            }
+            const exercise = normalizeExercise(ex);
+            return getExerciseGif(exercise.name);
+        });
+    }, [exercises]);
+
+    const { preloadedGifs } = useGifPreloader(gifPaths);
 
     const intensityColors = {
         baixa: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
@@ -194,15 +209,20 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                                             </div>
                                             
                                             {gifPath && isGifExpanded && (
-                                                <div className="flex-shrink-0 w-full sm:w-[280px] md:w-[320px] lg:w-[360px] rounded-lg overflow-hidden border-2 border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-900 shadow-lg flex items-center justify-center min-h-[150px] sm:min-h-[180px] md:min-h-[220px] lg:min-h-[250px] max-w-full mx-auto sm:mx-0">
-                                                    <img
+                                                <div 
+                                                    className="flex-shrink-0 w-full sm:w-[280px] md:w-[320px] lg:w-[360px] rounded-lg overflow-hidden border-2 border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-900 shadow-lg flex items-center justify-center min-h-[150px] sm:min-h-[180px] md:min-h-[220px] lg:min-h-[250px] max-w-full mx-auto sm:mx-0"
+                                                    style={{
+                                                        willChange: 'contents',
+                                                        contain: 'layout style paint',
+                                                    }}
+                                                >
+                                                    <GifLoader
                                                         src={gifPath}
                                                         alt={`Demonstração de ${exercise.name}`}
                                                         className="w-full h-full object-contain"
-                                                        loading="lazy"
+                                                        preloaded={preloadedGifs.has(gifPath)}
                                                         onError={(e) => {
                                                             console.warn(`GIF não encontrado: ${gifPath}`);
-                                                            (e.target as HTMLImageElement).style.display = 'none';
                                                         }}
                                                     />
                                                 </div>

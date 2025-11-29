@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from '../components/ui/Card';
 import { useUser } from '../context/UserContext';
 import { Button } from '../components/ui/Button';
@@ -9,6 +9,7 @@ import { SparklesIcon } from '../components/icons/SparklesIcon';
 import { ChartBarIcon } from '../components/icons/ChartBarIcon';
 import { BoltIcon } from '../components/icons/BoltIcon';
 import { CheckoutModal } from '../components/CheckoutModal';
+import { CancelSubscriptionModal } from '../components/CancelSubscriptionModal';
 import { getSubscriptionPlans, getActiveSubscription } from '../services/supabaseService';
 import { logger } from '../utils/logger';
 
@@ -21,12 +22,13 @@ interface SubscriptionPlan {
     price_yearly: number | null;
     features: string[];
     limits: Record<string, number>;
+    plan_category?: string;
 }
 
 const PremiumPage: React.FC = () => {
     const { user } = useUser();
     const { showError, showSuccess } = useToast();
-    const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+    const [allPlans, setAllPlans] = useState<SubscriptionPlan[]>([]);
     const [activeSubscription, setActiveSubscription] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [checkoutModal, setCheckoutModal] = useState<{
@@ -37,6 +39,13 @@ const PremiumPage: React.FC = () => {
         price: number;
         priceYearly?: number;
     } | null>(null);
+    const [cancelModal, setCancelModal] = useState<{
+        isOpen: boolean;
+        subscriptionId: string;
+        subscriptionName: string;
+        expiryDate?: string;
+        caktoPaymentId?: string;
+    } | null>(null);
     
     useEffect(() => {
         loadPlans();
@@ -46,11 +55,7 @@ const PremiumPage: React.FC = () => {
     const loadPlans = async () => {
         try {
             const subscriptionPlans = await getSubscriptionPlans();
-            // Filtrar apenas Basic, Premium e Enterprise (excluir Free)
-            const filteredPlans = subscriptionPlans.filter(p => 
-                ['basic', 'premium', 'enterprise'].includes(p.name)
-            );
-            setPlans(filteredPlans.map(p => ({
+            setAllPlans(subscriptionPlans.map(p => ({
                 id: p.id,
                 name: p.name,
                 display_name: p.display_name,
@@ -59,6 +64,7 @@ const PremiumPage: React.FC = () => {
                 price_yearly: p.price_yearly,
                 features: (p.features as string[]) || [],
                 limits: (p.limits as Record<string, number>) || {},
+                plan_category: (p as any).plan_category || null,
             })));
         } catch (error) {
             logger.error('Erro ao carregar planos', 'PremiumPage', error);
@@ -70,8 +76,6 @@ const PremiumPage: React.FC = () => {
     
     const loadActiveSubscription = async () => {
         try {
-            // Buscar assinatura usando username do usuário logado
-            // O webhook cria o username no Supabase baseado no email do pagamento
             const username = user.username;
             
             if (username) {
@@ -94,36 +98,10 @@ const PremiumPage: React.FC = () => {
         }
     };
     
-    const getPlanFeatures = (planName: string): string[] => {
-        // Features específicas conforme especificado pelo usuário
-        const planFeatures: Record<string, string[]> = {
-            'basic': [
-                'Treinos Personalizados',
-                'Nutrição Básica',
-                'Suporte por Email'
-            ],
-            'premium': [
-                'Tudo do Basic',
-                'Nutrição Avançada + Receitas',
-                'Análise de Desempenho IA',
-                'Suporte Prioritário'
-            ],
-            'enterprise': [
-                'Para academias',
-                'Tudo do Premium',
-                'Gestão de Múltiplos Alunos',
-                'Dashboard de Academia',
-                'Suporte Dedicado 24/7'
-            ]
-        };
-        
-        return planFeatures[planName] || [];
-    };
-    
-    const getPlanDescription = (planName: string): string => {
-        const plan = plans.find(p => p.name === planName);
-        return plan?.description || '';
-    };
+    // Separar planos por categoria
+    const b2cPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'b2c'), [allPlans]);
+    const b2bPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'b2b'), [allPlans]);
+    const personalPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'personal'), [allPlans]);
     
     const handleSubscribe = (plan: SubscriptionPlan) => {
         setCheckoutModal({
@@ -139,12 +117,147 @@ const PremiumPage: React.FC = () => {
     const handleCheckoutSuccess = async () => {
         showSuccess('Assinatura ativada com sucesso!');
         setCheckoutModal(null);
-        // Recarregar assinatura
         await loadActiveSubscription();
     };
     
+    // Componente para renderizar um plano
+    const PlanCard: React.FC<{
+        plan: SubscriptionPlan;
+        badge?: string;
+        badgeColor?: string;
+        highlight?: boolean;
+        showYearlyPrice?: boolean;
+    }> = ({ plan, badge, badgeColor = 'primary', highlight = false, showYearlyPrice = false }) => {
+        const monthlyPrice = plan.price_monthly;
+        const yearlyPrice = plan.price_yearly;
+        const savings = yearlyPrice ? (monthlyPrice * 12) - yearlyPrice : 0;
+        
+        return (
+            <Card 
+                className={`flex flex-col relative hover:shadow-xl transition-all duration-300 ${
+                    highlight 
+                        ? 'border-2 border-primary-500 bg-gradient-to-br from-primary-50/50 to-amber-50/50 dark:from-primary-900/10 dark:to-amber-900/10 scale-105' 
+                        : 'hover:shadow-lg'
+                }`}
+            >
+                {badge && (
+                    <div className={`absolute -top-3 sm:-top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r ${
+                        badgeColor === 'primary' ? 'from-primary-600 to-amber-500' :
+                        badgeColor === 'blue' ? 'from-blue-600 to-blue-500' :
+                        'from-green-600 to-green-500'
+                    } text-white text-xs font-bold px-3 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-lg animate-pulse`}>
+                        {badge}
+                    </div>
+                )}
+                
+                <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 pt-6 sm:pt-8">
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-2">
+                        {plan.display_name}
+                    </h2>
+                    <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mb-4">
+                        {plan.description}
+                    </p>
+                    <div className="mt-3 sm:mt-4">
+                        {showYearlyPrice && yearlyPrice ? (
+                            <div>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+                                        R$ {yearlyPrice.toFixed(2).replace('.', ',')}
+                                    </span>
+                                    <span className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">/ano</span>
+                                </div>
+                                {savings > 0 && (
+                                    <div className="mt-2">
+                                        <span className="text-sm text-green-600 dark:text-green-400 font-semibold">
+                                            Economia de R$ {savings.toFixed(2).replace('.', ',')}
+                                        </span>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            ou 12x de R$ {monthlyPrice.toFixed(2).replace('.', ',')}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div>
+                                <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+                                    R$ {monthlyPrice.toFixed(2).replace('.', ',')}
+                                </span>
+                                <span className="text-slate-500 dark:text-slate-400 ml-2 text-xs sm:text-sm">/mês</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                
+                <ul className="p-4 sm:p-6 space-y-2 sm:space-y-3 flex-grow">
+                    {plan.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2 sm:gap-3">
+                            <CheckCircleIcon className={`w-4 h-4 sm:w-5 sm:h-5 mt-0.5 flex-shrink-0 ${
+                                highlight ? 'text-primary-500' : 'text-slate-400'
+                            }`} />
+                            <span className={`text-sm sm:text-base ${
+                                highlight 
+                                    ? 'font-semibold text-slate-900 dark:text-white' 
+                                    : 'text-slate-700 dark:text-slate-300'
+                            }`}>
+                                {feature}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+                
+                <div className={`p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 ${
+                    highlight ? 'bg-primary-50/50 dark:bg-primary-900/20' : ''
+                }`}>
+                    <Button
+                        onClick={() => handleSubscribe(plan)}
+                        variant={highlight ? "primary" : "secondary"}
+                        className={`w-full ${
+                            highlight
+                                ? 'bg-gradient-to-r from-primary-600 to-amber-500 hover:from-primary-700 hover:to-amber-600 text-white'
+                                : ''
+                        }`}
+                        size="lg"
+                    >
+                        {highlight && <StarIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />}
+                        Assinar {plan.display_name}
+                    </Button>
+                </div>
+            </Card>
+        );
+    };
+    
+    // Componente para seção de explicação
+    const HowItWorksSection: React.FC<{
+        title: string;
+        steps: string[];
+        icon: React.ReactNode;
+    }> = ({ title, steps, icon }) => (
+        <Card className="mt-6 sm:mt-8">
+            <div className="p-4 sm:p-6">
+                <div className="flex items-center gap-3 mb-4">
+                    {icon}
+                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+                        {title}
+                    </h3>
+                </div>
+                <ol className="space-y-3">
+                    {steps.map((step, idx) => (
+                        <li key={idx} className="flex gap-3">
+                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-500 text-white flex items-center justify-center text-sm font-bold">
+                                {idx + 1}
+                            </span>
+                            <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300 pt-0.5">
+                                {step}
+                            </span>
+                        </li>
+                    ))}
+                </ol>
+            </div>
+        </Card>
+    );
+    
     return (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
             <div className="text-center mb-8 sm:mb-12">
                 <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 mb-4 animate-pulse">
                     <StarIcon className="w-8 h-8 sm:w-12 sm:h-12 text-white" />
@@ -192,112 +305,199 @@ const PremiumPage: React.FC = () => {
                         </div>
                     </Card>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
-                        <Card className="text-center p-4 sm:p-6">
-                            <ChartBarIcon className="w-10 h-10 sm:w-12 sm:h-12 text-primary-500 mx-auto mb-3 sm:mb-4" />
-                            <h3 className="font-bold text-base sm:text-lg mb-2">Relatórios Ilimitados</h3>
-                            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                                Gere quantos relatórios quiser para acompanhar seu progresso
-                            </p>
-                        </Card>
-                        <Card className="text-center p-4 sm:p-6">
-                            <BoltIcon className="w-10 h-10 sm:w-12 sm:h-12 text-amber-500 mx-auto mb-3 sm:mb-4" />
-                            <h3 className="font-bold text-base sm:text-lg mb-2">IA Avançada</h3>
-                            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                                Chat com memória longa e análises mais profundas
-                            </p>
-                        </Card>
-                        <Card className="text-center p-4 sm:p-6 sm:col-span-2 md:col-span-1">
-                            <SparklesIcon className="w-10 h-10 sm:w-12 sm:h-12 text-purple-500 mx-auto mb-3 sm:mb-4" />
-                            <h3 className="font-bold text-base sm:text-lg mb-2">Recursos Exclusivos</h3>
-                            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                                Acesso antecipado a novos recursos e funcionalidades
-                            </p>
-                        </Card>
-                    </div>
+                    {/* Seção de Gerenciamento de Assinatura */}
+                    <Card>
+                        <div className="p-4 sm:p-6">
+                            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-4">
+                                Gerenciar Assinatura
+                            </h3>
+                            <div className="space-y-4">
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <span className="text-slate-500 dark:text-slate-400">Plano:</span>
+                                            <p className="font-semibold text-slate-900 dark:text-white mt-1">
+                                                {activeSubscription.plan?.display_name || activeSubscription.plan?.name || 'N/A'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 dark:text-slate-400">Status:</span>
+                                            <p className="font-semibold text-green-600 dark:text-green-400 mt-1 capitalize">
+                                                {activeSubscription.status === 'active' ? 'Ativa' : activeSubscription.status}
+                                            </p>
+                                        </div>
+                                        {activeSubscription.current_period_end && (
+                                            <div>
+                                                <span className="text-slate-500 dark:text-slate-400">Próxima Renovação:</span>
+                                                <p className="font-semibold text-slate-900 dark:text-white mt-1">
+                                                    {new Date(activeSubscription.current_period_end).toLocaleDateString('pt-BR', {
+                                                        day: '2-digit',
+                                                        month: '2-digit',
+                                                        year: 'numeric'
+                                                    })}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {activeSubscription.billing_cycle && (
+                                            <div>
+                                                <span className="text-slate-500 dark:text-slate-400">Ciclo de Faturamento:</span>
+                                                <p className="font-semibold text-slate-900 dark:text-white mt-1 capitalize">
+                                                    {activeSubscription.billing_cycle === 'monthly' ? 'Mensal' : 'Anual'}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {activeSubscription.cancel_at_period_end && (
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                                        <p className="text-sm text-amber-800 dark:text-amber-200">
+                                            ⚠️ Sua assinatura será cancelada no fim do período pago. Você manterá acesso até{' '}
+                                            {activeSubscription.current_period_end 
+                                                ? new Date(activeSubscription.current_period_end).toLocaleDateString('pt-BR', {
+                                                    day: '2-digit',
+                                                    month: '2-digit',
+                                                    year: 'numeric'
+                                                })
+                                                : 'o fim do período'}
+                                            .
+                                        </p>
+                                    </div>
+                                )}
+
+                                {!activeSubscription.cancel_at_period_end && (
+                                    <Button
+                                        onClick={() => {
+                                            const planName = activeSubscription.plan?.display_name || activeSubscription.plan?.name || 'Assinatura';
+                                            setCancelModal({
+                                                isOpen: true,
+                                                subscriptionId: activeSubscription.id,
+                                                subscriptionName: planName,
+                                                expiryDate: activeSubscription.current_period_end,
+                                                caktoPaymentId: activeSubscription.provider_payment_id || activeSubscription.cakto_payment_id,
+                                            });
+                                        }}
+                                        variant="danger"
+                                        className="w-full sm:w-auto"
+                                    >
+                                        Cancelar Assinatura
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </Card>
                 </div>
             ) : (
-                <div className="space-y-6 sm:space-y-8">
-                    <div className="text-center mb-6">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
-                            Escolha o plano ideal para você ou sua academia.
-                        </h2>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 items-stretch">
-                        {plans.map((plan, index) => {
-                            const isPopular = plan.name === 'premium';
-                            const features = getPlanFeatures(plan.name);
-                            const description = getPlanDescription(plan.name);
+                <div className="space-y-8 sm:space-y-12">
+                    {/* PLANOS B2C - CONSUMIDOR FINAL */}
+                    {b2cPlans.length > 0 && (
+                        <div>
+                            <div className="text-center mb-6">
+                                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                                    Planos para Você
+                                </h2>
+                                <p className="text-slate-600 dark:text-slate-400">
+                                    Escolha o plano ideal para seus objetivos pessoais
+                                </p>
+                            </div>
                             
-                            return (
-                                <Card 
-                                    key={plan.id}
-                                    className={`flex flex-col relative hover:shadow-xl transition-all duration-300 ${
-                                        isPopular 
-                                            ? 'border-2 border-primary-500 bg-gradient-to-br from-primary-50/50 to-amber-50/50 dark:from-primary-900/10 dark:to-amber-900/10 scale-105' 
-                                            : 'hover:shadow-lg'
-                                    }`}
-                                >
-                                    {isPopular && (
-                                        <div className="absolute -top-3 sm:-top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary-600 to-amber-500 text-white text-xs font-bold px-3 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-lg animate-pulse">
-                                            Mais Popular
-                                        </div>
-                                    )}
-                                    
-                                    <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 pt-6 sm:pt-8">
-                                        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                                            {plan.display_name}
-                                        </h2>
-                                        <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mb-4">
-                                            {description}
-                                        </p>
-                                        <div className="mt-3 sm:mt-4">
-                                            <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                                                R$ {plan.price_monthly.toFixed(2).replace('.', ',')}
-                                            </span>
-                                            <span className="text-slate-500 dark:text-slate-400 ml-2 text-xs sm:text-sm">/mês</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <ul className="p-4 sm:p-6 space-y-2 sm:space-y-3 flex-grow">
-                                        {features.map((feature, idx) => (
-                                            <li key={idx} className="flex items-start gap-2 sm:gap-3">
-                                                <CheckCircleIcon className={`w-4 h-4 sm:w-5 sm:h-5 mt-0.5 flex-shrink-0 ${
-                                                    isPopular ? 'text-primary-500' : 'text-slate-400'
-                                                }`} />
-                                                <span className={`text-sm sm:text-base ${
-                                                    isPopular 
-                                                        ? 'font-semibold text-slate-900 dark:text-white' 
-                                                        : 'text-slate-700 dark:text-slate-300'
-                                                }`}>
-                                                    {feature}
-                                                </span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                    
-                                    <div className={`p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 ${
-                                        isPopular ? 'bg-primary-50/50 dark:bg-primary-900/20' : ''
-                                    }`}>
-                                        <Button
-                                            onClick={() => handleSubscribe(plan)}
-                                            variant={isPopular ? "primary" : "secondary"}
-                                            className={`w-full ${
-                                                isPopular
-                                                    ? 'bg-gradient-to-r from-primary-600 to-amber-500 hover:from-primary-700 hover:to-amber-600 text-white'
-                                                    : ''
-                                            }`}
-                                            size="lg"
-                                        >
-                                            {isPopular && <StarIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />}
-                                            Assinar {plan.display_name}
-                                        </Button>
-                                    </div>
-                                </Card>
-                            );
-                        })}
-                    </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-stretch max-w-5xl mx-auto">
+                                {b2cPlans.map((plan) => {
+                                    const isAnnual = plan.name === 'annual_vip';
+                                    return (
+                                        <PlanCard
+                                            key={plan.id}
+                                            plan={plan}
+                                            badge={isAnnual ? 'RECOMENDADO' : undefined}
+                                            highlight={isAnnual}
+                                            showYearlyPrice={isAnnual}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PLANOS B2B - ACADEMIAS */}
+                    {b2bPlans.length > 0 && (
+                        <div>
+                            <div className="text-center mb-6">
+                                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                                    Planos para Academias
+                                </h2>
+                                <p className="text-slate-600 dark:text-slate-400">
+                                    Ofereça acesso Premium aos seus alunos sem custo adicional para eles
+                                </p>
+                            </div>
+                            
+                            <HowItWorksSection
+                                title="Como Funciona"
+                                steps={[
+                                    'Academia compra o pacote → paga mensalmente',
+                                    'Recebe um Código Mestre único → ex: ACADEMIA-XYZ',
+                                    'Distribui o código para os alunos → via WhatsApp, e-mail, etc.',
+                                    'Alunos ativam no app → inserem o código e ganham acesso Premium',
+                                    'Acesso é gratuito para o aluno → enquanto a academia estiver pagando'
+                                ]}
+                                icon={<ChartBarIcon className="w-6 h-6 text-primary-500" />}
+                            />
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 items-stretch mt-6">
+                                {b2bPlans.map((plan) => {
+                                    const isPopular = plan.name === 'academy_growth';
+                                    return (
+                                        <PlanCard
+                                            key={plan.id}
+                                            plan={plan}
+                                            badge={isPopular ? 'MAIS VENDIDO' : undefined}
+                                            highlight={isPopular}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PLANOS PERSONAL TRAINER */}
+                    {personalPlans.length > 0 && (
+                        <div>
+                            <div className="text-center mb-6">
+                                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                                    Planos para Personal Trainers
+                                </h2>
+                                <p className="text-slate-600 dark:text-slate-400">
+                                    Entregue Nutricionista + Personal Trainer IA junto com seu treino
+                                </p>
+                            </div>
+                            
+                            <HowItWorksSection
+                                title="Como Funciona"
+                                steps={[
+                                    'Personal compra o plano → paga mensalmente',
+                                    'Recebe um Código de Equipe → ex: PERSONAL-ABC123',
+                                    'Envia código para clientes → via WhatsApp',
+                                    'Clientes ativam no app → ganham acesso Premium',
+                                    'Acesso é gratuito para o cliente → enquanto o personal estiver pagando'
+                                ]}
+                                icon={<BoltIcon className="w-6 h-6 text-amber-500" />}
+                            />
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-stretch mt-6 max-w-4xl mx-auto">
+                                {personalPlans.map((plan) => {
+                                    const isPopular = plan.name === 'personal_team_15';
+                                    return (
+                                        <PlanCard
+                                            key={plan.id}
+                                            plan={plan}
+                                            badge={isPopular ? 'MAIS VANTAJOSO' : undefined}
+                                            badgeColor={isPopular ? 'green' : undefined}
+                                            highlight={isPopular}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Seção de Recargas */}
                     <div className="mt-8 sm:mt-12">
@@ -352,7 +552,7 @@ const PremiumPage: React.FC = () => {
                                 </ul>
                                 <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700">
                                     <Button
-                                        onClick={() => showError('Recarga em breve disponível')}
+                                        onClick={() => window.open('https://pay.cakto.com.br/ihfy8cz_668443', '_blank', 'noopener,noreferrer')}
                                         variant="secondary"
                                         className="w-full"
                                         size="lg"
@@ -406,7 +606,7 @@ const PremiumPage: React.FC = () => {
                                 </ul>
                                 <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 bg-primary-50/50 dark:bg-primary-900/20">
                                     <Button
-                                        onClick={() => showError('Recarga em breve disponível')}
+                                        onClick={() => window.open('https://pay.cakto.com.br/hhxugxb_668446', '_blank', 'noopener,noreferrer')}
                                         variant="primary"
                                         className="w-full bg-gradient-to-r from-primary-600 to-blue-500 hover:from-primary-700 hover:to-blue-600 text-white"
                                         size="lg"
@@ -422,7 +622,7 @@ const PremiumPage: React.FC = () => {
                                     <div className="flex items-center gap-2 mb-2">
                                         <SparklesIcon className="w-6 h-6 text-purple-500" />
                                         <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
-                                            Passe Livre 30 Dias VIP
+                                            Passe Livre 30 Dias
                                         </h3>
                                     </div>
                                     <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-3">
@@ -457,7 +657,7 @@ const PremiumPage: React.FC = () => {
                                 </ul>
                                 <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700">
                                     <Button
-                                        onClick={() => showError('Recarga em breve disponível')}
+                                        onClick={() => window.open('https://pay.cakto.com.br/trszqtv_668453', '_blank', 'noopener,noreferrer')}
                                         variant="secondary"
                                         className="w-full"
                                         size="lg"
@@ -469,6 +669,7 @@ const PremiumPage: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Seção de Benefícios */}
                     <Card className="mt-6 sm:mt-8">
                         <div className="p-4 sm:p-6 md:p-8">
                             <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-4 sm:mb-6 text-center">
@@ -552,6 +753,21 @@ const PremiumPage: React.FC = () => {
                     price={checkoutModal.price}
                     priceYearly={checkoutModal.priceYearly}
                     onSuccess={handleCheckoutSuccess}
+                />
+            )}
+
+            {cancelModal && (
+                <CancelSubscriptionModal
+                    isOpen={cancelModal.isOpen}
+                    onClose={() => setCancelModal(null)}
+                    subscriptionId={cancelModal.subscriptionId}
+                    subscriptionName={cancelModal.subscriptionName}
+                    expiryDate={cancelModal.expiryDate}
+                    caktoPaymentId={cancelModal.caktoPaymentId}
+                    onSuccess={() => {
+                        setCancelModal(null);
+                        loadActiveSubscription(); // Recarregar assinatura
+                    }}
                 />
             )}
         </div>
