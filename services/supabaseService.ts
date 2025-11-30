@@ -51,8 +51,8 @@ export interface Database {
           // Controle de Chat
           text_msg_count_today: number | null;
           last_msg_date: string | null;
-          // Email
-          email: string | null;
+          // Nota: email não está na tabela users, está em auth.users
+          // email: string | null; // Removido - não existe na tabela
           created_at: string;
           updated_at: string;
         };
@@ -450,26 +450,12 @@ export async function getActiveSubscription(userId?: string, userEmail?: string,
   
   // Se não tem userId, tentar buscar pelo email ou username
   if (!targetUserId) {
-    // Primeiro tentar pelo email (se a coluna existir)
+    // Nota: email não está na tabela users (está em auth.users)
+    // Para buscar por email, use auth.users ou uma função SQL que acesse auth.users
+    // Por enquanto, pulamos a busca por email e vamos direto para username
     if (userEmail) {
-      try {
-        const { data: userData, error: emailError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', userEmail)
-          .maybeSingle();
-        
-        if (userData && !emailError) {
-          targetUserId = userData.id;
-          logger.info(`Usuário encontrado pelo email: ${userEmail}`, 'supabaseService');
-        } else if (emailError) {
-          // Se a coluna email não existir, ignorar o erro e continuar
-          logger.debug(`Coluna email pode não existir: ${emailError.message}`, 'supabaseService');
-        }
-      } catch (error) {
-        // Ignorar erro se a coluna não existir
-        logger.debug('Tentativa de buscar por email falhou (coluna pode não existir)', 'supabaseService');
-      }
+      logger.debug(`Email fornecido (${userEmail}), mas não buscando na tabela users (coluna não existe)`, 'supabaseService');
+      // TODO: Implementar busca por email via auth.users ou função SQL se necessário
     }
     
     // Se não encontrou pelo email, tentar pelo username
@@ -491,9 +477,10 @@ export async function getActiveSubscription(userId?: string, userEmail?: string,
     // Se ainda não encontrou, tentar buscar todas as assinaturas ativas e verificar
     if (!targetUserId && username) {
       // Buscar usuários com username similar (pode ter diferenças de formatação)
+      // Nota: não selecionar 'email' pois essa coluna não existe na tabela users (está em auth.users)
       const { data: usersData } = await supabase
         .from('users')
-        .select('id, username, email')
+        .select('id, username')
         .ilike('username', `%${username}%`);
       
       if (usersData && usersData.length > 0) {
