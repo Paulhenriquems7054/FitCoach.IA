@@ -23,7 +23,17 @@ export interface CouponValidationResult {
  */
 export async function validateCoupon(code: string): Promise<CouponValidationResult> {
     try {
-        const supabase = getSupabaseClient();
+        let supabase;
+        try {
+            supabase = getSupabaseClient();
+        } catch (configError: any) {
+            // Supabase não configurado
+            logger.warn('Supabase não configurado para validação de cupom', 'couponService', configError);
+            return {
+                isValid: false,
+                error: 'Serviço de validação de cupons não disponível no momento. Por favor, tente novamente mais tarde.'
+            };
+        }
         
         // Buscar cupom
         const { data: coupon, error } = await supabase
@@ -112,7 +122,17 @@ export async function validateCoupon(code: string): Promise<CouponValidationResu
  */
 export async function applyCouponToUser(couponCode: string, userId: string): Promise<{ success: boolean; planLinked?: string; error?: string }> {
     try {
-        const supabase = getSupabaseClient();
+        let supabase;
+        try {
+            supabase = getSupabaseClient();
+        } catch (configError: any) {
+            // Supabase não configurado
+            logger.warn('Supabase não configurado para aplicar cupom', 'couponService', configError);
+            return {
+                success: false,
+                error: 'Serviço de cupons não disponível no momento. Por favor, tente novamente mais tarde.'
+            };
+        }
         
         // Usar a função SQL do Supabase para aplicar o cupom
         const { data, error } = await supabase.rpc('validate_and_apply_coupon', {
