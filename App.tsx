@@ -36,6 +36,9 @@ const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const PermissionsManagementPage = lazy(() => import('./pages/PermissionsManagementPage'));
 const VideoPresentationPage = lazy(() => import('./pages/VideoPresentationPage'));
 const PremiumPage = lazy(() => import('./pages/PremiumPage'));
+const ActivationScreen = lazy(() => import('./pages/ActivationScreen'));
+const SubscriptionStatusScreen = lazy(() => import('./pages/SubscriptionStatusScreen'));
+const ChangePlanPage = lazy(() => import('./pages/ChangePlanPage'));
 
 // Componente de loading
 const PageLoader = () => (
@@ -322,6 +325,9 @@ const App: React.FC = () => {
             case '/admin-dashboard': return <AdminDashboardPage />;
             case '/permissions': return <PermissionsManagementPage />;
             case '/premium': return <PremiumPage />;
+            case '/activation': return <ActivationScreen />;
+            case '/subscription-status': return <SubscriptionStatusScreen />;
+            case '/change-plan': return <ChangePlanPage />;
             case '/':
             default:
                 // Se for admin, mostrar dashboard administrativo; caso contrário, mostrar home do aluno

@@ -46,18 +46,50 @@ if ('serviceWorker' in navigator) {
     // Override service worker registration in dev mode to prevent any registration
     const originalRegister = navigator.serviceWorker.register;
     navigator.serviceWorker.register = function() {
-      // Silently ignore in development - return a rejected promise that won't log errors
-      return Promise.reject(new Error('Service workers disabled in development'));
+      // Silently ignore in development - return a resolved promise that won't log errors
+      return Promise.resolve({
+        installing: null,
+        waiting: null,
+        active: null,
+        scope: '/',
+        update: () => Promise.resolve(),
+        unregister: () => Promise.resolve(true),
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => true,
+      } as ServiceWorkerRegistration);
     };
     
-    // Suppress console errors for service worker in development
+    // Suppress console errors and warnings for service worker in development
     const originalError = console.error;
+    const originalWarn = console.warn;
+    
     console.error = function(...args: any[]) {
       // Filter out service worker errors in development
-      if (args[0] && typeof args[0] === 'string' && args[0].includes('[SW]')) {
+      const message = args[0]?.toString() || '';
+      const errorMessage = args[1]?.toString() || '';
+      if (message.includes('Service workers disabled') || 
+          message.includes('[SW]') ||
+          message.includes('serviceWorker') ||
+          errorMessage.includes('Service workers disabled') ||
+          errorMessage.includes('serviceWorker')) {
         return; // Don't log service worker errors in dev
       }
       originalError.apply(console, args);
+    };
+    
+    console.warn = function(...args: any[]) {
+      // Filter out service worker warnings in development
+      const message = args[0]?.toString() || '';
+      const errorMessage = args[1]?.toString() || '';
+      if (message.includes('Service workers disabled') || 
+          message.includes('[SW]') ||
+          message.includes('serviceWorker') ||
+          errorMessage.includes('Service workers disabled') ||
+          errorMessage.includes('serviceWorker')) {
+        return; // Don't log service worker warnings in dev
+      }
+      originalWarn.apply(console, args);
     };
   } else if (import.meta.env.PROD) {
     // Production: Register service worker

@@ -68,7 +68,14 @@ export const useAutoLogout = (timeoutMinutes: number = 30) => {
     // Eventos que indicam atividade do usuário
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
     
-    const handleActivity = () => {
+    const handleActivity = (e: Event) => {
+      // Ignorar eventos de scroll dentro do sidebar
+      const target = e.target as HTMLElement;
+      const sidebar = document.getElementById('sidebar-navigation');
+      if (sidebar && sidebar.contains(target)) {
+        // Não resetar timer para scroll dentro do sidebar
+        return;
+      }
       resetTimer();
     };
 

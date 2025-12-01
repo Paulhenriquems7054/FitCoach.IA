@@ -13,7 +13,16 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
-        strictPort: true,
+        strictPort: true, // Força usar porta 3000
+        open: true, // Abre o navegador automaticamente
+        watch: {
+          // Ignorar mudanças em arquivos que podem causar loops
+          ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**'],
+          // Usar polling apenas se necessário (mais estável)
+          usePolling: false,
+          // Intervalo de polling se necessário
+          interval: 100
+        },
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           'Pragma': 'no-cache',
@@ -22,7 +31,10 @@ export default defineConfig(({ mode }) => {
         hmr: {
           protocol: 'ws',
           host: 'localhost',
-          port: 3000
+          port: 3000,
+          clientPort: 3000,
+          // Melhorar estabilidade do HMR
+          overlay: true
         },
         // Ensure static assets are served with correct MIME types
         middlewareMode: false,

@@ -10,6 +10,7 @@ import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { saveAppSetting } from '../services/databaseService';
 import { Skeleton } from '../components/ui/Skeleton';
+import { ProtectedFeature } from '../components/ProtectedFeature';
 import type { ProgressAnalysis } from '../types';
 
 const AnalysisSkeleton = () => (
@@ -90,8 +91,8 @@ const AnalysisPage: React.FC = () => {
             <Card>
                 <div className="p-4 sm:p-6">
                     <h2 className="text-base sm:text-lg font-bold">Histórico de Peso</h2>
-                    <div style={{ width: '100%', height: 250 }} className="mt-3 sm:mt-4 overflow-x-auto">
-                        <ResponsiveContainer width="100%" minHeight={250}>
+                    <div className="mt-3 sm:mt-4 overflow-x-auto" style={{ width: '100%', minHeight: 250 }}>
+                        <ResponsiveContainer width="100%" height={250} minHeight={250}>
                             <LineChart data={user.weightHistory}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.2)" />
                                 <XAxis dataKey="date" stroke="rgb(100 116 139)" fontSize={12} />
@@ -127,45 +128,47 @@ const AnalysisPage: React.FC = () => {
                 </div>
             </Card>
 
-             <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-center mb-4 sm:mb-6">Análise do FitCoach.IA</h2>
-                {isLoading ? (
-                    <AnalysisSkeleton />
-                ) : error ? (
-                    <Alert type="error" title="Erro na Análise">
-                        <p className="text-sm sm:text-base">{error}</p>
-                    </Alert>
-                ) : analysis ? (
-                    <Card>
-                        <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
-                            <div>
-                                <h3 className="font-semibold text-base sm:text-lg text-primary-700 dark:text-primary-400">Análise Geral</h3>
-                                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mt-1">{analysis.analise_texto}</p>
+            <ProtectedFeature feature="workoutAnalysis">
+                <div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-center mb-4 sm:mb-6">Análise do FitCoach.IA</h2>
+                    {isLoading ? (
+                        <AnalysisSkeleton />
+                    ) : error ? (
+                        <Alert type="error" title="Erro na Análise">
+                            <p className="text-sm sm:text-base">{error}</p>
+                        </Alert>
+                    ) : analysis ? (
+                        <Card>
+                            <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+                                <div>
+                                    <h3 className="font-semibold text-base sm:text-lg text-primary-700 dark:text-primary-400">Análise Geral</h3>
+                                    <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mt-1">{analysis.analise_texto}</p>
+                                </div>
+                                <p className="text-xs sm:text-sm p-3 bg-sky-50 dark:bg-sky-900/50 rounded-lg"><strong>Projeção:</strong> {analysis.projecao_proxima_semana}</p>
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                                    <div className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
+                                        <h4 className="font-semibold text-sm sm:text-base text-green-800 dark:text-green-300">Pontos Fortes</h4>
+                                        <ul className="list-disc list-inside text-xs sm:text-sm text-green-700 dark:text-green-200 mt-2 space-y-1">
+                                            {analysis.pontos_fortes.map((item, i) => <li key={i}>{item}</li>)}
+                                        </ul>
+                                    </div>
+                                    <div className="p-3 sm:p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg">
+                                         <h4 className="font-semibold text-sm sm:text-base text-amber-800 dark:text-amber-300">Áreas para Melhoria</h4>
+                                        <ul className="list-disc list-inside text-xs sm:text-sm text-amber-700 dark:text-amber-200 mt-2 space-y-1">
+                                            {analysis.areas_melhoria.map((item, i) => <li key={i}>{item}</li>)}
+                                        </ul>
+                                    </div>
+                                 </div>
                             </div>
-                            <p className="text-xs sm:text-sm p-3 bg-sky-50 dark:bg-sky-900/50 rounded-lg"><strong>Projeção:</strong> {analysis.projecao_proxima_semana}</p>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                                <div className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
-                                    <h4 className="font-semibold text-sm sm:text-base text-green-800 dark:text-green-300">Pontos Fortes</h4>
-                                    <ul className="list-disc list-inside text-xs sm:text-sm text-green-700 dark:text-green-200 mt-2 space-y-1">
-                                        {analysis.pontos_fortes.map((item, i) => <li key={i}>{item}</li>)}
-                                    </ul>
-                                </div>
-                                <div className="p-3 sm:p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg">
-                                     <h4 className="font-semibold text-sm sm:text-base text-amber-800 dark:text-amber-300">Áreas para Melhoria</h4>
-                                    <ul className="list-disc list-inside text-xs sm:text-sm text-amber-700 dark:text-amber-200 mt-2 space-y-1">
-                                        {analysis.areas_melhoria.map((item, i) => <li key={i}>{item}</li>)}
-                                    </ul>
-                                </div>
-                             </div>
-                        </div>
-                    </Card>
-                ) : (
-                    <Card className="flex flex-col items-center justify-center min-h-[200px] p-4 sm:p-6 text-center">
-                        <TrendingUpIcon className="w-10 h-10 sm:w-12 sm:h-12 text-slate-400" />
-                        <p className="mt-3 sm:mt-4 text-sm sm:text-base text-slate-500 dark:text-slate-400">Adicione mais registros de peso para que a IA possa analisar seu progresso.</p>
-                    </Card>
-                )}
-            </div>
+                        </Card>
+                    ) : (
+                        <Card className="flex flex-col items-center justify-center min-h-[200px] p-4 sm:p-6 text-center">
+                            <TrendingUpIcon className="w-10 h-10 sm:w-12 sm:h-12 text-slate-400" />
+                            <p className="mt-3 sm:mt-4 text-sm sm:text-base text-slate-500 dark:text-slate-400">Adicione mais registros de peso para que a IA possa analisar seu progresso.</p>
+                        </Card>
+                    )}
+                </div>
+            </ProtectedFeature>
         </div>
     );
 };

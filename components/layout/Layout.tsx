@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import Header from '../Header';
-import Sidebar from './Sidebar';
+import Sidebar from './Sidebar.tsx';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useI18n } from '../../context/I18nContext';
 import NutriAssistant from '../chatbot/NutriAssistant';

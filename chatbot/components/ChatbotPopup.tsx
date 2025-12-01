@@ -21,6 +21,9 @@ import { ChatMessage, WebSearchResult, MapSearchResult } from '../types';
 import { logger } from '../../utils/logger';
 import { checkTextUsage, incrementTextMessageCount } from '../../services/usageLimitService';
 import { useToast } from '../../components/ui/Toast';
+import { ProtectedFeature } from '../../components/ProtectedFeature';
+import { useSubscription } from '../../hooks/useSubscription';
+import { VoiceMinutesCounter } from '../../components/VoiceMinutesCounter';
 
 const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> => {
   return new Promise((resolve, reject) => {
@@ -52,6 +55,7 @@ const PLACEHOLDER_TEXT: { [key: string]: string } = {
 
 const ChatbotPopup: React.FC = () => {
   const { showError } = useToast();
+  const { canAccess, getRemainingMinutes } = useSubscription();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -647,6 +651,19 @@ const ChatbotPopup: React.FC = () => {
   const handleRecordButtonClick = useCallback(async () => {
     if (isLoading || isAudioLoading) return; // Prevent interaction if app is busy or audio session is initializing
 
+    // Verificar acesso ao chat de voz
+    if (!canAccess('voiceChat')) {
+      showError('Você não tem acesso ao chat de voz. Assine um plano premium.');
+      return;
+    }
+
+    // Verificar minutos disponíveis
+    const remaining = getRemainingMinutes();
+    if (remaining <= 0) {
+      showError('Você não tem minutos de voz disponíveis. Recarregue seus minutos.');
+      return;
+    }
+
     if (isRecording) { // If already recording voice chat, stop it
       await stopLiveAudioSession();
       setIsRecording(false);
@@ -664,7 +681,7 @@ const ChatbotPopup: React.FC = () => {
         () => setIsRecording(true)
       );
     }
-  }, [isLoading, isAudioLoading, isRecording, isTranscribing, handleStartLiveSession, onUserAudioInputToChat]);
+  }, [isLoading, isAudioLoading, isRecording, isTranscribing, handleStartLiveSession, onUserAudioInputToChat, canAccess, getRemainingMinutes, showError]);
 
   const handleTranscribeAudioButtonClick = useCallback(async () => {
     if (isLoading || isAudioLoading) return; // Prevent interaction if app is busy or audio session is initializing
@@ -735,6 +752,14 @@ const ChatbotPopup: React.FC = () => {
 
   return (
     <>
+      <VoiceMinutesCounter 
+        isActive={isRecording} 
+        onMinutesExhausted={() => {
+          stopLiveAudioSession();
+          setIsRecording(false);
+          showError('Seus minutos de voz acabaram. Recarregue para continuar.');
+        }}
+      />
       {!isOpen && (
         <button
           onClick={togglePopup}
