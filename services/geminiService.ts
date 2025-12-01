@@ -150,7 +150,7 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
             try {
                 const ai = getGeminiClient();
                 const response = await ai.models.generateContent({
-                    model: "gemini-2.5-flash",
+                    model: "gemini-1.5-flash", // Usando modelo estável
                     contents: prompt,
                     config: {
                       responseMimeType: "application/json",
@@ -208,7 +208,7 @@ export const startChat = (user: User, language: 'pt' | 'en' | 'es' = 'pt'): void
   }
   const ai = getGeminiClient();
   chat = ai.chats.create({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-1.5-flash', // Modelo estável
     config: { 
       systemInstruction: langPrompts[language],
       generationConfig: {
@@ -352,7 +352,7 @@ export const moderateContent = async (content: string): Promise<ModerationResult
     try {
         const ai = getGeminiClient();
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-1.5-flash", // Modelo estável
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -511,7 +511,7 @@ export const getAICoachTip = async (user: User): Promise<string> => {
     
     try {
         const ai = getGeminiClient();
-        const response = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
+        const response = await ai.models.generateContent({ model: "gemini-1.5-flash", contents: prompt }); // Modelo estável
         return response.text.trim();
     } catch (error: any) {
         // Silenciar erros de API key inválida e retornar dica genérica
@@ -558,7 +558,7 @@ export const analyzeProgress = async (user: User): Promise<ProgressAnalysis> => 
     `;
     const ai = getGeminiClient();
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-1.5-flash", // Modelo estável
         contents: prompt,
         config: { responseMimeType: "application/json", responseSchema: progressAnalysisSchema }
     });
@@ -608,7 +608,7 @@ export const getFoodSubstitutions = async (food: string, user: User): Promise<Fo
     `;
     const ai = getGeminiClient();
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-1.5-flash", // Modelo estável
         contents: prompt,
         config: { responseMimeType: "application/json", responseSchema: foodSubstitutionsSchema }
     });

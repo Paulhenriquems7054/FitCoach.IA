@@ -134,6 +134,11 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               src={preview}
               alt={`Foto de perfil de ${userName}`}
               className="w-32 h-32 rounded-full object-cover border-4 border-slate-200 dark:border-slate-700 shadow-lg"
+              onError={(e) => {
+                // Se a imagem falhar ao carregar, resetar preview
+                console.error('Erro ao carregar foto de perfil:', e);
+                setPreview(null);
+              }}
             />
             {!disabled && (
               <button

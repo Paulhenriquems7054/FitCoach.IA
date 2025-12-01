@@ -6,14 +6,10 @@ import { Button } from '../components/ui/Button';
 import { PhotoUploader } from '../components/ui/PhotoUploader';
 import { useToast } from '../components/ui/Toast';
 import { saveUser, resetPassword, getUserByUsername, updateUsername } from '../services/databaseService';
-import { deleteUserAccount } from '../services/accountDeletionService';
-import { Alert } from '../components/ui/Alert';
 
 const ProfilePage: React.FC = () => {
     const { user, setUser } = useUser();
     const { showSuccess, showError } = useToast();
-    const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
-    const [isDeleting, setIsDeleting] = React.useState(false);
     const isAdmin = user.gymRole === 'admin' || user.username === 'Administrador' || user.username === 'Desenvolvedor';
     const isDefaultUser = user.username === 'Administrador' || user.username === 'Desenvolvedor';
     
@@ -33,7 +29,15 @@ const ProfilePage: React.FC = () => {
 
     React.useEffect(() => {
         if (!isAdmin) {
-            setFormData(user);
+            // Atualizar formData quando user mudar (incluindo dados da enquete)
+            setFormData(prev => ({
+                ...prev,
+                ...user,
+                // Garantir que valores numéricos não sejam undefined
+                idade: user.idade || prev.idade || 30,
+                peso: user.peso || prev.peso || 75,
+                altura: user.altura || prev.altura || 180,
+            }));
         }
     }, [user, isAdmin]);
 
@@ -51,14 +55,38 @@ const ProfilePage: React.FC = () => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: name === 'idade' || name === 'peso' || name === 'altura' ? Number(value) : value }));
+        setFormData((prev) => {
+            if (name === 'idade' || name === 'peso' || name === 'altura') {
+                // Converter para número, mas manter o valor atual se for inválido
+                const numValue = value === '' ? 0 : Number(value);
+                return { ...prev, [name]: isNaN(numValue) ? prev[name as keyof typeof prev] : numValue };
+            }
+            return { ...prev, [name]: value };
+        });
     };
 
     const handlePhotoChange = async (photoUrl: string | null) => {
         try {
             const updatedUser = { ...user, photoUrl: photoUrl || undefined };
-            // Salvar no banco de dados
+            
+            // Salvar no IndexedDB local
             await saveUser(updatedUser);
+            
+            // Se o usuário estiver autenticado no Supabase, salvar também lá
+            try {
+                const { saveUserToSupabase } = await import('../services/supabaseService');
+                const supabase = await import('../services/supabaseService').then(m => m.getSupabaseClient());
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                
+                if (authUser) {
+                    // Usuário autenticado - salvar no Supabase também
+                    await saveUserToSupabase(updatedUser);
+                }
+            } catch (supabaseError: any) {
+                // Se falhar ao salvar no Supabase, apenas logar o erro mas não bloquear
+                console.warn('Aviso: Não foi possível salvar foto no Supabase (continuando com salvamento local):', supabaseError);
+            }
+            
             // Atualizar contexto
             setUser(updatedUser);
             // Atualizar formData se não for admin
@@ -72,10 +100,55 @@ const ProfilePage: React.FC = () => {
         }
     };
 
-    const handleSave = () => {
-        setUser(formData);
-        setIsEditing(false);
-        showSuccess('Perfil atualizado com sucesso!');
+    const handleSave = async () => {
+        try {
+            // Validar dados antes de salvar
+            if (!formData.nome || formData.nome.trim() === '') {
+                showError('O nome é obrigatório');
+                return;
+            }
+            
+            if (formData.idade <= 0 || formData.idade > 150) {
+                showError('Por favor, informe uma idade válida (entre 1 e 150 anos)');
+                return;
+            }
+            
+            if (formData.peso <= 0 || formData.peso > 500) {
+                showError('Por favor, informe um peso válido (entre 1 e 500 kg)');
+                return;
+            }
+            
+            if (formData.altura <= 0 || formData.altura > 300) {
+                showError('Por favor, informe uma altura válida (entre 1 e 300 cm)');
+                return;
+            }
+            
+            // Salvar no IndexedDB local
+            await saveUser(formData);
+            
+            // Se o usuário estiver autenticado no Supabase, salvar também lá
+            try {
+                const { saveUserToSupabase } = await import('../services/supabaseService');
+                const supabase = await import('../services/supabaseService').then(m => m.getSupabaseClient());
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                
+                if (authUser) {
+                    // Usuário autenticado - salvar no Supabase também
+                    await saveUserToSupabase(formData);
+                }
+            } catch (supabaseError: any) {
+                // Se falhar ao salvar no Supabase, apenas logar o erro mas não bloquear
+                console.warn('Aviso: Não foi possível salvar no Supabase (continuando com salvamento local):', supabaseError);
+            }
+            
+            // Atualizar contexto
+            setUser(formData);
+            setIsEditing(false);
+            showSuccess('Perfil atualizado com sucesso!');
+        } catch (error: any) {
+            console.error('Erro ao salvar perfil:', error);
+            showError(error.message || 'Erro ao salvar perfil');
+        }
     };
 
     const handleCancel = () => {
@@ -754,7 +827,7 @@ const ProfilePage: React.FC = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="idade" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Idade</label>
-                                <input type="number" name="idade" id="idade" value={formData.idade} onChange={handleChange} disabled={!isEditing} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed" />
+                                <input type="number" name="idade" id="idade" min="1" max="150" value={formData.idade || ''} onChange={handleChange} disabled={!isEditing} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed" />
                             </div>
                             <div>
                                 <label htmlFor="genero" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Gênero</label>
@@ -768,11 +841,11 @@ const ProfilePage: React.FC = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="peso" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Peso (kg)</label>
-                                <input type="number" name="peso" id="peso" step="0.1" value={formData.peso} onChange={handleChange} disabled={!isEditing} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed" />
+                                <input type="number" name="peso" id="peso" step="0.1" min="1" max="500" value={formData.peso || ''} onChange={handleChange} disabled={!isEditing} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed" />
                             </div>
                             <div>
                                 <label htmlFor="altura" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Altura (cm)</label>
-                                <input type="number" name="altura" id="altura" value={formData.altura} onChange={handleChange} disabled={!isEditing} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed" />
+                                <input type="number" name="altura" id="altura" min="1" max="300" value={formData.altura || ''} onChange={handleChange} disabled={!isEditing} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed" />
                             </div>
                         </div>
 
@@ -796,86 +869,8 @@ const ProfilePage: React.FC = () => {
                             <Button onClick={() => setIsEditing(true)}>Editar Perfil</Button>
                         )}
                     </div>
-
-                    {/* Seção de Excluir Conta */}
-                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                            <h3 className="text-sm font-semibold text-red-900 dark:text-red-200 mb-2">
-                                Zona de Perigo
-                            </h3>
-                            <p className="text-sm text-red-700 dark:text-red-300 mb-4">
-                                Ao excluir sua conta, todos os seus dados serão permanentemente removidos e não poderão ser recuperados.
-                            </p>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setShowDeleteConfirm(true)}
-                                className="bg-red-600 hover:bg-red-700 text-white"
-                            >
-                                Excluir minha conta
-                            </Button>
-                        </div>
-                    </div>
                 </div>
             </Card>
-
-            {/* Modal de Confirmação de Exclusão */}
-            {showDeleteConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <Card className="w-full max-w-md">
-                        <div className="p-6">
-                            <h2 className="text-xl font-bold text-red-600 dark:text-red-400 mb-4">
-                                Confirmar Exclusão de Conta
-                            </h2>
-                            <Alert type="error" title="Atenção" className="mb-4">
-                                Esta ação é irreversível. Todos os seus dados serão permanentemente deletados, incluindo:
-                                <ul className="list-disc list-inside mt-2 space-y-1">
-                                    <li>Seu perfil e informações pessoais</li>
-                                    <li>Histórico de chat</li>
-                                    <li>Planos de treino e refeições</li>
-                                    <li>Histórico de peso</li>
-                                    <li>Todos os outros dados associados à sua conta</li>
-                                </ul>
-                            </Alert>
-                            <div className="flex gap-3 mt-6">
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => setShowDeleteConfirm(false)}
-                                    className="flex-1"
-                                    disabled={isDeleting}
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    onClick={async () => {
-                                        setIsDeleting(true);
-                                        try {
-                                            const result = await deleteUserAccount();
-                                            if (result.success) {
-                                                showSuccess('Conta excluída com sucesso');
-                                                // Redirecionar para login após 2 segundos
-                                                setTimeout(() => {
-                                                    window.location.hash = '#/login';
-                                                    window.location.reload();
-                                                }, 2000);
-                                            } else {
-                                                showError(result.error || 'Erro ao excluir conta');
-                                                setIsDeleting(false);
-                                            }
-                                        } catch (error: any) {
-                                            showError(error.message || 'Erro ao excluir conta');
-                                            setIsDeleting(false);
-                                        }
-                                    }}
-                                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                                    disabled={isDeleting}
-                                >
-                                    {isDeleting ? 'Excluindo...' : 'Confirmar Exclusão'}
-                                </Button>
-                            </div>
-                        </div>
-                    </Card>
-                </div>
-            )}
         </div>
     );
 };

@@ -55,6 +55,38 @@ const initialUser: User = {
 const loadStoredUser = async (): Promise<User | null> => {
   if (typeof window === 'undefined') return null;
   try {
+    // Primeiro, tentar carregar do Supabase se o usuário estiver autenticado
+    try {
+      const { getSupabaseClient } = await import('../services/supabaseService');
+      const supabase = getSupabaseClient();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      
+      if (authUser) {
+        const { getCurrentUserProfile } = await import('../services/supabaseService');
+        const supabaseUser = await getCurrentUserProfile();
+        
+        if (supabaseUser) {
+          // Salvar no IndexedDB local também para sincronização
+          const { saveUser } = await import('../services/databaseService');
+          await saveUser(supabaseUser);
+          
+          return {
+            ...initialUser,
+            ...supabaseUser,
+            weightHistory: Array.isArray(supabaseUser.weightHistory) ? supabaseUser.weightHistory : initialUser.weightHistory,
+            completedChallengeIds: Array.isArray(supabaseUser.completedChallengeIds)
+              ? supabaseUser.completedChallengeIds
+              : initialUser.completedChallengeIds,
+          };
+        }
+      }
+    } catch (supabaseError) {
+      // Se falhar ao carregar do Supabase, continuar com IndexedDB local
+      console.warn('Não foi possível carregar do Supabase, usando IndexedDB local:', supabaseError);
+    }
+    
+    // Fallback: carregar do IndexedDB local
+    const { getUser } = await import('../services/databaseService');
     const user = await getUser();
     if (!user) return null;
 

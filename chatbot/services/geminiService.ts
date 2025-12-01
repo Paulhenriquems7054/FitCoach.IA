@@ -87,7 +87,11 @@ const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
 // Ensure the GoogleGenAI instance is created right before an API call
 // to use the most up-to-date API key.
 function getGeminiClient(): GoogleGenAI {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API key for Gemini is not configured. Please set VITE_GEMINI_API_KEY in your .env file.");
+  }
+  return new GoogleGenAI({ apiKey });
 }
 
 export async function initializeChat(

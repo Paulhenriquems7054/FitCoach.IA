@@ -591,14 +591,43 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
       }
 
       // Atualizar perfil do usuário com dados da enquete
-      setUser(prevUser => ({
-        ...prevUser,
-        idade: (answers.idade as number) || prevUser.idade,
+      const updatedUser = {
+        ...user,
+        idade: (answers.idade as number) || user.idade,
         genero: generoNormalized as 'Masculino' | 'Feminino',
-        altura: (answers.altura as number) || prevUser.altura,
-        peso: (answers.peso as number) || prevUser.peso,
+        altura: (answers.altura as number) || user.altura,
+        peso: (answers.peso as number) || user.peso,
         objetivo: objetivo,
-      }));
+      };
+
+      // Atualizar contexto primeiro
+      setUser(updatedUser);
+
+      // Salvar no banco de dados (IndexedDB) de forma assíncrona
+      (async () => {
+        try {
+          const { saveUser } = await import('../services/databaseService');
+          await saveUser(updatedUser);
+          logger.info('Dados da enquete salvos no IndexedDB', 'WelcomeSurvey');
+        } catch (dbError) {
+          logger.error('Erro ao salvar dados da enquete no IndexedDB', 'WelcomeSurvey', dbError);
+        }
+
+        // Se o usuário estiver autenticado no Supabase, salvar também lá
+        try {
+          const { saveUserToSupabase, getSupabaseClient } = await import('../services/supabaseService');
+          const supabase = getSupabaseClient();
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          
+          if (authUser) {
+            await saveUserToSupabase(updatedUser);
+            logger.info('Dados da enquete salvos no Supabase', 'WelcomeSurvey');
+          }
+        } catch (supabaseError) {
+          // Se falhar ao salvar no Supabase, apenas logar o erro mas não bloquear
+          logger.warn('Aviso: Não foi possível salvar dados da enquete no Supabase (continuando com salvamento local)', 'WelcomeSurvey', supabaseError);
+        }
+      })();
 
       logger.info('Perfil do usuário atualizado com dados da enquete', 'WelcomeSurvey');
     } catch (error) {

@@ -66,13 +66,11 @@ if ('serviceWorker' in navigator) {
     
     console.error = function(...args: any[]) {
       // Filter out service worker errors in development
-      const message = args[0]?.toString() || '';
-      const errorMessage = args[1]?.toString() || '';
-      if (message.includes('Service workers disabled') || 
-          message.includes('[SW]') ||
-          message.includes('serviceWorker') ||
-          errorMessage.includes('Service workers disabled') ||
-          errorMessage.includes('serviceWorker')) {
+      const fullMessage = args.map(arg => String(arg)).join(' ');
+      if (fullMessage.includes('Service workers disabled') || 
+          fullMessage.includes('[SW]') ||
+          fullMessage.includes('serviceWorker') ||
+          fullMessage.includes('Registration failed')) {
         return; // Don't log service worker errors in dev
       }
       originalError.apply(console, args);
@@ -80,13 +78,11 @@ if ('serviceWorker' in navigator) {
     
     console.warn = function(...args: any[]) {
       // Filter out service worker warnings in development
-      const message = args[0]?.toString() || '';
-      const errorMessage = args[1]?.toString() || '';
-      if (message.includes('Service workers disabled') || 
-          message.includes('[SW]') ||
-          message.includes('serviceWorker') ||
-          errorMessage.includes('Service workers disabled') ||
-          errorMessage.includes('serviceWorker')) {
+      const fullMessage = args.map(arg => String(arg)).join(' ');
+      if (fullMessage.includes('Service workers disabled') || 
+          fullMessage.includes('[SW]') ||
+          fullMessage.includes('serviceWorker') ||
+          fullMessage.includes('Registration failed')) {
         return; // Don't log service worker warnings in dev
       }
       originalWarn.apply(console, args);
