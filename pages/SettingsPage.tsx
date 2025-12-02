@@ -264,12 +264,14 @@ const SettingsPage: React.FC = () => {
 
             saveGymBranding(branding);
             setBrandingDirty(false);
-            showSuccess('Personalização salva com sucesso! A página será recarregada para aplicar as mudanças.');
+            showSuccess('Personalização salva com sucesso! As cores foram aplicadas em todo o sistema.');
             
-            // Recarregar após um breve delay
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
+            // As cores serão aplicadas automaticamente via eventos customizados
+            // Não é mais necessário recarregar a página
+            // Mas manter reload como fallback opcional após 2 segundos se necessário
+            // setTimeout(() => {
+            //     window.location.reload();
+            // }, 2000);
         } catch (error) {
             showError('Erro ao salvar personalização');
             logger.error('Erro ao salvar personalização', 'SettingsPage', error);

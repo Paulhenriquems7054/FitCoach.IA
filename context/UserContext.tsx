@@ -57,19 +57,23 @@ const loadStoredUser = async (): Promise<User | null> => {
   try {
     // 1) Se existe sessão local (Administrador, Desenvolvedor, Aluno, etc.), priorizar IndexedDB
     const currentUsername = await getCurrentUsername();
-    if (currentUsername) {
-      const storedUser = await getUserByUsername(currentUsername);
+    if (currentUsername && currentUsername.trim() !== '') {
+      const storedUser = await getUserByUsername(currentUsername.trim());
       if (storedUser) {
-        return {
-          ...initialUser,
-          ...storedUser,
-          weightHistory: Array.isArray(storedUser.weightHistory)
-            ? storedUser.weightHistory
-            : initialUser.weightHistory,
-          completedChallengeIds: Array.isArray(storedUser.completedChallengeIds)
-            ? storedUser.completedChallengeIds
-            : initialUser.completedChallengeIds,
-        };
+        // Verificar se o username do usuário encontrado corresponde ao current_username
+        // Isso evita carregar o usuário errado se houver múltiplos usuários
+        if (storedUser.username === currentUsername.trim() || storedUser.nome === currentUsername.trim()) {
+          return {
+            ...initialUser,
+            ...storedUser,
+            weightHistory: Array.isArray(storedUser.weightHistory)
+              ? storedUser.weightHistory
+              : initialUser.weightHistory,
+            completedChallengeIds: Array.isArray(storedUser.completedChallengeIds)
+              ? storedUser.completedChallengeIds
+              : initialUser.completedChallengeIds,
+          };
+        }
       }
     }
 
@@ -143,7 +147,27 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       try {
         const loadedUser = await loadStoredUser();
         if (loadedUser) {
-          setUser(loadedUser);
+          // Verificar se o usuário carregado corresponde ao current_username atual
+          const currentUsername = await getCurrentUsername();
+          if (currentUsername && currentUsername.trim() !== '') {
+            const expectedUsername = currentUsername.trim();
+            // Verificar se o usuário carregado corresponde ao username esperado
+            if (loadedUser.username === expectedUsername || loadedUser.nome === expectedUsername) {
+              setUser(loadedUser);
+            } else {
+              // Se não corresponde, tentar carregar novamente com o username correto
+              const correctUser = await getUserByUsername(expectedUsername);
+              if (correctUser) {
+                setUser(correctUser);
+              } else {
+                // Se não encontrou, usar o usuário carregado (pode ser fallback)
+                setUser(loadedUser);
+              }
+            }
+          } else {
+            // Se não há current_username, usar o usuário carregado
+            setUser(loadedUser);
+          }
         }
       } catch (error) {
         // Usar logger se disponível

@@ -597,12 +597,57 @@ const LoginPage: React.FC = () => {
                     subscriptionStatus: 'active' as const,
                     gymRole: 'admin' as const,
                 };
+
+                // Limpar sessão anterior e salvar nova
+                const { clearLoginSession } = await import('../services/databaseService');
+                await clearLoginSession();
                 await saveLoginSession(devUser.username);
                 setUser(devUser as any);
-                showSuccess('Login de desenvolvedor realizado com sucesso. Acesso total liberado.');
-                window.location.hash = '#/';
+                showSuccess('Login como Desenvolvedor realizado com sucesso!');
+                setTimeout(() => {
+                    window.location.hash = '#/admin-dashboard';
+                }, 1000);
                 setIsLoading(false);
                 return;
+            }
+
+            // Tratamento especial para Administrador: garantir que o login funcione corretamente
+            if (sanitizedUsername === 'Administrador' || sanitizedUsername.toLowerCase() === 'administrador') {
+                // Encerrar qualquer sessão Supabase anterior para evitar conflitos
+                try {
+                    const supabase = getSupabaseClient();
+                    await supabase.auth.signOut();
+                } catch (signOutError) {
+                    logger.warn('Não foi possível fazer signOut do Supabase ao entrar como Administrador', 'LoginPage', signOutError);
+                }
+
+                // Tentar buscar o usuário Administrador no banco local primeiro
+                const adminUser = await getUserByUsername('Administrador');
+                if (adminUser) {
+                    // Verificar senha
+                    const { loginUser } = await import('../services/databaseService');
+                    const credentials: LoginCredentials = { 
+                        username: 'Administrador', 
+                        password: sanitizedPassword 
+                    };
+                    const loggedInAdmin = await loginUser(credentials);
+                    
+                    if (loggedInAdmin) {
+                        // Limpar sessão anterior e salvar nova
+                        const { clearLoginSession } = await import('../services/databaseService');
+                        await clearLoginSession();
+                        await saveLoginSession('Administrador');
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        setUser(loggedInAdmin);
+                        showSuccess('Login como Administrador realizado com sucesso!');
+                        setTimeout(() => {
+                            window.location.hash = '#/';
+                        }, 1000);
+                        setIsLoading(false);
+                        return;
+                    }
+                }
+                // Se não encontrou ou senha incorreta, continuar com fluxo normal
             }
 
             let user: any = null;
@@ -786,11 +831,42 @@ const LoginPage: React.FC = () => {
                     return;
                 }
 
-                // Salvar sessão
-                await saveLoginSession(user.username || sanitizedUsername);
+                // IMPORTANTE: Salvar sessão ANTES de atualizar o contexto
+                // Isso garante que o current_username seja atualizado antes de qualquer recarregamento
+                const usernameToSave = user.username || sanitizedUsername;
                 
-                // Atualizar contexto do usuário
+                // Limpar sessão anterior para evitar conflitos
+                const { clearLoginSession } = await import('../services/databaseService');
+                await clearLoginSession();
+                
+                // Aguardar um pouco para garantir que a limpeza foi concluída
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                // Salvar nova sessão
+                await saveLoginSession(usernameToSave);
+                
+                // Aguardar um pouco para garantir que o saveLoginSession foi concluído
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Atualizar contexto do usuário com o usuário do login
                 setUser(user);
+                
+                // Forçar recarregamento do usuário do banco para garantir consistência
+                // Usar o username exato que foi usado no login
+                try {
+                    const reloadedUser = await getUserByUsername(usernameToSave);
+                    if (reloadedUser && (reloadedUser.username === usernameToSave || reloadedUser.nome === usernameToSave)) {
+                        // Verificar se é realmente o usuário correto
+                        setUser(reloadedUser);
+                        logger.info(`Usuário recarregado após login: ${usernameToSave}`, 'LoginPage');
+                    } else {
+                        // Se não encontrou ou não corresponde, usar o usuário do login
+                        logger.warn(`Usuário recarregado não corresponde ao login esperado. Usando usuário do login.`, 'LoginPage');
+                    }
+                } catch (reloadError) {
+                    // Se falhar ao recarregar, usar o usuário do login
+                    logger.warn('Erro ao recarregar usuário após login', 'LoginPage', reloadError);
+                }
                 
                 const successMsg = 'Login realizado com sucesso!';
                 setSuccess(successMsg);

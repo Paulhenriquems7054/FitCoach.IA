@@ -71,6 +71,9 @@ export const saveGymBranding = (branding: GymBranding): void => {
     // Aplicar CSS customizado
     applyBrandingStyles(branding);
     
+    // Disparar evento customizado para atualizar na mesma aba
+    window.dispatchEvent(new CustomEvent('gym-branding-updated', { detail: branding }));
+    
     logger.info(`Branding da academia ${branding.gymId} aplicado`, 'gymConfigService');
   } catch (error) {
     logger.error('Erro ao salvar branding de academia', 'gymConfigService', error);
@@ -161,28 +164,107 @@ export const applyBrandingStyles = (branding: GymBranding): void => {
       content: url(${branding.logo || ''});
     }
     
-    /* Aplicar em TODOS os elementos que usam primary */
+    /* Aplicar em TODOS os elementos que usam primary - Backgrounds */
+    .bg-primary-50,
+    .bg-primary-100,
+    .bg-primary-200,
+    .bg-primary-300,
+    .bg-primary-400,
     .bg-primary-500,
     .bg-primary-600,
-    .bg-primary-700 {
+    .bg-primary-700,
+    .bg-primary-800,
+    .bg-primary-900,
+    button.bg-primary-500,
+    button.bg-primary-600,
+    button.bg-primary-700,
+    [class*="bg-primary"] {
       background-color: ${branding.colors.primary} !important;
     }
     
+    /* Text colors */
+    .text-primary-50,
+    .text-primary-100,
+    .text-primary-200,
+    .text-primary-300,
+    .text-primary-400,
     .text-primary-500,
     .text-primary-600,
-    .text-primary-700 {
+    .text-primary-700,
+    .text-primary-800,
+    .text-primary-900,
+    a.text-primary-500,
+    a.text-primary-600,
+    a.text-primary-700,
+    [class*="text-primary"] {
       color: ${branding.colors.primary} !important;
     }
     
+    /* Border colors */
+    .border-primary-50,
+    .border-primary-100,
+    .border-primary-200,
+    .border-primary-300,
+    .border-primary-400,
     .border-primary-500,
-    .border-primary-600 {
+    .border-primary-600,
+    .border-primary-700,
+    .border-primary-800,
+    .border-primary-900,
+    [class*="border-primary"] {
       border-color: ${branding.colors.primary} !important;
     }
     
-    /* Hover states */
+    /* Hover states - Backgrounds */
+    .hover\\:bg-primary-50:hover,
+    .hover\\:bg-primary-100:hover,
+    .hover\\:bg-primary-200:hover,
+    .hover\\:bg-primary-300:hover,
+    .hover\\:bg-primary-400:hover,
+    .hover\\:bg-primary-500:hover,
     .hover\\:bg-primary-600:hover,
-    .hover\\:bg-primary-700:hover {
+    .hover\\:bg-primary-700:hover,
+    .hover\\:bg-primary-800:hover,
+    .hover\\:bg-primary-900:hover,
+    button:hover.bg-primary-500,
+    button:hover.bg-primary-600,
+    button:hover.bg-primary-700 {
       background-color: ${branding.colors.secondary} !important;
+    }
+    
+    /* Hover states - Text */
+    .hover\\:text-primary-500:hover,
+    .hover\\:text-primary-600:hover,
+    .hover\\:text-primary-700:hover,
+    a:hover.text-primary-500,
+    a:hover.text-primary-600,
+    a:hover.text-primary-700 {
+      color: ${branding.colors.secondary} !important;
+    }
+    
+    /* Focus rings */
+    .focus\\:ring-primary-500:focus,
+    .focus\\:ring-primary-600:focus,
+    .focus\\:ring-primary-700:focus,
+    .ring-primary-500,
+    .ring-primary-600,
+    .ring-primary-700 {
+      --tw-ring-color: ${branding.colors.primary} !important;
+      border-color: ${branding.colors.primary} !important;
+    }
+    
+    /* Gradients */
+    .bg-gradient-to-r.from-primary-500,
+    .bg-gradient-to-r.from-primary-600,
+    .bg-gradient-to-br.from-primary-500,
+    .bg-gradient-to-br.from-primary-600,
+    .bg-gradient-to-br.to-primary-600,
+    .bg-gradient-to-br.to-primary-700,
+    [class*="from-primary"],
+    [class*="to-primary"] {
+      --tw-gradient-from: ${branding.colors.primary} !important;
+      --tw-gradient-to: ${branding.colors.secondary} !important;
+      background-image: linear-gradient(to right, ${branding.colors.primary}, ${branding.colors.secondary}) !important;
     }
   `;
   

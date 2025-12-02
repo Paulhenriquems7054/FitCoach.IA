@@ -29,15 +29,29 @@ import { EyeIcon } from '../components/icons/EyeIcon';
 import { EyeSlashIcon } from '../components/icons/EyeSlashIcon';
 import { getCompanyByUserId, getCompanyLicenseStats, type Company } from '../services/companyService';
 import { logger } from '../utils/logger';
+import { getAccountType } from '../utils/accountType';
+import { getPersonalTrainerClients, getPersonalTrainerActivationCode, getPersonalTrainerStats, type PersonalTrainerClient } from '../services/personalTrainerService';
 
 const StudentManagementPage: React.FC = () => {
     const { user: currentUser } = useUser();
     const { showSuccess, showError } = useToast();
     const permissions = usePermissions();
+    const accountType = getAccountType(currentUser);
     const [students, setStudents] = useState<User[]>([]);
     const [trainers, setTrainers] = useState<User[]>([]);
     const [receptionists, setReceptionists] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    
+    // Estados para personal trainers
+    const [clients, setClients] = useState<PersonalTrainerClient[]>([]);
+    const [activationCode, setActivationCode] = useState<string | null>(null);
+    const [personalStats, setPersonalStats] = useState<{
+        totalClients: number;
+        activeClients: number;
+        totalWeightLoss: number;
+        averageWeightLoss: number;
+        clientsWithProgress: number;
+    } | null>(null);
     const [showStudentForm, setShowStudentForm] = useState(false);
     const [showTrainerForm, setShowTrainerForm] = useState(false);
     const [showReceptionistForm, setShowReceptionistForm] = useState(false);
@@ -784,6 +798,170 @@ const StudentManagementPage: React.FC = () => {
         );
     }
 
+    // Se for personal trainer, mostrar interface de gerenciamento de clientes
+    if (accountType === 'USER_PERSONAL') {
+        return (
+            <div className="container mx-auto px-4 py-6 sm:py-8">
+                <div className="mb-6">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                        Gerenciar Clientes
+                    </h1>
+                    <p className="text-slate-600 dark:text-slate-400">
+                        Gerencie seus clientes e acompanhe o progresso deles
+                    </p>
+                </div>
+
+                {/* Código de Equipe */}
+                {activationCode && (
+                    <Card className="mb-6">
+                        <div className="p-4 sm:p-6">
+                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                                🔑 Código de Equipe
+                            </h2>
+                            <div className="flex items-center gap-4">
+                                <div className="flex-1 bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border-2 border-primary-300 dark:border-primary-700">
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Compartilhe este código com seus clientes</p>
+                                    <p className="text-2xl font-bold text-primary-600 dark:text-primary-400 font-mono">
+                                        {activationCode}
+                                    </p>
+                                </div>
+                                <Button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(activationCode);
+                                        showSuccess('Código copiado para a área de transferência!');
+                                    }}
+                                    variant="primary"
+                                >
+                                    📋 Copiar
+                                </Button>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-3">
+                                Seus clientes devem usar este código ao se cadastrar no app para ter acesso Premium gratuito.
+                            </p>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Estatísticas */}
+                {personalStats && (
+                    <Card className="mb-6">
+                        <div className="p-4 sm:p-6">
+                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                                📊 Estatísticas
+                            </h2>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                <div className="bg-primary-50 dark:bg-primary-900/20 p-3 rounded-lg border border-primary-200 dark:border-primary-800">
+                                    <div className="text-xs text-primary-600 dark:text-primary-400 mb-1">Total de Clientes</div>
+                                    <div className="text-2xl font-bold text-primary-700 dark:text-primary-300">
+                                        {personalStats.totalClients}
+                                    </div>
+                                </div>
+                                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                                    <div className="text-xs text-green-600 dark:text-green-400 mb-1">Clientes Ativos</div>
+                                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                                        {personalStats.activeClients}
+                                    </div>
+                                </div>
+                                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                                    <div className="text-xs text-blue-600 dark:text-blue-400 mb-1">Perda Total (kg)</div>
+                                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                                        {personalStats.totalWeightLoss.toFixed(1)}
+                                    </div>
+                                </div>
+                                <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg border border-purple-200 dark:border-purple-800">
+                                    <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">Média por Cliente</div>
+                                    <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+                                        {personalStats.averageWeightLoss.toFixed(1)} kg
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Lista de Clientes */}
+                {isLoadingClients ? (
+                    <Card>
+                        <div className="p-6 text-center">
+                            <p className="text-slate-600 dark:text-slate-400">Carregando clientes...</p>
+                        </div>
+                    </Card>
+                ) : clients.length === 0 ? (
+                    <Card>
+                        <div className="p-6 text-center">
+                            <p className="text-slate-600 dark:text-slate-400 mb-2">Nenhum cliente vinculado ainda.</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-500">
+                                Compartilhe seu código de equipe para que clientes possam se vincular.
+                            </p>
+                        </div>
+                    </Card>
+                ) : (
+                    <Card>
+                        <div className="p-4 sm:p-6">
+                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                                👥 Lista de Clientes
+                            </h2>
+                            <div className="space-y-3">
+                                {clients.map(client => {
+                                    const hasProgress = client.weightHistory && client.weightHistory.length > 1;
+                                    const weightChange = hasProgress ? (() => {
+                                        const sorted = [...client.weightHistory].sort((a, b) => 
+                                            new Date(a.date).getTime() - new Date(b.date).getTime()
+                                        );
+                                        return sorted[0].weight - sorted[sorted.length - 1].weight;
+                                    })() : 0;
+
+                                    return (
+                                        <div key={client.userId} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-start gap-3 flex-1">
+                                                    {client.photoUrl ? (
+                                                        <img src={client.photoUrl} alt={client.nome} className="w-12 h-12 rounded-full" />
+                                                    ) : (
+                                                        <div className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
+                                                            <span className="text-primary-600 dark:text-primary-400 font-semibold">
+                                                                {client.nome.charAt(0).toUpperCase()}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1">
+                                                        <h3 className="font-semibold text-slate-900 dark:text-white">{client.nome}</h3>
+                                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                            {client.peso} kg • {client.altura} cm • {client.objetivo}
+                                                        </p>
+                                                        {hasProgress && (
+                                                            <div className="mt-2 flex items-center gap-2">
+                                                                <span className="text-xs text-slate-600 dark:text-slate-400">Progresso:</span>
+                                                                <span className={`text-sm font-semibold ${weightChange > 0 ? 'text-green-600 dark:text-green-400' : weightChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                                                                    {weightChange > 0 ? '-' : weightChange < 0 ? '+' : ''}{Math.abs(weightChange).toFixed(1)} kg
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {!hasProgress && (
+                                                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">Aguardando primeiro registro de peso</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    onClick={() => window.location.hash = `/analysis?client=${client.userId}`}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                >
+                                                    Ver Progresso
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </Card>
+                )}
+            </div>
+        );
+    }
+
+    // Interface padrão para academias
     return (
         <div className="container mx-auto px-4 py-6 sm:py-8">
             <div className="mb-6">

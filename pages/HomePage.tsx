@@ -12,6 +12,9 @@ import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { useI18n } from '../context/I18nContext';
 import { getAppSetting, saveAppSetting } from '../services/databaseService';
+import { getAccountType } from '../utils/accountType';
+import { UsersIcon } from '../components/icons/UsersIcon';
+import { ChartBarIcon } from '../components/icons/ChartBarIcon';
 
 const QuickActionCard: React.FC<{ href: string; title: string; description: string; icon: React.ElementType }> = ({ href, title, description, icon: Icon }) => (
     <a href={href} className="block group">
@@ -37,33 +40,40 @@ const QuickActionCard: React.FC<{ href: string; title: string; description: stri
 const HomePage: React.FC = () => {
   const { user } = useUser();
   const { t } = useI18n();
+  const accountType = getAccountType(user);
   const [coachTip, setCoachTip] = useState<string>('');
   const [showCheckin, setShowCheckin] = useState(false);
 
   useEffect(() => {
-    getAICoachTip(user).then(setCoachTip);
+    // Apenas carregar dica de coach para usuários B2C/GYM (não para personal trainers)
+    if (accountType !== 'USER_PERSONAL') {
+      getAICoachTip(user).then(setCoachTip);
+    }
 
-    const checkLastCheckin = async () => {
-      try {
-        const lastCheckin = await getAppSetting<string>('lastWeightCheckin');
-        const oneWeek = 7 * 24 * 60 * 60 * 1000;
-        if (!lastCheckin || (new Date().getTime() - new Date(lastCheckin).getTime() > oneWeek)) {
-          setShowCheckin(true);
-        }
-      } catch (error) {
-        // Fallback para localStorage
-        if (typeof window !== 'undefined') {
-          const lastCheckin = localStorage.getItem('lastWeightCheckin');
+    // Apenas mostrar checkin para usuários B2C/GYM
+    if (accountType !== 'USER_PERSONAL') {
+      const checkLastCheckin = async () => {
+        try {
+          const lastCheckin = await getAppSetting<string>('lastWeightCheckin');
           const oneWeek = 7 * 24 * 60 * 60 * 1000;
           if (!lastCheckin || (new Date().getTime() - new Date(lastCheckin).getTime() > oneWeek)) {
             setShowCheckin(true);
           }
+        } catch (error) {
+          // Fallback para localStorage
+          if (typeof window !== 'undefined') {
+            const lastCheckin = localStorage.getItem('lastWeightCheckin');
+            const oneWeek = 7 * 24 * 60 * 60 * 1000;
+            if (!lastCheckin || (new Date().getTime() - new Date(lastCheckin).getTime() > oneWeek)) {
+              setShowCheckin(true);
+            }
+          }
         }
-      }
-    };
+      };
 
-    checkLastCheckin();
-  }, [user]);
+      checkLastCheckin();
+    }
+  }, [user, accountType]);
 
   const handleCheckinDismiss = async () => {
     setShowCheckin(false);
@@ -79,6 +89,55 @@ const HomePage: React.FC = () => {
     }
   }
   
+  // Personalizar HomePage para Personal Trainers
+  if (accountType === 'USER_PERSONAL') {
+    return (
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 px-2 sm:px-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+            Olá, {user.isAnonymized ? 'Personal Trainer' : user.nome}!
+          </h1>
+          <p className="mt-2 text-base sm:text-lg text-slate-600 dark:text-slate-400">
+            Gerencie seus clientes e acompanhe o progresso deles
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <QuickActionCard 
+            href="#/analysis"
+            title="Progresso dos Alunos"
+            description="Visualize o progresso de todos os seus clientes"
+            icon={ChartBarIcon}
+          />
+          <QuickActionCard 
+            href="#/student-management"
+            title="Gerenciar Alunos"
+            description="Adicione, remova e gerencie seus clientes"
+            icon={UsersIcon}
+          />
+          <QuickActionCard 
+            href="#/settings"
+            title="Configurações"
+            description="Gerencie seu código de equipe e configurações"
+            icon={SparklesIcon}
+          />
+        </div>
+
+        <Card>
+          <div className="p-6">
+            <h3 className="font-bold text-slate-900 dark:text-white mb-4">📋 Próximos Passos</h3>
+            <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+              <li>✅ Compartilhe seu código de equipe com seus clientes</li>
+              <li>✅ Acompanhe o progresso de cada cliente em "Progresso dos Alunos"</li>
+              <li>✅ Gerencie seus clientes em "Gerenciar Alunos"</li>
+            </ul>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // HomePage padrão para USER_B2C e USER_GYM
   return (
     <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 px-2 sm:px-4">
         <div>

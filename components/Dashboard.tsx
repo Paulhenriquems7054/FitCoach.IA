@@ -6,6 +6,8 @@ import { useUser } from '../context/UserContext';
 import { getWellnessPlan, getCompletedWorkouts } from '../services/databaseService';
 import type { WellnessPlan } from '../types';
 import { logger } from '../utils/logger';
+import { getAccountType } from '../utils/accountType';
+import PersonalDashboard from './dashboards/PersonalDashboard';
 
 interface DashboardProps {
   summary?: null; // Mantido para compatibilidade, mas não usado mais
@@ -62,6 +64,7 @@ const CircularProgress: React.FC<{ progress: number }> = ({ progress }) => {
 
 const Dashboard: React.FC<DashboardProps> = memo(({ summary }) => {
   const { user } = useUser();
+  const accountType = getAccountType(user);
   const [workoutPlan, setWorkoutPlan] = useState<WellnessPlan | null>(null);
   const [completedWorkouts, setCompletedWorkouts] = useState<Set<number>>(new Set());
   const [weeklyData, setWeeklyData] = useState<WeeklyWorkoutData[]>([]);
@@ -71,6 +74,11 @@ const Dashboard: React.FC<DashboardProps> = memo(({ summary }) => {
     progressoPercentual: 0,
     treinosEstaSemana: 0,
   });
+
+  // Se for personal trainer, mostrar dashboard específico
+  if (accountType === 'USER_PERSONAL') {
+    return <PersonalDashboard />;
+  }
 
   useEffect(() => {
     const loadWorkoutData = async () => {

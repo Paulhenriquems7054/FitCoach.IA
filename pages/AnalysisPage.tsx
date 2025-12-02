@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Card } from '../components/ui/Card';
 import { useUser } from '../context/UserContext';
 import { analyzeProgress } from '../services/geminiService';
@@ -12,6 +12,11 @@ import { saveAppSetting } from '../services/databaseService';
 import { Skeleton } from '../components/ui/Skeleton';
 import { ProtectedFeature } from '../components/ProtectedFeature';
 import type { ProgressAnalysis } from '../types';
+import { getAccountType } from '../utils/accountType';
+import { getPersonalTrainerClients, getPersonalTrainerStats, type PersonalTrainerClient } from '../services/personalTrainerService';
+import { UsersIcon } from '../components/icons/UsersIcon';
+import { ChartBarIcon } from '../components/icons/ChartBarIcon';
+import { logger } from '../utils/logger';
 
 const AnalysisSkeleton = () => (
     <Card>
@@ -37,10 +42,22 @@ const AnalysisSkeleton = () => (
 
 const AnalysisPage: React.FC = () => {
     const { user, updateWeightHistory } = useUser();
+    const accountType = getAccountType(user);
     const [analysis, setAnalysis] = useState<ProgressAnalysis | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [newWeight, setNewWeight] = useState<string>(user.peso.toString());
+    
+    // Estados para dashboard de personal trainer
+    const [clients, setClients] = useState<PersonalTrainerClient[]>([]);
+    const [stats, setStats] = useState<{
+        totalClients: number;
+        activeClients: number;
+        totalWeightLoss: number;
+        averageWeightLoss: number;
+        clientsWithProgress: number;
+    } | null>(null);
+    const [isLoadingClients, setIsLoadingClients] = useState(false);
 
     const handleAnalyze = async () => {
         setIsLoading(true);
@@ -55,12 +72,30 @@ const AnalysisPage: React.FC = () => {
         }
     };
     
-    // Auto-analyze on load if there's enough history
+    // Auto-analyze on load if there's enough history (apenas para USER_B2C)
     useEffect(() => {
-        if (user.weightHistory.length > 1) {
+        if (accountType !== 'USER_PERSONAL' && user.weightHistory.length > 1) {
             handleAnalyze();
         }
-    }, [user.weightHistory]);
+    }, [user.weightHistory, accountType]);
+
+    // Carregar clientes se for personal trainer
+    useEffect(() => {
+        if (accountType === 'USER_PERSONAL' && user.id) {
+            setIsLoadingClients(true);
+            Promise.all([
+                getPersonalTrainerClients(user.id),
+                getPersonalTrainerStats(user.id)
+            ]).then(([clientsData, statsData]) => {
+                setClients(clientsData);
+                setStats(statsData);
+            }).catch(err => {
+                logger.error('Erro ao carregar clientes', 'AnalysisPage', err);
+            }).finally(() => {
+                setIsLoadingClients(false);
+            });
+        }
+    }, [accountType, user.id]);
 
     const handleAddWeight = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -81,6 +116,148 @@ const AnalysisPage: React.FC = () => {
     };
 
 
+    // Se for personal trainer, mostrar dashboard de clientes
+    if (accountType === 'USER_PERSONAL') {
+        return (
+            <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 px-2 sm:px-4">
+                <div className="text-center">
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Progresso dos Alunos</h1>
+                    <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400 px-2">Acompanhe o progresso de todos os seus clientes em um só lugar.</p>
+                </div>
+
+                {/* Estatísticas */}
+                {stats && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <Card>
+                            <div className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <UsersIcon className="w-8 h-8 text-primary-500" />
+                                    <div>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">Total de Clientes</p>
+                                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.totalClients}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                        <Card>
+                            <div className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <ChartBarIcon className="w-8 h-8 text-green-500" />
+                                    <div>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">Clientes Ativos</p>
+                                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.activeClients}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                        <Card>
+                            <div className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <TrendingUpIcon className="w-8 h-8 text-blue-500" />
+                                    <div>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">Perda Total (kg)</p>
+                                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.totalWeightLoss.toFixed(1)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                        <Card>
+                            <div className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <SparklesIcon className="w-8 h-8 text-purple-500" />
+                                    <div>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">Média por Cliente</p>
+                                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.averageWeightLoss.toFixed(1)} kg</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                )}
+
+                {/* Lista de Clientes */}
+                {isLoadingClients ? (
+                    <Card>
+                        <div className="p-6">
+                            <Skeleton className="h-8 w-1/3 mb-4" />
+                            <div className="space-y-4">
+                                {[1, 2, 3].map(i => (
+                                    <Skeleton key={i} className="h-20 w-full" />
+                                ))}
+                            </div>
+                        </div>
+                    </Card>
+                ) : clients.length === 0 ? (
+                    <Card>
+                        <div className="p-6 text-center">
+                            <UsersIcon className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                            <p className="text-slate-600 dark:text-slate-400">Nenhum cliente vinculado ainda.</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">Compartilhe seu código de equipe para que clientes possam se vincular.</p>
+                        </div>
+                    </Card>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {clients.map(client => {
+                            const hasProgress = client.weightHistory && client.weightHistory.length > 1;
+                            const weightChange = hasProgress ? (() => {
+                                const sorted = [...client.weightHistory].sort((a, b) => 
+                                    new Date(a.date).getTime() - new Date(b.date).getTime()
+                                );
+                                return sorted[0].weight - sorted[sorted.length - 1].weight;
+                            })() : 0;
+
+                            return (
+                                <Card key={client.userId} className="hover:shadow-lg transition-shadow">
+                                    <div className="p-4">
+                                        <div className="flex items-start gap-3 mb-3">
+                                            {client.photoUrl ? (
+                                                <img src={client.photoUrl} alt={client.nome} className="w-12 h-12 rounded-full" />
+                                            ) : (
+                                                <div className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
+                                                    <span className="text-primary-600 dark:text-primary-400 font-semibold">
+                                                        {client.nome.charAt(0).toUpperCase()}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <div className="flex-1">
+                                                <h3 className="font-semibold text-slate-900 dark:text-white">{client.nome}</h3>
+                                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                    {client.peso} kg • {client.altura} cm
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {hasProgress && (
+                                            <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-slate-600 dark:text-slate-400">Progresso:</span>
+                                                    <span className={`font-semibold ${weightChange > 0 ? 'text-green-600 dark:text-green-400' : weightChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                                                        {weightChange > 0 ? '-' : weightChange < 0 ? '+' : ''}{Math.abs(weightChange).toFixed(1)} kg
+                                                    </span>
+                                                </div>
+                                                <div className="mt-2">
+                                                    <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className={`h-full ${weightChange > 0 ? 'bg-green-500' : weightChange < 0 ? 'bg-red-500' : 'bg-slate-400'}`}
+                                                            style={{ width: `${Math.min(100, Math.abs(weightChange) * 10)}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {!hasProgress && (
+                                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">Aguardando primeiro registro de peso</p>
+                                        )}
+                                    </div>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // Para USER_B2C e USER_GYM, mostrar análise pessoal
     return (
         <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 px-2 sm:px-4">
              <div className="text-center">

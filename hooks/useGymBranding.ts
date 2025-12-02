@@ -53,20 +53,27 @@ export const useGymBranding = () => {
     // Carregar imediatamente
     loadBranding();
 
-    // Escutar mudanças no localStorage
-    const handleStorageChange = (e: StorageEvent) => {
+    // Escutar mudanças no localStorage (incluindo na mesma aba)
+    const handleStorageChange = (e: StorageEvent | CustomEvent) => {
+      const key = 'key' in e ? e.key : null;
       if (
-        e.key === 'nutria_gym_branding' ||
-        e.key === 'nutria_gym_config'
+        key === 'nutria_gym_branding' ||
+        key === 'nutria_gym_config' ||
+        !key // CustomEvent não tem key, então recarregar sempre
       ) {
         loadBranding();
       }
     };
 
-    window.addEventListener('storage', handleStorageChange);
+    // Escutar eventos storage (outras abas)
+    window.addEventListener('storage', handleStorageChange as EventListener);
+    
+    // Escutar eventos customizados (mesma aba)
+    window.addEventListener('gym-branding-updated', handleStorageChange as EventListener);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange as EventListener);
+      window.removeEventListener('gym-branding-updated', handleStorageChange as EventListener);
     };
   }, []);
 
