@@ -75,9 +75,27 @@ export const InviteCodeEntry: React.FC<InviteCodeEntryProps> = ({ onCodeValidate
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 px-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 px-4 relative overflow-hidden">
+      {/* Logo de fundo suave */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+        <img
+          src="/icons/play_store_512.png"
+          alt="Logo FitCoach.IA"
+          className="select-none opacity-25 dark:opacity-15 w-[280px] h-[280px] sm:w-[360px] sm:h-[360px] object-contain"
+        />
+      </div>
+
+      <Card className="w-full max-w-md relative z-10">
         <div className="p-6 space-y-6">
+          {/* Logo centralizada no topo */}
+          <div className="flex justify-center mb-4">
+            <img
+              src="/icons/play_store_512.png"
+              alt="Logo FitCoach.IA"
+              className="w-20 h-20 sm:w-24 sm:h-24 object-contain"
+            />
+          </div>
+
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Código de Convite
