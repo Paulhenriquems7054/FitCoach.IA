@@ -113,12 +113,7 @@ const SettingsPage: React.FC = () => {
                     }
                 }
             } catch (error) {
-                try {
-                  const { logger } = await import('../utils/logger');
-                  logger.error('Erro ao carregar configurações', 'SettingsPage', error);
-                } catch {
-                  console.error('Erro ao carregar configurações:', error);
-                }
+                logger.error('Erro ao carregar configurações', 'SettingsPage', error);
                 // Fallback para localStorage
                 if (typeof window !== 'undefined') {
                     const stored = window.localStorage.getItem(API_MODE_STORAGE_KEY);
@@ -277,12 +272,7 @@ const SettingsPage: React.FC = () => {
             }, 1500);
         } catch (error) {
             showError('Erro ao salvar personalização');
-            try {
-              const { logger } = await import('../utils/logger');
-              logger.error('Erro ao salvar personalização', 'SettingsPage', error);
-            } catch {
-              console.error(error);
-            }
+            logger.error('Erro ao salvar personalização', 'SettingsPage', error);
         }
     };
 
@@ -416,12 +406,7 @@ const SettingsPage: React.FC = () => {
             setStatusMessage('Configurações salvas com sucesso!');
             setErrorMessage(null);
         } catch (error) {
-            try {
-              const { logger } = await import('../utils/logger');
-              logger.error('Erro ao salvar configurações', 'SettingsPage', error);
-            } catch {
-              console.error('Erro ao salvar configurações', error);
-            }
+            logger.error('Erro ao salvar configurações', 'SettingsPage', error);
             setErrorMessage('Não foi possível salvar as configurações. Tente novamente.');
             setStatusMessage(null);
         }

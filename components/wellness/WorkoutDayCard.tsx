@@ -4,6 +4,7 @@ import type { WorkoutDay, Exercise } from '../../types';
 import { getExerciseGif } from '../../services/exerciseGifService';
 import { useGifPreloader } from '../../hooks/useGifPreloader';
 import { GifLoader } from '../ui/GifLoader';
+import { logger } from '../../utils/logger';
 
 interface WorkoutDayCardProps {
     workoutDay: WorkoutDay;
@@ -224,12 +225,7 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                                                         onError={(e) => {
                                                             // Debug: GIF não encontrado (remover em produção)
                                                             if (import.meta.env.DEV) {
-                                                              try {
-                                                                const { logger } = await import('../../utils/logger');
-                                                                logger.debug(`GIF não encontrado: ${gifPath}`, 'WorkoutDayCard');
-                                                              } catch {
-                                                                // Ignorar se logger não disponível
-                                                              }
+                                                              logger.debug(`GIF não encontrado: ${gifPath}`, 'WorkoutDayCard');
                                                             }
                                                         }}
                                                     />

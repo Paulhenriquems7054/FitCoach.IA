@@ -5,6 +5,7 @@ import { Card } from './ui/Card';
 import { useUser } from '../context/UserContext';
 import { getWellnessPlan, getCompletedWorkouts } from '../services/databaseService';
 import type { WellnessPlan } from '../types';
+import { logger } from '../utils/logger';
 
 interface DashboardProps {
   summary?: null; // Mantido para compatibilidade, mas não usado mais
@@ -115,12 +116,7 @@ const Dashboard: React.FC<DashboardProps> = memo(({ summary }) => {
           setWeeklyData(weekly);
         }
       } catch (error) {
-        try {
-          const { logger } = await import('../utils/logger');
-          logger.error('Erro ao carregar dados de treino', 'Dashboard', error);
-        } catch {
-          console.error('Erro ao carregar dados de treino:', error);
-        }
+        logger.error('Erro ao carregar dados de treino', 'Dashboard', error);
       }
     };
 

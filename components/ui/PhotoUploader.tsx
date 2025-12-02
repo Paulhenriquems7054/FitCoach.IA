@@ -4,6 +4,7 @@ import { CameraIcon } from '../icons/CameraIcon';
 import { XIcon } from '../icons/XIcon';
 import { Avatar } from './Avatar';
 import { useToast } from './Toast';
+import { logger } from '../../utils/logger';
 
 interface PhotoUploaderProps {
   currentPhotoUrl?: string;
@@ -100,12 +101,7 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       onPhotoChange(base64String);
       showSuccess('Foto atualizada com sucesso!');
     } catch (err) {
-      try {
-        const { logger } = await import('../../utils/logger');
-        logger.error('Erro ao processar imagem', 'PhotoUploader', err);
-      } catch {
-        console.error('Erro ao processar imagem:', err);
-      }
+      logger.error('Erro ao processar imagem', 'PhotoUploader', err);
       showError('Não foi possível processar a imagem. Tente novamente.');
     }
   }, [onPhotoChange, showError, showSuccess]);
@@ -141,12 +137,7 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               className="w-32 h-32 rounded-full object-cover border-4 border-slate-200 dark:border-slate-700 shadow-lg"
               onError={async (e) => {
                 // Se a imagem falhar ao carregar, resetar preview
-                try {
-                  const { logger } = await import('../../utils/logger');
-                  logger.error('Erro ao carregar foto de perfil', 'PhotoUploader', e);
-                } catch {
-                  console.error('Erro ao carregar foto de perfil:', e);
-                }
+                logger.error('Erro ao carregar foto de perfil', 'PhotoUploader', e);
                 setPreview(null);
               }}
             />

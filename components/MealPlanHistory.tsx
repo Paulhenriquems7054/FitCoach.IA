@@ -7,6 +7,7 @@ import MealPlanDisplay from './MealPlanDisplay';
 import { XIcon } from './icons/XIcon';
 import { useUser } from '../context/UserContext';
 import { getAccountType } from '../utils/accountType';
+import { logger } from '../utils/logger';
 
 interface MealPlanHistoryProps {
     userId: string;
@@ -50,12 +51,7 @@ export const MealPlanHistory: React.FC<MealPlanHistoryProps> = ({
                 
                 setPlans(plansWithMetadata);
             } catch (error) {
-                try {
-              const { logger } = await import('../utils/logger');
-              logger.error('Erro ao carregar histórico', 'MealPlanHistory', error);
-            } catch {
-              console.error('Erro ao carregar histórico:', error);
-            }
+                logger.error('Erro ao carregar histórico', 'MealPlanHistory', error);
             } finally {
                 setIsLoading(false);
             }

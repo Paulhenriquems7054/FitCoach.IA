@@ -19,6 +19,7 @@ import {
     getCompletedWorkouts,
     clearCompletedWorkouts 
 } from '../services/databaseService';
+import { logger } from '../utils/logger';
 import type { WellnessPlan, WorkoutDay } from '../types';
 import { logger } from '../utils/logger';
 
@@ -179,12 +180,7 @@ const WellnessPlanPage: React.FC = () => {
         try {
             await saveWellnessPlan(updatedPlan);
         } catch (error) {
-            try {
-              const { logger } = await import('../utils/logger');
-              logger.error('Erro ao salvar plano editado', 'WellnessPlanPage', error);
-            } catch {
-              console.error('Erro ao salvar plano editado:', error);
-            }
+            logger.error('Erro ao salvar plano editado', 'WellnessPlanPage', error);
         }
     };
 

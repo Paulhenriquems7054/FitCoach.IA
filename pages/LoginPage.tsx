@@ -17,6 +17,7 @@ import { validateCoupon, applyCouponToUser } from '../services/couponService';
 import type { LoginCredentials } from '../types';
 import { sanitizeInput, sanitizeEmail } from '../utils/security';
 import { getAccountType } from '../utils/accountType';
+import { logger } from '../utils/logger';
 
 const LoginPage: React.FC = () => {
     const { user, setUser } = useUser();
@@ -109,12 +110,7 @@ const LoginPage: React.FC = () => {
             if (userError) {
                 // Logger será importado dinamicamente se necessário
                 if (typeof window !== 'undefined') {
-                  try {
-                    const { logger } = await import('../utils/logger');
-                    logger.error('Erro ao buscar usuário', 'LoginPage', userError);
-                  } catch {
-                    console.error('Erro ao buscar usuário:', userError);
-                  }
+                  logger.error('Erro ao buscar usuário', 'LoginPage', userError);
                 } else {
                   console.error('Erro ao buscar usuário:', userError);
                 }
@@ -155,12 +151,7 @@ const LoginPage: React.FC = () => {
             }
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-            try {
-              const { logger } = await import('../utils/logger');
-              logger.error('Erro no login por token', 'LoginPage', error);
-            } catch {
-              console.error('Erro no login por token:', error);
-            }
+            logger.error('Erro no login por token', 'LoginPage', error);
             const errorMsg = error.message || 'Erro ao processar token de acesso. Tente fazer login manualmente.';
             setError(errorMsg);
             showError(errorMsg);
@@ -479,12 +470,7 @@ const LoginPage: React.FC = () => {
                 userError = directInsertError;
             } catch (directError) {
                 // Se inserção direta falhar (RLS), usar função RPC
-                try {
-                  const { logger } = await import('../utils/logger');
-                  logger.warn('Inserção direta falhou, tentando função RPC', 'LoginPage', directError);
-                } catch {
-                  console.warn('Inserção direta falhou, tentando função RPC', directError);
-                }
+                logger.warn('Inserção direta falhou, tentando função RPC', 'LoginPage', directError);
                 
                 try {
                     // Preparar dados do usuário em JSONB conforme a função espera
@@ -514,12 +500,7 @@ const LoginPage: React.FC = () => {
 
                     userError = rpcError;
                 } catch (rpcError) {
-                    try {
-                      const { logger } = await import('../utils/logger');
-                      logger.error('Erro ao criar usuário via função RPC', 'LoginPage', rpcError);
-                    } catch {
-                      console.error('Erro ao criar usuário via função RPC', rpcError);
-                    }
+                    logger.error('Erro ao criar usuário via função RPC', 'LoginPage', rpcError);
                     userError = rpcError as any;
                 }
             }
@@ -527,12 +508,7 @@ const LoginPage: React.FC = () => {
             if (userError) {
                 // Log do erro mas não bloquear o cadastro
                 // O usuário pode fazer login depois e o perfil será criado
-                try {
-                  const { logger } = await import('../utils/logger');
-                  logger.warn('Erro ao criar perfil no Supabase (usuário pode fazer login depois)', 'LoginPage', userError);
-                } catch {
-                  console.warn('Erro ao criar perfil no Supabase (usuário pode fazer login depois):', userError);
-                }
+                logger.warn('Erro ao criar perfil no Supabase (usuário pode fazer login depois)', 'LoginPage', userError);
                 // Não lançar erro - permitir que o cadastro continue
             }
 
@@ -540,12 +516,7 @@ const LoginPage: React.FC = () => {
             if (signupCouponCode.trim() && couponPlan) {
                 const applyResult = await applyCouponToUser(signupCouponCode.trim(), userId);
                 if (!applyResult.success) {
-                    try {
-                      const { logger } = await import('../utils/logger');
-                      logger.warn('Erro ao aplicar cupom', 'LoginPage', { error: applyResult.error });
-                    } catch {
-                      console.warn('Erro ao aplicar cupom:', applyResult.error);
-                    }
+                    logger.warn('Erro ao aplicar cupom', 'LoginPage', { error: applyResult.error });
                     // Não bloquear o cadastro se falhar aplicar o cupom
                 }
             }
@@ -603,12 +574,7 @@ const LoginPage: React.FC = () => {
                     const supabase = getSupabaseClient();
                     await supabase.auth.signOut();
                 } catch (signOutError) {
-                    try {
-                      const { logger } = await import('../utils/logger');
-                      logger.warn('Não foi possível fazer signOut do Supabase ao entrar como desenvolvedor', 'LoginPage', signOutError);
-                    } catch {
-                      console.warn('Não foi possível fazer signOut do Supabase ao entrar como desenvolvedor:', signOutError);
-                    }
+                    logger.warn('Não foi possível fazer signOut do Supabase ao entrar como desenvolvedor', 'LoginPage', signOutError);
                 }
 
                 const devUser = {
@@ -807,12 +773,7 @@ const LoginPage: React.FC = () => {
                         }
                     } catch (error) {
                         // Se falhar a sincronização, continuar com dados locais
-                        try {
-                          const { logger } = await import('../utils/logger');
-                          logger.warn('Erro ao sincronizar status no login', 'LoginPage', error);
-                        } catch {
-                          console.warn('Erro ao sincronizar status no login:', error);
-                        }
+                        logger.warn('Erro ao sincronizar status no login', 'LoginPage', error);
                     }
                 }
 
@@ -845,18 +806,13 @@ const LoginPage: React.FC = () => {
                 
                 // Debug: verificação de enquete (apenas em DEV)
                 if (import.meta.env.DEV) {
-                  try {
-                    const { logger } = await import('../utils/logger');
-                    logger.debug('Verificação de enquete', 'LoginPage', {
-                      username: usernameForSurvey,
-                      gymRole: user.gymRole,
-                      flag: SURVEY_STORAGE_FLAG,
-                      hasAnswered: hasAnsweredSurvey,
-                      accountType,
-                    });
-                  } catch {
-                    // Ignorar em produção
-                  }
+                  logger.debug('Verificação de enquete', 'LoginPage', {
+                    username: usernameForSurvey,
+                    gymRole: user.gymRole,
+                    flag: SURVEY_STORAGE_FLAG,
+                    hasAnswered: hasAnsweredSurvey,
+                    accountType,
+                  });
                 }
                 
                 // Redirecionar baseado no tipo de conta

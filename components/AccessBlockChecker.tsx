@@ -10,6 +10,7 @@ import { syncBlockStatus, checkServerAvailability } from '../services/syncServic
 import { useRouter } from '../hooks/useRouter';
 import { Alert } from './ui/Alert';
 import { Button } from './ui/Button';
+import { logger } from '../utils/logger';
 
 export const AccessBlockChecker: React.FC = () => {
     const { user, setUser } = useUser();
@@ -55,12 +56,7 @@ export const AccessBlockChecker: React.FC = () => {
                     push('#/login');
                 }
             } catch (error) {
-                try {
-                  const { logger } = await import('../utils/logger');
-                  logger.error('Erro ao verificar acesso', 'AccessBlockChecker', error);
-                } catch {
-                  console.error('Erro ao verificar acesso:', error);
-                }
+                logger.error('Erro ao verificar acesso', 'AccessBlockChecker', error);
             }
         };
 
