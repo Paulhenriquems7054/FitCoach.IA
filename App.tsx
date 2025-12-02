@@ -39,6 +39,7 @@ const PremiumPage = lazy(() => import('./pages/PremiumPage'));
 const ActivationScreen = lazy(() => import('./pages/ActivationScreen'));
 const SubscriptionStatusScreen = lazy(() => import('./pages/SubscriptionStatusScreen'));
 const ChangePlanPage = lazy(() => import('./pages/ChangePlanPage'));
+const CreateDefaultUsersPage = lazy(() => import('./pages/CreateDefaultUsersPage'));
 
 // Componente de loading
 const PageLoader = () => (
@@ -283,10 +284,17 @@ const App: React.FC = () => {
     // Verificar se é admin (apenas se estiver logado)
     const isDefaultAdmin = isLoggedIn && (user.username === 'Administrador' || user.username === 'Desenvolvedor');
     const isAdmin = isLoggedIn && (user.gymRole === 'admin' || isDefaultAdmin);
+    const isDeveloper = isLoggedIn && (user.username === 'Desenvolvedor' || user.username === 'dev123');
+
+    // Se for desenvolvedor, redirecionar para admin-dashboard se não estiver lá
+    if (isDeveloper && path !== '/admin-dashboard') {
+        window.location.hash = '#/admin-dashboard';
+        return null;
+    }
 
     // Rotas permitidas para administradores
     const adminAllowedRoutes = ['/', '/privacy', '/configuracoes', '/perfil', '/student-management', '/gym-admin', '/permissions', '/premium'];
-    const isAdminAccessingStudentRoute = isAdmin && !adminAllowedRoutes.includes(path) && path !== '/admin-dashboard';
+    const isAdminAccessingStudentRoute = isAdmin && !isDeveloper && !adminAllowedRoutes.includes(path) && path !== '/admin-dashboard';
 
     // Se admin tentar acessar rota de aluno, redirecionar para dashboard
     if (isAdminAccessingStudentRoute) {
@@ -328,8 +336,13 @@ const App: React.FC = () => {
             case '/activation': return <ActivationScreen />;
             case '/subscription-status': return <SubscriptionStatusScreen />;
             case '/change-plan': return <ChangePlanPage />;
+            case '/create-default-users': return <CreateDefaultUsersPage />;
             case '/':
             default:
+                // Se for desenvolvedor, sempre mostrar admin-dashboard
+                if (isDeveloper) {
+                    return <AdminDashboardPage />;
+                }
                 // Se for admin, mostrar dashboard administrativo; caso contrário, mostrar home do aluno
                 if (isAdmin) {
                     return <AdminDashboardPage />;

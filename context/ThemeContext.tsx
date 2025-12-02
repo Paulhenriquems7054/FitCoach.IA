@@ -30,7 +30,12 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           setThemeSetting(savedTheme);
         }
       } catch (error) {
-        console.error('Erro ao carregar tema:', error);
+        // Usar logger se disponível, senão console.error (contexto pode carregar antes do logger)
+        if (typeof window !== 'undefined' && (window as any).__logger) {
+          (window as any).__logger.error('Erro ao carregar tema', 'ThemeContext', error);
+        } else {
+          console.error('Erro ao carregar tema:', error);
+        }
         // Fallback para localStorage se o banco não estiver pronto
         if (typeof window !== 'undefined') {
           const savedThemeSetting = localStorage.getItem('theme_setting');
@@ -84,7 +89,12 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         try {
           await saveAppSetting('theme_setting', themeSetting);
         } catch (error) {
-          console.error('Erro ao salvar tema:', error);
+          // Usar logger se disponível
+          if (typeof window !== 'undefined' && (window as any).__logger) {
+            (window as any).__logger.error('Erro ao salvar tema', 'ThemeContext', error);
+          } else {
+            console.error('Erro ao salvar tema:', error);
+          }
           // Fallback para localStorage
           if (typeof window !== 'undefined') {
             localStorage.setItem('theme_setting', themeSetting);

@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSubscription } from '../hooks/useSubscription';
 import { useUser } from '../context/UserContext';
+import { useToast } from '../components/ui/Toast';
 
 interface VoiceMinutesCounterProps {
   isActive: boolean; // Se o chat de voz está ativo
@@ -20,6 +21,7 @@ export function VoiceMinutesCounter({
   const { getRemainingMinutes, status } = useSubscription();
   const [remainingMinutes, setRemainingMinutes] = useState<number>(0);
   const [isUnlimited, setIsUnlimited] = useState(false);
+  const { showWarning } = useToast();
 
   useEffect(() => {
     if (!isActive || !user?.id) return;
@@ -32,6 +34,11 @@ export function VoiceMinutesCounter({
       // Verificar se minutos acabaram
       if (remaining <= 0 && !isUnlimited && onMinutesExhausted) {
         onMinutesExhausted();
+      }
+
+      // Notificação quando limite estiver próximo (<= 3 minutos)
+      if (remaining > 0 && remaining <= 3 && !isUnlimited) {
+        showWarning('Seus minutos de voz estão quase acabando. Considere recarregar na página de planos.');
       }
     };
 

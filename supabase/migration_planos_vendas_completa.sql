@@ -58,6 +58,26 @@ DO UPDATE SET
 -- PLANOS B2B (ACADEMIAS)
 -- ============================================
 
+-- Pack Starter Mini - R$ 149,90/mês (10 licenças)
+INSERT INTO public.subscription_plans (name, display_name, description, price_monthly, price_yearly, limits, features, is_active, is_visible, plan_category)
+VALUES
+    ('academy_starter_mini', 'Starter Mini', 'Ideal para academias pequenas ou para testar', 149.90, NULL,
+     '{"voice_daily_limit_seconds": 900, "text_msg_daily_limit": -1, "photo_analysis_unlimited": true, "workout_unlimited": true, "chat_unlimited": true, "max_licenses": 10}'::jsonb,
+     '["10 Licenças Premium", "Código Mestre Único", "Custo por aluno: R$ 14,99/mês", "Todas as features Premium para cada aluno", "Acesso gratuito para os alunos", "Ideal para testar o sistema"]'::jsonb,
+     TRUE, TRUE, 'b2b')
+ON CONFLICT (name) 
+DO UPDATE SET
+    display_name = EXCLUDED.display_name,
+    description = EXCLUDED.description,
+    price_monthly = EXCLUDED.price_monthly,
+    price_yearly = EXCLUDED.price_yearly,
+    limits = EXCLUDED.limits,
+    features = EXCLUDED.features,
+    is_active = EXCLUDED.is_active,
+    is_visible = EXCLUDED.is_visible,
+    plan_category = EXCLUDED.plan_category,
+    updated_at = NOW();
+
 -- Pack Starter - R$ 299,90/mês (20 licenças)
 INSERT INTO public.subscription_plans (name, display_name, description, price_monthly, price_yearly, limits, features, is_active, is_visible, plan_category)
 VALUES

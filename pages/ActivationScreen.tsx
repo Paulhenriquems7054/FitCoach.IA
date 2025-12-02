@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { useUser } from '../context/UserContext';
 import { activateUserWithCode } from '../services/activationCodeService';
+import { validatePromotionalCode, applyPromotionalCode } from '../services/promotionalCodeService';
 
 export function ActivationScreen() {
   const { user } = useUser();
@@ -13,6 +14,11 @@ export function ActivationScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const [promoCode, setPromoCode] = useState('');
+  const [promoMessage, setPromoMessage] = useState<string | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
 
   async function handleActivate() {
     if (!code.trim() || !user?.id) return;
@@ -36,6 +42,33 @@ export function ActivationScreen() {
       setError('Erro inesperado. Tente novamente.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleApplyPromo() {
+    if (!promoCode.trim() || !user?.id) return;
+
+    setIsApplyingPromo(true);
+    setPromoError(null);
+    setPromoMessage(null);
+
+    try {
+      const validation = await validatePromotionalCode(promoCode);
+      if (!validation.valid) {
+        setPromoError(validation.message || 'Código promocional inválido.');
+        return;
+      }
+
+      const result = await applyPromotionalCode(user.id, promoCode);
+      if (result.success) {
+        setPromoMessage(result.message || 'Código aplicado com sucesso!');
+      } else {
+        setPromoError(result.message || 'Não foi possível aplicar o código.');
+      }
+    } catch (err) {
+      setPromoError('Erro inesperado ao aplicar código promocional. Tente novamente.');
+    } finally {
+      setIsApplyingPromo(false);
     }
   }
 
@@ -64,6 +97,29 @@ export function ActivationScreen() {
         disabled={loading || !code.trim()}
       >
         {loading ? 'Ativando...' : 'Ativar Código'}
+      </button>
+
+      <hr className="my-6" />
+
+      <h2>Código Promocional</h2>
+      <p>Se você possui um código promocional (teste, desconto, acesso especial), digite abaixo:</p>
+
+      <input
+        type="text"
+        value={promoCode}
+        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+        placeholder="Ex: TESTE-7DIAS"
+        maxLength={30}
+      />
+
+      {promoError && <div className="error">{promoError}</div>}
+      {promoMessage && <div className="success">{promoMessage}</div>}
+
+      <button
+        onClick={handleApplyPromo}
+        disabled={isApplyingPromo || !promoCode.trim()}
+      >
+        {isApplyingPromo ? 'Aplicando...' : 'Aplicar Código Promocional'}
       </button>
     </div>
   );

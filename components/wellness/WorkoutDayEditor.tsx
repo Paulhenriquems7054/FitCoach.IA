@@ -81,15 +81,14 @@ export const WorkoutDayEditor: React.FC<WorkoutDayEditorProps> = ({
 
     /**
      * Adiciona um exercício ao dia
+     *
+     * Antes, só permitíamos exercícios que existissem na biblioteca de GIFs,
+     * o que dava a impressão de que o botão não funcionava quando o usuário digitava
+     * um nome diferente. Agora, permitimos qualquer nome de exercício digitado.
      */
     const handleAddExercise = () => {
         if (!exerciseForm.name.trim()) {
-            alert('Por favor, selecione um exercício da lista');
-            return;
-        }
-
-        if (!isExerciseAvailable(exerciseForm.name)) {
-            alert('Este exercício não possui GIF disponível. Por favor, selecione um exercício da lista.');
+            alert('Por favor, informe o nome do exercício.');
             return;
         }
 

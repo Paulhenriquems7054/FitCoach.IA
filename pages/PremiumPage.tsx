@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { useUser } from '../context/UserContext';
 import { Button } from '../components/ui/Button';
@@ -47,6 +47,11 @@ const PremiumPage: React.FC = () => {
         caktoPaymentId?: string;
     } | null>(null);
     
+    const turboRef = useRef<HTMLDivElement | null>(null);
+    const bank100Ref = useRef<HTMLDivElement | null>(null);
+    const unlimitedRef = useRef<HTMLDivElement | null>(null);
+    const [hasScrolledFromHash, setHasScrolledFromHash] = useState(false);
+    
     useEffect(() => {
         loadPlans();
         loadActiveSubscription();
@@ -83,7 +88,7 @@ const PremiumPage: React.FC = () => {
                 const subscription = await getActiveSubscription(undefined, undefined, username);
                 
                 if (subscription) {
-                    logger.info('Assinatura encontrada!', 'PremiumPage', subscription);
+                    logger.info('Assinatura encontrada!', 'PremiumPage');
                     setActiveSubscription(subscription);
                 } else {
                     logger.warn('Nenhuma assinatura ativa encontrada', 'PremiumPage');
@@ -102,6 +107,34 @@ const PremiumPage: React.FC = () => {
     const b2cPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'b2c'), [allPlans]);
     const b2bPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'b2b'), [allPlans]);
     const personalPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'personal'), [allPlans]);
+
+    // Rolar para a oferta específica quando vier de #/premium?product=...
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (loading || activeSubscription || hasScrolledFromHash) return;
+
+        const hash = window.location.hash || '';
+        const [, queryString] = hash.split('?');
+        if (!queryString) return;
+
+        const params = new URLSearchParams(queryString);
+        const product = params.get('product');
+        if (!product) return;
+
+        let targetRef: React.RefObject<HTMLDivElement> | null = null;
+        if (product === 'turbo') {
+            targetRef = turboRef;
+        } else if (product === 'bank_100') {
+            targetRef = bank100Ref;
+        } else if (product === 'unlimited_30') {
+            targetRef = unlimitedRef;
+        }
+
+        if (targetRef?.current) {
+            targetRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setHasScrolledFromHash(true);
+        }
+    }, [loading, activeSubscription, hasScrolledFromHash]);
     
     const handleSubscribe = (plan: SubscriptionPlan) => {
         setCheckoutModal({
@@ -136,7 +169,10 @@ const PremiumPage: React.FC = () => {
             <Card 
                 className={`flex flex-col relative hover:shadow-xl transition-all duration-300 ${
                     highlight 
-                        ? 'border-2 border-primary-500 bg-gradient-to-br from-primary-50/50 to-amber-50/50 dark:from-primary-900/10 dark:to-amber-900/10 scale-105' 
+                        // Importante: removido qualquer scale para evitar que o card
+                        // ultrapasse o contêiner pai (que usa overflow-hidden),
+                        // o que fazia o plano recomendado aparecer cortado pela metade.
+                        ? 'border-2 border-primary-500 bg-gradient-to-br from-primary-50/50 to-amber-50/50 dark:from-primary-900/10 dark:to-amber-900/10'
                         : 'hover:shadow-lg'
                 }`}
             >
@@ -408,7 +444,7 @@ const PremiumPage: React.FC = () => {
                                         <PlanCard
                                             key={plan.id}
                                             plan={plan}
-                                            badge={isAnnual ? 'RECOMENDADO' : undefined}
+                                            /* Removido o selo "RECOMENDADO" para evitar corte visual do card em alguns layouts */
                                             highlight={isAnnual}
                                             showYearlyPrice={isAnnual}
                                         />
@@ -431,13 +467,13 @@ const PremiumPage: React.FC = () => {
                             </div>
                             
                             <HowItWorksSection
-                                title="Como Funciona"
+                                title="Como funciona para academias"
                                 steps={[
-                                    'Academia compra o pacote → paga mensalmente',
-                                    'Recebe um Código Mestre único → ex: ACADEMIA-XYZ',
-                                    'Distribui o código para os alunos → via WhatsApp, e-mail, etc.',
-                                    'Alunos ativam no app → inserem o código e ganham acesso Premium',
-                                    'Acesso é gratuito para o aluno → enquanto a academia estiver pagando'
+                                    '1. A academia contrata um dos planos para academias (Starter, Growth ou Pro).',
+                                    '2. Após a ativação, a academia recebe um Código Mestre exclusivo (ex: ACADEMIA-XYZ).',
+                                    '3. A academia compartilha esse código com os alunos (WhatsApp, redes sociais, e-mail, etc.).',
+                                    '4. O aluno entra no app FitCoach.IA, informa o código e desbloqueia o acesso Premium.',
+                                    '5. Enquanto a academia mantiver a assinatura ativa, os alunos continuam com acesso Premium sem custo extra.'
                                 ]}
                                 icon={<ChartBarIcon className="w-6 h-6 text-primary-500" />}
                             />
@@ -471,13 +507,13 @@ const PremiumPage: React.FC = () => {
                             </div>
                             
                             <HowItWorksSection
-                                title="Como Funciona"
+                                title="Como funciona para personal trainers"
                                 steps={[
-                                    'Personal compra o plano → paga mensalmente',
-                                    'Recebe um Código de Equipe → ex: PERSONAL-ABC123',
-                                    'Envia código para clientes → via WhatsApp',
-                                    'Clientes ativam no app → ganham acesso Premium',
-                                    'Acesso é gratuito para o cliente → enquanto o personal estiver pagando'
+                                    '1. O personal contrata um dos planos para personal trainers.',
+                                    '2. Após a ativação, o personal recebe um Código de Equipe exclusivo (ex: PERSONAL-ABC123).',
+                                    '3. O personal envia esse código para os clientes (WhatsApp, grupos, redes sociais, etc.).',
+                                    '4. O cliente entra no app FitCoach.IA, informa o código e passa a ter acesso Premium.',
+                                    '5. Enquanto o personal mantiver a assinatura ativa, os clientes continuam com acesso Premium sem pagar nada a mais.'
                                 ]}
                                 icon={<BoltIcon className="w-6 h-6 text-amber-500" />}
                             />
@@ -512,7 +548,7 @@ const PremiumPage: React.FC = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                             {/* Sessão Turbo */}
-                            <Card className="flex flex-col hover:shadow-lg transition-all relative">
+                            <Card ref={turboRef} className="flex flex-col hover:shadow-lg transition-all relative">
                                 <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
                                     <div className="flex items-center gap-2 mb-2">
                                         <BoltIcon className="w-6 h-6 text-yellow-500" />
@@ -534,7 +570,7 @@ const PremiumPage: React.FC = () => {
                                     <li className="flex items-start gap-2">
                                         <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
                                         <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
-                                            +30 Minutos de Voz
+                                            +20 Minutos de Voz
                                         </span>
                                     </li>
                                     <li className="flex items-start gap-2">
@@ -553,7 +589,7 @@ const PremiumPage: React.FC = () => {
                                 <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700">
                                     <Button
                                         onClick={() => window.open('https://pay.cakto.com.br/ihfy8cz_668443', '_blank', 'noopener,noreferrer')}
-                                        variant="secondary"
+                                        variant="primary"
                                         className="w-full"
                                         size="lg"
                                     >
@@ -563,7 +599,7 @@ const PremiumPage: React.FC = () => {
                             </Card>
 
                             {/* Banco de Voz 100 */}
-                            <Card className="flex flex-col hover:shadow-lg transition-all relative border-2 border-primary-500 bg-gradient-to-br from-primary-50/50 to-blue-50/50 dark:from-primary-900/10 dark:to-blue-900/10">
+                            <Card ref={bank100Ref} className="flex flex-col hover:shadow-lg transition-all relative border-2 border-primary-500 bg-gradient-to-br from-primary-50/50 to-blue-50/50 dark:from-primary-900/10 dark:to-blue-900/10">
                                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary-600 to-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
                                     MELHOR ESCOLHA
                                 </div>
@@ -617,7 +653,7 @@ const PremiumPage: React.FC = () => {
                             </Card>
 
                             {/* Passe Livre 30 Dias */}
-                            <Card className="flex flex-col hover:shadow-lg transition-all relative">
+                            <Card ref={unlimitedRef} className="flex flex-col hover:shadow-lg transition-all relative">
                                 <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
                                     <div className="flex items-center gap-2 mb-2">
                                         <SparklesIcon className="w-6 h-6 text-purple-500" />
@@ -658,7 +694,7 @@ const PremiumPage: React.FC = () => {
                                 <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700">
                                     <Button
                                         onClick={() => window.open('https://pay.cakto.com.br/trszqtv_668453', '_blank', 'noopener,noreferrer')}
-                                        variant="secondary"
+                                        variant="primary"
                                         className="w-full"
                                         size="lg"
                                     >

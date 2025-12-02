@@ -9,6 +9,7 @@ import {
   getGymLogo,
   loadGymBranding,
   loadGymConfig,
+  applyBrandingStyles,
 } from '../services/gymConfigService';
 import type { Gym, GymBranding } from '../types';
 
@@ -37,6 +38,11 @@ export const useGymBranding = () => {
         // Obter logo
         const gymLogo = getGymLogo();
         setLogo(gymLogo);
+        
+        // Aplicar branding imediatamente se disponível
+        if (loadedBranding) {
+          applyBrandingStyles(loadedBranding);
+        }
       } catch (error) {
         console.error('Erro ao carregar branding da academia', error);
       } finally {
@@ -44,6 +50,7 @@ export const useGymBranding = () => {
       }
     };
 
+    // Carregar imediatamente
     loadBranding();
 
     // Escutar mudanças no localStorage

@@ -179,7 +179,12 @@ const WellnessPlanPage: React.FC = () => {
         try {
             await saveWellnessPlan(updatedPlan);
         } catch (error) {
-            console.error('Erro ao salvar plano editado:', error);
+            try {
+              const { logger } = await import('../utils/logger');
+              logger.error('Erro ao salvar plano editado', 'WellnessPlanPage', error);
+            } catch {
+              console.error('Erro ao salvar plano editado:', error);
+            }
         }
     };
 

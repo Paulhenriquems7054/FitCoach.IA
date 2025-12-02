@@ -962,27 +962,113 @@ const ChatbotPopup: React.FC = () => {
       {/* Modal de limite diário de voz (Google Play: sem preço/link de compra direto) */}
       {showLimitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-              Limite diário de voz atingido
-            </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              Para manter a segurança e as regras da loja, o uso de voz foi bloqueado por hoje.
-            </p>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              Você pode gerenciar seu plano e seu tempo de uso acessando a página de conta.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-2xl p-6 space-y-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                  Seus minutos de voz acabaram
+                </h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  Escolha uma opção abaixo para continuar usando a conversa por voz com o FitCoach.IA.
+                </p>
+              </div>
               <button
                 type="button"
-                className="flex-1 px-4 py-2 rounded-md border border-slate-300 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
+                className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                onClick={() => setShowLimitModal(false)}
+                aria-label="Fechar"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+              {/* Ajuda Rápida */}
+              <button
+                type="button"
+                className="text-left rounded-lg border border-emerald-300/70 dark:border-emerald-500/60 bg-emerald-50/80 dark:bg-emerald-900/20 p-4 hover:shadow-md transition-shadow"
+                onClick={() => {
+                  setShowLimitModal(false);
+                  if (typeof window !== 'undefined') {
+                    window.location.hash = '#/premium?product=turbo';
+                  }
+                }}
+              >
+                <h3 className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-1">
+                  Ajuda Rápida
+                </h3>
+                <p className="text-xs text-emerald-900/90 dark:text-emerald-100/90 mb-2">
+                  +20 minutos adicionais para hoje. Ideal para finalizar uma sessão urgente.
+                </p>
+                <ul className="text-[11px] text-emerald-900/80 dark:text-emerald-100/80 space-y-1">
+                  <li>• Ativação imediata</li>
+                  <li>• Expira em 24 horas</li>
+                  <li>• Usa antes do seu banco de minutos</li>
+                </ul>
+              </button>
+
+              {/* Minutos de Reserva */}
+              <button
+                type="button"
+                className="text-left rounded-lg border border-sky-300/70 dark:border-sky-500/60 bg-sky-50/80 dark:bg-sky-900/20 p-4 hover:shadow-md transition-shadow"
+                onClick={() => {
+                  setShowLimitModal(false);
+                  if (typeof window !== 'undefined') {
+                    window.location.hash = '#/premium?product=bank_100';
+                  }
+                }}
+              >
+                <h3 className="text-sm font-bold text-sky-800 dark:text-sky-200 mb-1">
+                  Minutos de Reserva
+                </h3>
+                <p className="text-xs text-sky-900/90 dark:text-sky-100/90 mb-2">
+                  +100 minutos para seu banco de voz. Perfeito para usar aos poucos.
+                </p>
+                <ul className="text-[11px] text-sky-900/80 dark:text-sky-100/80 space-y-1">
+                  <li>• Não expira</li>
+                  <li>• Usado automaticamente após o free diário e o boost</li>
+                  <li>• Acumulativo: soma com saldos anteriores</li>
+                </ul>
+              </button>
+
+              {/* Conversa Ilimitada 30 Dias */}
+              <button
+                type="button"
+                className="text-left rounded-lg border border-amber-300/80 dark:border-amber-500/70 bg-amber-50/90 dark:bg-amber-900/25 p-4 hover:shadow-md transition-shadow"
+                onClick={() => {
+                  setShowLimitModal(false);
+                  if (typeof window !== 'undefined') {
+                    window.location.hash = '#/premium?product=unlimited_30';
+                  }
+                }}
+              >
+                <h3 className="text-sm font-bold text-amber-900 dark:text-amber-100 mb-1">
+                  Conversa Ilimitada 30 Dias
+                </h3>
+                <p className="text-xs text-amber-900/90 dark:text-amber-100/90 mb-2">
+                  Use voz à vontade por 30 dias, sem descontar dos seus saldos.
+                </p>
+                <ul className="text-[11px] text-amber-900/80 dark:text-amber-100/80 space-y-1">
+                  <li>• Acesso ilimitado à voz por 30 dias</li>
+                  <li>• Free diário, Boost e Banco ficam como reserva</li>
+                  <li>• Ideal para uso intenso no mês</li>
+                </ul>
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                className="px-4 py-2 rounded-md border border-slate-300 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
                 onClick={() => setShowLimitModal(false)}
               >
-                Fechar
+                Agora não
               </button>
               <button
                 type="button"
-                className="flex-1 px-4 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                className="px-4 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
                 onClick={() => {
                   setShowLimitModal(false);
                   if (typeof window !== 'undefined') {
@@ -990,7 +1076,7 @@ const ChatbotPopup: React.FC = () => {
                   }
                 }}
               >
-                Gerenciar conta
+                Ver todos os planos
               </button>
             </div>
           </div>

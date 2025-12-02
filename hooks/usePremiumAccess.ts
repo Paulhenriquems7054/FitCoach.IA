@@ -21,6 +21,7 @@ const isPremiumPlan = (planType?: string): boolean => {
   const premiumPlans = [
     'monthly',
     'annual_vip',
+    'academy_starter_mini',
     'academy_starter',
     'academy_growth',
     'academy_pro',

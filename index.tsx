@@ -9,87 +9,11 @@ import { DeviceProvider } from './context/DeviceContext';
 import { DatabaseInitializer } from './components/DatabaseInitializer';
 
 // Service Worker management
-if ('serviceWorker' in navigator) {
-  // Always unregister service workers in development
-  if (import.meta.env.DEV) {
-    // Force unregister immediately and prevent registration
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      const unregisterPromises = registrations.map((registration) => {
-        return registration.unregister().then((success) => {
-          if (success) {
-            console.log('[SW] Service Worker unregistered (dev mode)');
-          }
-          return success;
-        });
-      });
-      
-      return Promise.all(unregisterPromises);
-    }).then(() => {
-      // Clear all caches in development
-      if ('caches' in window) {
-        return caches.keys().then((cacheNames) => {
-          const deletePromises = cacheNames.map((cacheName) => {
-            return caches.delete(cacheName).then((success) => {
-              if (success) {
-                console.log('[SW] Cache deleted (dev mode):', cacheName);
-              }
-              return success;
-            });
-          });
-          return Promise.all(deletePromises);
-        });
-      }
-    }).catch((error) => {
-      console.warn('[SW] Error cleaning up service workers in dev mode:', error);
-    });
-    
-    // Override service worker registration in dev mode to prevent any registration
-    const originalRegister = navigator.serviceWorker.register;
-    navigator.serviceWorker.register = function() {
-      // Silently ignore in development - return a resolved promise that won't log errors
-      return Promise.resolve({
-        installing: null,
-        waiting: null,
-        active: null,
-        scope: '/',
-        update: () => Promise.resolve(),
-        unregister: () => Promise.resolve(true),
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        dispatchEvent: () => true,
-      } as ServiceWorkerRegistration);
-    };
-    
-    // Suppress console errors and warnings for service worker in development
-    const originalError = console.error;
-    const originalWarn = console.warn;
-    
-    console.error = function(...args: any[]) {
-      // Filter out service worker errors in development
-      const fullMessage = args.map(arg => String(arg)).join(' ');
-      if (fullMessage.includes('Service workers disabled') || 
-          fullMessage.includes('[SW]') ||
-          fullMessage.includes('serviceWorker') ||
-          fullMessage.includes('Registration failed')) {
-        return; // Don't log service worker errors in dev
-      }
-      originalError.apply(console, args);
-    };
-    
-    console.warn = function(...args: any[]) {
-      // Filter out service worker warnings in development
-      const fullMessage = args.map(arg => String(arg)).join(' ');
-      if (fullMessage.includes('Service workers disabled') || 
-          fullMessage.includes('[SW]') ||
-          fullMessage.includes('serviceWorker') ||
-          fullMessage.includes('Registration failed')) {
-        return; // Don't log service worker warnings in dev
-      }
-      originalWarn.apply(console, args);
-    };
-  } else if (import.meta.env.PROD) {
-    // Production: Register service worker
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
+// Importante: em desenvolvimento NÃO fazemos nada com service workers
+// para evitar qualquer erro/ruído no console. Só registramos em produção.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  // Production: Register service worker
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
       // First, unregister ALL existing service workers to force fresh start
       registrations.forEach((registration) => {
         registration.unregister().then((success) => {
@@ -138,7 +62,6 @@ if ('serviceWorker' in navigator) {
           });
       }, 100);
     });
-  }
 }
 
 

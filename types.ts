@@ -24,7 +24,7 @@ export interface User {
   subscription: 'free' | 'premium';
   
   // Controle de Plano
-  planType?: 'free' | 'monthly' | 'annual_vip' | 'academy_starter' | 'academy_growth' | 'academy_pro' | 'personal_team_5' | 'personal_team_15';
+  planType?: 'free' | 'monthly' | 'annual_vip' | 'academy_starter_mini' | 'academy_starter' | 'academy_growth' | 'academy_pro' | 'personal_team_5' | 'personal_team_15';
   subscriptionStatus?: 'active' | 'inactive' | 'expired';
   expiryDate?: string; // ISO date string
   

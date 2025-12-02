@@ -101,8 +101,9 @@ export const loadGymBranding = (): GymBranding | null => {
 
 /**
  * Aplica estilos CSS customizados baseados no branding
+ * EXPORTADA para uso em outros lugares do sistema
  */
-const applyBrandingStyles = (branding: GymBranding): void => {
+export const applyBrandingStyles = (branding: GymBranding): void => {
   if (typeof document === 'undefined') return;
   
   const styleId = 'gym-branding-styles';
@@ -114,6 +115,17 @@ const applyBrandingStyles = (branding: GymBranding): void => {
     document.head.appendChild(styleElement);
   }
   
+  // Função auxiliar para converter hex para RGB
+  const hexToRgb = (hex: string): string => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
+      : '34, 197, 94'; // fallback emerald-500
+  };
+
+  const primaryRgb = hexToRgb(branding.colors.primary);
+  const secondaryRgb = hexToRgb(branding.colors.secondary);
+
   const css = `
     :root {
       --gym-primary: ${branding.colors.primary};
@@ -121,8 +133,17 @@ const applyBrandingStyles = (branding: GymBranding): void => {
       --gym-accent: ${branding.colors.accent};
       ${branding.colors.background ? `--gym-background: ${branding.colors.background};` : ''}
       ${branding.colors.text ? `--gym-text: ${branding.colors.text};` : ''}
+      
+      /* Integração com Tailwind */
+      --color-primary-500: ${branding.colors.primary};
+      --color-primary-600: ${branding.colors.secondary};
+      --color-primary-700: ${branding.colors.secondary};
+      --tw-color-primary: ${branding.colors.primary};
+      --tw-color-primary-dark: ${branding.colors.secondary};
+      --tw-color-accent: ${branding.colors.accent};
     }
     
+    /* Classes utilitárias para uso direto */
     .gym-primary {
       background-color: ${branding.colors.primary} !important;
       color: white !important;
@@ -138,6 +159,30 @@ const applyBrandingStyles = (branding: GymBranding): void => {
     
     .gym-logo {
       content: url(${branding.logo || ''});
+    }
+    
+    /* Aplicar em TODOS os elementos que usam primary */
+    .bg-primary-500,
+    .bg-primary-600,
+    .bg-primary-700 {
+      background-color: ${branding.colors.primary} !important;
+    }
+    
+    .text-primary-500,
+    .text-primary-600,
+    .text-primary-700 {
+      color: ${branding.colors.primary} !important;
+    }
+    
+    .border-primary-500,
+    .border-primary-600 {
+      border-color: ${branding.colors.primary} !important;
+    }
+    
+    /* Hover states */
+    .hover\\:bg-primary-600:hover,
+    .hover\\:bg-primary-700:hover {
+      background-color: ${branding.colors.secondary} !important;
     }
   `;
   

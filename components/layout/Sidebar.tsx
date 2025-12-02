@@ -4,6 +4,7 @@ import { useRouter } from '../../hooks/useRouter';
 import { useUser } from '../../context/UserContext';
 import { useI18n } from '../../context/I18nContext';
 import { usePermissions } from '../../hooks/usePermissions';
+import { getAccountType } from '../../utils/accountType';
 import { HomeIcon } from '../icons/HomeIcon';
 import { ChartBarIcon } from '../icons/ChartBarIcon';
 import { XIcon } from '../icons/XIcon';
@@ -61,23 +62,25 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     }
   }, [open]);
 
-  // Verificar se é aluno
+  // Verificar roles básicos
   const isStudent = user.gymRole === 'student';
-  // Verificar se é administrador
   const isAdmin = user.gymRole === 'admin';
+  const isTrainer = user.gymRole === 'trainer';
+  const isDeveloper = user.username === 'Desenvolvedor' || user.username === 'dev123';
+  const accountType = getAccountType(user);
 
-  // Áreas permitidas para alunos
+  // Áreas permitidas para alunos (USER_GYM / USER_B2C)
   const studentAllowedRoutes = [
     '/',
     '/wellness',
     '/biblioteca',
     '/desafios',
-    '/analysis',
+    // '/analysis', // Progresso não disponível para aluno
     '/reports',
     '/generator',
     '/smart-meal',
     '/analyzer',
-    '/perfil'
+    '/perfil',
   ];
 
   // Rotas permitidas para administradores
@@ -86,40 +89,80 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     '/student-management'
   ];
 
+  // Rotas permitidas apenas para desenvolvedor (apenas Dashboard Administrativo)
+  const developerAllowedRoutes = [
+    '/admin-dashboard'
+  ];
+
   // Memoizar arrays de navegação para evitar re-renders desnecessários
-  const mainNavigation = useMemo(() => [
-    { name: t('sidebar.home'), href: '#/', icon: HomeIcon },
-    { name: 'Meu Plano de Treino', href: '#/wellness', icon: HeartIcon },
-    { name: 'Biblioteca de Exercícios', href: '#/biblioteca', icon: BookOpenIcon },
-    { name: t('sidebar.challenges'), href: '#/desafios', icon: TrophyIcon },
-    { name: t('sidebar.progressAnalysis'), href: '#/analysis', icon: TrendingUpIcon },
-    { name: t('sidebar.aiReports'), href: '#/reports', icon: ChartBarIcon },
-    { name: t('sidebar.planGenerator'), href: '#/generator', icon: SparklesIcon },
-    { name: t('sidebar.smartMeal'), href: '#/smart-meal', icon: WandIcon },
-    { name: t('sidebar.plateAnalyzer'), href: '#/analyzer', icon: CameraIcon },
-    { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
-  ]
-    .filter(item => {
-      // Se é administrador, mostrar apenas Dashboard
-      if (isAdmin) {
-        const route = item.href.replace(/#/g, '');
+  const mainNavigation = useMemo(() => {
+    // Desenvolvedor: apenas dashboard administrativo
+    if (isDeveloper) {
+      return [
+        { name: 'Controle de Academias e Assinaturas', href: '#/admin-dashboard', icon: ChartBarIcon },
+      ];
+    }
+
+    // Personal Trainer / Profissional (USER_PERSONAL):
+    // - Foco em Progresso e gestão de alunos
+    if (accountType === 'USER_PERSONAL') {
+      return [
+        { name: 'Progresso dos Alunos', href: '#/analysis', icon: TrendingUpIcon },
+        { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
+        { name: 'Biblioteca de Exercícios', href: '#/biblioteca', icon: BookOpenIcon },
+      ].filter(item => item.show !== false);
+    }
+
+    // Menu padrão (USER_B2C / USER_GYM)
+    const items = [
+      { name: t('sidebar.home'), href: '#/', icon: HomeIcon },
+      { name: 'Meu Plano de Treino', href: '#/wellness', icon: HeartIcon },
+      { name: 'Biblioteca de Exercícios', href: '#/biblioteca', icon: BookOpenIcon },
+      { name: t('sidebar.challenges'), href: '#/desafios', icon: TrophyIcon },
+      { name: t('sidebar.progressAnalysis'), href: '#/analysis', icon: TrendingUpIcon },
+      { name: t('sidebar.aiReports'), href: '#/reports', icon: ChartBarIcon },
+      { name: t('sidebar.planGenerator'), href: '#/generator', icon: SparklesIcon },
+      { name: t('sidebar.smartMeal'), href: '#/smart-meal', icon: WandIcon },
+      { name: t('sidebar.plateAnalyzer'), href: '#/analyzer', icon: CameraIcon },
+      { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
+    ];
+
+    return items.filter(item => {
+      const route = item.href.replace(/#/g, '');
+
+      // Admin de academia: apenas rotas administrativas
+      if (isAdmin && !isDeveloper) {
         return adminAllowedRoutes.includes(route);
       }
-      // Se é aluno, mostrar apenas rotas permitidas
+
+      // Aluno (USER_GYM): apenas rotas da whitelist
       if (isStudent) {
-        const route = item.href.replace(/#/g, '');
         return studentAllowedRoutes.includes(route);
       }
-      // Para trainer, mostrar todos exceto os que têm show: false
-      return item.show !== false;
-    }), [t, permissions.canViewStudents, isAdmin, isStudent]);
 
-  const userNavigation = useMemo(() => [
+      // Trainer (quando não tratado como USER_PERSONAL): esconder itens com show === false
+      if (isTrainer) {
+        return item.show !== false;
+      }
+
+      // Usuário comum (B2C): todos os itens visíveis
+      return item.show !== false;
+    });
+  }, [t, permissions.canViewStudents, isAdmin, isStudent, isTrainer, isDeveloper, accountType]);
+
+  const userNavigation = useMemo(() => {
+    // Se for desenvolvedor, não mostrar navegação de usuário
+    if (isDeveloper) {
+      return [];
+    }
+    
+    return [
       { name: 'Perfil', href: '#/perfil', icon: UserCircleIcon },
       { name: t('sidebar.privacy'), href: '#/privacy', icon: ShieldCheckIcon, show: isAdmin },
       { name: t('sidebar.settings'), href: '#/configuracoes', icon: CogIcon, show: isAdmin },
       { name: 'Gerenciar Permissões', href: '#/permissions', icon: KeyIcon, show: isAdmin },
-  ].filter(item => item.show !== false), [t, isAdmin]);
+    ].filter(item => item.show !== false);
+  }, [t, isAdmin, isDeveloper]);
 
   // Memoizar função isCurrent para evitar recriação a cada render
   const isCurrent = useMemo(() => (href: string) => {

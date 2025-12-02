@@ -8,6 +8,7 @@ import NutriAssistant from '../chatbot/NutriAssistant';
 import { useAutoLogout } from '../../hooks/useAutoLogout';
 import { AccessBlockChecker } from '../AccessBlockChecker';
 import { useUser } from '../../context/UserContext';
+import { getAccountType } from '../../utils/accountType';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -20,6 +21,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   // Se o aluno está bloqueado, não renderizar o layout normal
   const isBlocked = user.gymRole === 'student' && user.accessBlocked;
+  const accountType = getAccountType(user);
 
   return (
     <div className="min-h-screen text-slate-800 dark:text-slate-200 transition-colors duration-300">
@@ -50,7 +52,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </div>
         </div>
       )}
-      {!isBlocked && <NutriAssistant />}
+      {/* IA de Voz/Chat: desabilitada para PERSONAL (USER_PERSONAL) */}
+      {!isBlocked && accountType !== 'USER_PERSONAL' && <NutriAssistant />}
     </div>
   );
 };

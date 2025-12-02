@@ -27,6 +27,8 @@ import type { User } from '../types';
 import { Goal } from '../types';
 import { EyeIcon } from '../components/icons/EyeIcon';
 import { EyeSlashIcon } from '../components/icons/EyeSlashIcon';
+import { getCompanyByUserId, getCompanyLicenseStats, type Company } from '../services/companyService';
+import { logger } from '../utils/logger';
 
 const StudentManagementPage: React.FC = () => {
     const { user: currentUser } = useUser();
@@ -52,6 +54,16 @@ const StudentManagementPage: React.FC = () => {
     const [showBlockModal, setShowBlockModal] = useState(false);
     const [studentToBlock, setStudentToBlock] = useState<User | null>(null);
     const [blockReason, setBlockReason] = useState('');
+    const [company, setCompany] = useState<Company | null>(null);
+    const [licenseStats, setLicenseStats] = useState<{
+        total: number;
+        active: number;
+        revoked: number;
+        expired: number;
+        available: number;
+        maxLicenses: number;
+    } | null>(null);
+    const [isLoadingStats, setIsLoadingStats] = useState(false);
 
     const [studentForm, setStudentForm] = useState({
         nome: '',
@@ -77,6 +89,31 @@ const StudentManagementPage: React.FC = () => {
         idade: 30,
         genero: 'Masculino' as 'Masculino' | 'Feminino',
     });
+
+    // Carregar empresa e estatísticas de licenças
+    useEffect(() => {
+        const loadCompanyAndStats = async () => {
+            if (!currentUser.id) return;
+            
+            setIsLoadingStats(true);
+            try {
+                const companyResult = await getCompanyByUserId(currentUser.id);
+                if (companyResult.success && companyResult.company) {
+                    setCompany(companyResult.company);
+                    
+                    // Carregar estatísticas de licenças
+                    const stats = await getCompanyLicenseStats(companyResult.company.id);
+                    setLicenseStats(stats);
+                }
+            } catch (error) {
+                logger.error('Erro ao carregar empresa e estatísticas', 'StudentManagementPage', error);
+            } finally {
+                setIsLoadingStats(false);
+            }
+        };
+
+        loadCompanyAndStats();
+    }, [currentUser.id]);
 
     useEffect(() => {
         loadUsers();
@@ -757,6 +794,83 @@ const StudentManagementPage: React.FC = () => {
                     Gerencie alunos e treinadores da academia
                 </p>
             </div>
+
+            {/* Estatísticas de Licenças */}
+            {company && licenseStats && (
+                <Card className="mb-6">
+                    <div className="p-4 sm:p-6">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                            📊 Estatísticas de Licenças
+                        </h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                            <div className="bg-primary-50 dark:bg-primary-900/20 p-3 rounded-lg border border-primary-200 dark:border-primary-800">
+                                <div className="text-xs text-primary-600 dark:text-primary-400 mb-1">Total de Licenças</div>
+                                <div className="text-2xl font-bold text-primary-700 dark:text-primary-300">
+                                    {licenseStats.maxLicenses}
+                                </div>
+                            </div>
+                            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                                <div className="text-xs text-green-600 dark:text-green-400 mb-1">Ativas</div>
+                                <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                                    {licenseStats.active}
+                                </div>
+                            </div>
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <div className="text-xs text-blue-600 dark:text-blue-400 mb-1">Disponíveis</div>
+                                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                                    {licenseStats.available}
+                                </div>
+                            </div>
+                            <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
+                                <div className="text-xs text-amber-600 dark:text-amber-400 mb-1">Uso</div>
+                                <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                                    {licenseStats.maxLicenses > 0 
+                                        ? Math.round((licenseStats.active / licenseStats.maxLicenses) * 100) 
+                                        : 0}%
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Barra de progresso */}
+                        <div className="mb-2">
+                            <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 mb-1">
+                                <span>Licenças em uso</span>
+                                <span>{licenseStats.active} / {licenseStats.maxLicenses}</span>
+                            </div>
+                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                                <div 
+                                    className={`h-full rounded-full transition-all duration-300 ${
+                                        licenseStats.available === 0 
+                                            ? 'bg-red-500' 
+                                            : licenseStats.available <= licenseStats.maxLicenses * 0.2
+                                            ? 'bg-amber-500'
+                                            : 'bg-primary-500'
+                                    }`}
+                                    style={{ 
+                                        width: `${licenseStats.maxLicenses > 0 
+                                            ? (licenseStats.active / licenseStats.maxLicenses) * 100 
+                                            : 0}%` 
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Alerta quando próximo do limite */}
+                        {licenseStats.available <= licenseStats.maxLicenses * 0.2 && licenseStats.available > 0 && (
+                            <Alert type="warning" title="Atenção">
+                                Você está usando {licenseStats.active} de {licenseStats.maxLicenses} licenças. 
+                                Restam apenas {licenseStats.available} licenças disponíveis.
+                            </Alert>
+                        )}
+                        {licenseStats.available === 0 && (
+                            <Alert type="error" title="Limite Atingido">
+                                Todas as {licenseStats.maxLicenses} licenças estão em uso. 
+                                Considere fazer upgrade do plano para adicionar mais licenças.
+                            </Alert>
+                        )}
+                    </div>
+                </Card>
+            )}
 
             {/* Botões de ação */}
             {permissions.canCreateStudents && (

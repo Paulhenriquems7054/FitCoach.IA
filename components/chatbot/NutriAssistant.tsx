@@ -194,6 +194,49 @@ const NutriAssistant: React.FC = () => {
     initializeAssistantSession();
   }, []);
 
+  const handleCopyConversation = useCallback(async () => {
+    try {
+      if (!navigator?.clipboard) {
+        throw new Error('Clipboard API não disponível');
+      }
+
+      const history = messages
+        .filter((msg) => msg.content && msg.content.trim())
+        .map((msg) => {
+          const prefix =
+            msg.role === 'user'
+              ? 'Você:'
+              : msg.role === 'assistant'
+              ? 'FitCoach.IA:'
+              : 'Sistema:';
+          return `${prefix} ${msg.content}`;
+        })
+        .join('\n\n');
+
+      if (!history) return;
+
+      await navigator.clipboard.writeText(history);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'system',
+          content: '✅ Conversa copiada para a área de transferência.',
+          isStreaming: false,
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'system',
+          content:
+            'Não foi possível copiar a conversa automaticamente. Selecione o texto manualmente e use Ctrl+C.',
+          isStreaming: false,
+        },
+      ]);
+    }
+  }, [messages]);
+
   const handleApplyCustomPrompt = () => {
     setAssistantCustomPrompt(promptDraft);
     setCustomPrompt(promptDraft);
@@ -301,12 +344,22 @@ const NutriAssistant: React.FC = () => {
                 <span className="sm:hidden">{showPromptEditor ? 'Ocultar' : 'Prompt'}</span>
               </button>
               <button
+                onClick={handleCopyConversation}
+                className="rounded-full p-2 transition hover:bg-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-white/50"
+                aria-label="Copiar conversa"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M7 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V7Zm2-1a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H9Z" />
+                  <path d="M5 5a2 2 0 0 1 2-2h7a1 1 0 1 1 0 2H7v12a1 1 0 1 1-2 0V5Z" />
+                </svg>
+              </button>
+              <button
                 onClick={handleResetChat}
                 className="rounded-full p-2 transition hover:bg-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-white/50"
-                aria-label="Reiniciar conversa"
+                aria-label="Excluir conversa"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582M20 20v-5h-.581M5.5 9A7 7 0 0119 9m-14 6a7 7 0 0013.5 0" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M9 3a1 1 0 0 0-.894.553L7.382 5H5a1 1 0 1 0 0 2h.262l.823 11.521A2 2 0 0 0 8.08 20.5h7.84a2 2 0 0 0 1.995-1.979L18.738 7H19a1 1 0 1 0 0-2h-2.382l-.724-1.447A1 1 0 0 0 15 3H9Zm1.118 4.553a1 1 0 0 1 1.06.93l.5 8.5a1 1 0 1 1-1.996.118l-.5-8.5a1 1 0 0 1 .936-1.048Zm4.764 0a1 1 0 0 1 .936 1.048l-.5 8.5a1 1 0 0 1-1.996-.118l.5-8.5a1 1 0 0 1 1.06-.93Z" />
                 </svg>
               </button>
               <button

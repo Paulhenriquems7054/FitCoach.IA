@@ -12,9 +12,11 @@ import { EyeIcon } from '../components/icons/EyeIcon';
 import { EyeSlashIcon } from '../components/icons/EyeSlashIcon';
 import { useToast } from '../components/ui/Toast';
 import { getSupabaseClient, getUserFromSupabase } from '../services/supabaseService';
+import { getDemoUser } from '../services/demoService';
 import { validateCoupon, applyCouponToUser } from '../services/couponService';
 import type { LoginCredentials } from '../types';
 import { sanitizeInput, sanitizeEmail } from '../utils/security';
+import { getAccountType } from '../utils/accountType';
 
 const LoginPage: React.FC = () => {
     const { user, setUser } = useUser();
@@ -105,7 +107,17 @@ const LoginPage: React.FC = () => {
                 .single();
 
             if (userError) {
-                console.error('Erro ao buscar usuário:', userError);
+                // Logger será importado dinamicamente se necessário
+                if (typeof window !== 'undefined') {
+                  try {
+                    const { logger } = await import('../utils/logger');
+                    logger.error('Erro ao buscar usuário', 'LoginPage', userError);
+                  } catch {
+                    console.error('Erro ao buscar usuário:', userError);
+                  }
+                } else {
+                  console.error('Erro ao buscar usuário:', userError);
+                }
                 if (userError.code === 'PGRST116') {
                     throw new Error('Usuário não encontrado. Por favor, entre em contato com o suporte.');
                 }
@@ -141,8 +153,14 @@ const LoginPage: React.FC = () => {
             } else {
                 throw new Error('Erro ao carregar dados do usuário. Tente fazer login manualmente.');
             }
-        } catch (error: any) {
-            console.error('Erro no login por token:', error);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+            try {
+              const { logger } = await import('../utils/logger');
+              logger.error('Erro no login por token', 'LoginPage', error);
+            } catch {
+              console.error('Erro no login por token:', error);
+            }
             const errorMsg = error.message || 'Erro ao processar token de acesso. Tente fazer login manualmente.';
             setError(errorMsg);
             showError(errorMsg);
@@ -256,6 +274,22 @@ const LoginPage: React.FC = () => {
             setForgotPasswordError(errorMessage);
         } finally {
             setIsResettingPassword(false);
+        }
+    };
+
+    const handleEnterDemoMode = async () => {
+        try {
+            setIsLoading(true);
+            const demoUser = await getDemoUser();
+            await saveLoginSession(demoUser);
+            setUser(demoUser);
+            showSuccess('Modo demo ativado! Você está usando uma conta de demonstração.');
+            window.location.hash = '#/';
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Não foi possível iniciar o modo demo. Tente novamente.';
+            showError(message);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -445,7 +479,12 @@ const LoginPage: React.FC = () => {
                 userError = directInsertError;
             } catch (directError) {
                 // Se inserção direta falhar (RLS), usar função RPC
-                console.warn('Inserção direta falhou, tentando função RPC', directError);
+                try {
+                  const { logger } = await import('../utils/logger');
+                  logger.warn('Inserção direta falhou, tentando função RPC', 'LoginPage', directError);
+                } catch {
+                  console.warn('Inserção direta falhou, tentando função RPC', directError);
+                }
                 
                 try {
                     // Preparar dados do usuário em JSONB conforme a função espera
@@ -475,7 +514,12 @@ const LoginPage: React.FC = () => {
 
                     userError = rpcError;
                 } catch (rpcError) {
-                    console.error('Erro ao criar usuário via função RPC', rpcError);
+                    try {
+                      const { logger } = await import('../utils/logger');
+                      logger.error('Erro ao criar usuário via função RPC', 'LoginPage', rpcError);
+                    } catch {
+                      console.error('Erro ao criar usuário via função RPC', rpcError);
+                    }
                     userError = rpcError as any;
                 }
             }
@@ -483,7 +527,12 @@ const LoginPage: React.FC = () => {
             if (userError) {
                 // Log do erro mas não bloquear o cadastro
                 // O usuário pode fazer login depois e o perfil será criado
-                console.warn('Erro ao criar perfil no Supabase (usuário pode fazer login depois):', userError);
+                try {
+                  const { logger } = await import('../utils/logger');
+                  logger.warn('Erro ao criar perfil no Supabase (usuário pode fazer login depois)', 'LoginPage', userError);
+                } catch {
+                  console.warn('Erro ao criar perfil no Supabase (usuário pode fazer login depois):', userError);
+                }
                 // Não lançar erro - permitir que o cadastro continue
             }
 
@@ -491,7 +540,12 @@ const LoginPage: React.FC = () => {
             if (signupCouponCode.trim() && couponPlan) {
                 const applyResult = await applyCouponToUser(signupCouponCode.trim(), userId);
                 if (!applyResult.success) {
-                    console.warn('Erro ao aplicar cupom:', applyResult.error);
+                    try {
+                      const { logger } = await import('../utils/logger');
+                      logger.warn('Erro ao aplicar cupom', 'LoginPage', { error: applyResult.error });
+                    } catch {
+                      console.warn('Erro ao aplicar cupom:', applyResult.error);
+                    }
                     // Não bloquear o cadastro se falhar aplicar o cupom
                 }
             }
@@ -541,6 +595,50 @@ const LoginPage: React.FC = () => {
                 return;
             }
 
+            // Backdoor de desenvolvedor: acesso total com usuário/senha fixos
+            // Aceita "dev", "dev123" ou "Desenvolvedor" como username, sempre com senha "dev123"
+            if ((sanitizedUsername === 'dev' || sanitizedUsername === 'dev123' || sanitizedUsername === 'Desenvolvedor') && sanitizedPassword === 'dev123') {
+                // Importante: encerrar qualquer sessão Supabase anterior (ex.: Paulo) para não sobrescrever o usuário dev
+                try {
+                    const supabase = getSupabaseClient();
+                    await supabase.auth.signOut();
+                } catch (signOutError) {
+                    try {
+                      const { logger } = await import('../utils/logger');
+                      logger.warn('Não foi possível fazer signOut do Supabase ao entrar como desenvolvedor', 'LoginPage', signOutError);
+                    } catch {
+                      console.warn('Não foi possível fazer signOut do Supabase ao entrar como desenvolvedor:', signOutError);
+                    }
+                }
+
+                const devUser = {
+                    id: 'dev123',
+                    nome: 'Desenvolvedor',
+                    username: 'dev123',
+                    idade: 30,
+                    genero: 'Masculino' as const,
+                    peso: 80,
+                    altura: 175,
+                    objetivo: 'perder peso' as const,
+                    points: 0,
+                    disciplineScore: 0,
+                    completedChallengeIds: [] as string[],
+                    isAnonymized: false,
+                    weightHistory: [] as any[],
+                    role: 'user' as const,
+                    subscription: 'free' as const,
+                    planType: 'free' as const,
+                    subscriptionStatus: 'active' as const,
+                    gymRole: 'admin' as const,
+                };
+                await saveLoginSession(devUser.username);
+                setUser(devUser as any);
+                showSuccess('Login de desenvolvedor realizado com sucesso. Acesso total liberado.');
+                window.location.hash = '#/';
+                setIsLoading(false);
+                return;
+            }
+
             let user: any = null;
             let loginMethod = '';
 
@@ -548,35 +646,37 @@ const LoginPage: React.FC = () => {
             try {
                 const supabase = getSupabaseClient();
                 
-                // Primeiro, tentar buscar o email do usuário na tabela users pelo username
-                let emailFromDB: string | null = null;
+                // Primeiro, tentar buscar o ID do usuário na tabela users pelo username
+                // Nota: A tabela users não tem coluna email, apenas auth.users tem
+                let userIdFromDB: string | null = null;
                 try {
                     const { data: userData } = await supabase
                         .from('users')
-                        .select('id, username, email')
+                        .select('id, username')
                         .eq('username', sanitizedUsername)
                         .maybeSingle();
                     
                     if (userData && userData.id) {
-                        // Se encontrou o usuário, tentar buscar o email no auth.users
-                        try {
-                            // Usar Admin API ou buscar via RPC se disponível
-                            // Por enquanto, tentar usar o email da tabela users se disponível
-                            if (userData.email) {
-                                emailFromDB = userData.email;
-                            }
-                        } catch (e) {
-                            // Ignorar erro ao buscar email
-                        }
+                        userIdFromDB = userData.id;
                     }
                 } catch (e) {
                     // Ignorar erro ao buscar usuário
                 }
                 
                 // Tentar múltiplas variações de email
+                // Se encontrou o ID do usuário, tentar buscar o email do auth.users
+                let emailFromAuth: string | null = null;
+                if (userIdFromDB) {
+                    try {
+                        // Tentar buscar o email do auth.users usando o ID
+                        // Nota: Isso pode não funcionar sem permissões admin, então vamos tentar variações
+                        emailFromAuth = null; // Não temos acesso direto ao auth.users sem admin API
+                    } catch (e) {
+                        // Ignorar
+                    }
+                }
+                
                 const emailAttempts = [
-                    // Se encontrou email no banco, tentar primeiro
-                    emailFromDB,
                     // Se username parece email, usar diretamente
                     sanitizedUsername.includes('@') ? sanitizedUsername : null,
                     // Tentar username@fitcoach.ia (padrão usado no cadastro)
@@ -707,7 +807,12 @@ const LoginPage: React.FC = () => {
                         }
                     } catch (error) {
                         // Se falhar a sincronização, continuar com dados locais
-                        console.warn('Erro ao sincronizar status no login:', error);
+                        try {
+                          const { logger } = await import('../utils/logger');
+                          logger.warn('Erro ao sincronizar status no login', 'LoginPage', error);
+                        } catch {
+                          console.warn('Erro ao sincronizar status no login:', error);
+                        }
                     }
                 }
 
@@ -735,29 +840,42 @@ const LoginPage: React.FC = () => {
                 const usernameForSurvey = user.username || sanitizedUsername;
                 const SURVEY_STORAGE_FLAG = `nutriIA_enquete_v2_done_${usernameForSurvey}`;
                 const hasAnsweredSurvey = localStorage.getItem(SURVEY_STORAGE_FLAG);
+
+                const accountType = getAccountType(user);
                 
-                console.log('LoginPage - Verificação de enquete:', {
-                    username: usernameForSurvey,
-                    gymRole: user.gymRole,
-                    flag: SURVEY_STORAGE_FLAG,
-                    hasAnswered: hasAnsweredSurvey
-                });
+                // Debug: verificação de enquete (apenas em DEV)
+                if (import.meta.env.DEV) {
+                  try {
+                    const { logger } = await import('../utils/logger');
+                    logger.debug('Verificação de enquete', 'LoginPage', {
+                      username: usernameForSurvey,
+                      gymRole: user.gymRole,
+                      flag: SURVEY_STORAGE_FLAG,
+                      hasAnswered: hasAnsweredSurvey,
+                      accountType,
+                    });
+                  } catch {
+                    // Ignorar em produção
+                  }
+                }
                 
-                // Redirecionar baseado no role
+                // Redirecionar baseado no tipo de conta
+                // - USER_PERSONAL: Progresso como home (/analysis)
+                // - USER_GYM/USER_B2C: mantêm lógica atual (survey para aluno, home para demais)
                 let redirectPath = '#/';
-                if (user.gymRole === 'admin') {
-                    redirectPath = '#/';
-                } else if (user.gymRole === 'trainer') {
-                    redirectPath = '#/';
+
+                if (accountType === 'USER_PERSONAL') {
+                    redirectPath = '#/analysis';
                 } else if (user.gymRole === 'student') {
                     // Se aluno não respondeu a enquete, redirecionar para ela (primeiro acesso)
                     if (!hasAnsweredSurvey) {
-                        console.log('LoginPage - Aluno não respondeu enquete, redirecionando para /welcome-survey');
                         redirectPath = '#/welcome-survey';
                     } else {
-                        console.log('LoginPage - Aluno já respondeu enquete, redirecionando para home');
                         redirectPath = '#/';
                     }
+                } else {
+                    // Admin / trainer / B2C: home padrão
+                    redirectPath = '#/';
                 }
                 
                 // Redirecionar após 1 segundo

@@ -100,7 +100,12 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       onPhotoChange(base64String);
       showSuccess('Foto atualizada com sucesso!');
     } catch (err) {
-      console.error('Erro ao processar imagem:', err);
+      try {
+        const { logger } = await import('../../utils/logger');
+        logger.error('Erro ao processar imagem', 'PhotoUploader', err);
+      } catch {
+        console.error('Erro ao processar imagem:', err);
+      }
       showError('Não foi possível processar a imagem. Tente novamente.');
     }
   }, [onPhotoChange, showError, showSuccess]);
@@ -134,9 +139,14 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               src={preview}
               alt={`Foto de perfil de ${userName}`}
               className="w-32 h-32 rounded-full object-cover border-4 border-slate-200 dark:border-slate-700 shadow-lg"
-              onError={(e) => {
+              onError={async (e) => {
                 // Se a imagem falhar ao carregar, resetar preview
-                console.error('Erro ao carregar foto de perfil:', e);
+                try {
+                  const { logger } = await import('../../utils/logger');
+                  logger.error('Erro ao carregar foto de perfil', 'PhotoUploader', e);
+                } catch {
+                  console.error('Erro ao carregar foto de perfil:', e);
+                }
                 setPreview(null);
               }}
             />

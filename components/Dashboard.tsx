@@ -115,7 +115,12 @@ const Dashboard: React.FC<DashboardProps> = memo(({ summary }) => {
           setWeeklyData(weekly);
         }
       } catch (error) {
-        console.error('Erro ao carregar dados de treino:', error);
+        try {
+          const { logger } = await import('../utils/logger');
+          logger.error('Erro ao carregar dados de treino', 'Dashboard', error);
+        } catch {
+          console.error('Erro ao carregar dados de treino:', error);
+        }
       }
     };
 

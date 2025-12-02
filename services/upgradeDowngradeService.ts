@@ -98,6 +98,15 @@ export async function changePlan(
       })
       .eq('id', userId);
 
+    // 7. Criar/atualizar chave de API automaticamente se for admin de academia
+    try {
+      const { autoSetupGymApiKey } = await import('./gymApiKeyService');
+      await autoSetupGymApiKey(userId, 'active');
+    } catch (apiKeyError) {
+      // Não bloquear upgrade se falhar ao criar chave
+      logger.warn('Erro ao criar chave de API automaticamente (não crítico)', 'upgradeDowngradeService', apiKeyError);
+    }
+
     logger.info(`Plano alterado para ${newPlanName} para usuário ${userId}`, 'upgradeDowngradeService');
 
     return {
@@ -123,6 +132,7 @@ function isPlanUpgrade(
     'free',
     'monthly',
     'annual_vip',
+    'academy_starter_mini',
     'academy_starter',
     'academy_growth',
     'academy_pro',

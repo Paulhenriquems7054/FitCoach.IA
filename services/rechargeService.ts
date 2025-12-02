@@ -55,16 +55,35 @@ export async function applyRecharge(
 
   switch (rechargeType) {
     case 'turbo':
-      // Adiciona 30 minutos ao banco de voz
-      const currentBankTurbo = await getCurrentVoiceBank(userId);
-      const newBankTurbo = currentBankTurbo + 30;
+      // Ajuda Rápida: adiciona +20 minutos em boost com validade de 24h
+      {
+        const nowIso = now.toISOString();
+        const { data: userData } = await supabase
+          .from('users')
+          .select('boost_minutes_balance, boost_expires_at')
+          .eq('id', userId)
+          .maybeSingle();
 
-      await supabase
-        .from('users')
-        .update({
-          voice_balance_upsell: newBankTurbo * 60, // Converter para segundos
-        })
-        .eq('id', userId);
+        let currentBoost = userData?.boost_minutes_balance || 0;
+        let boostExpiresAt: Date | null = userData?.boost_expires_at ? new Date(userData.boost_expires_at) : null;
+
+        // Se o boost atual já expirou, zera antes de adicionar
+        if (boostExpiresAt && boostExpiresAt < now) {
+          currentBoost = 0;
+          boostExpiresAt = null;
+        }
+
+        const newBoostMinutes = currentBoost + 20; // +20 minutos de Ajuda Rápida
+        const newExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+        await supabase
+          .from('users')
+          .update({
+            boost_minutes_balance: newBoostMinutes,
+            boost_expires_at: newExpiresAt.toISOString(),
+          })
+          .eq('id', userId);
+      }
 
       // Marca recarga como aplicada e expira em 24h
       await supabase

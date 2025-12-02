@@ -5,6 +5,8 @@ import { getMealPlansWithMetadata } from '../services/databaseService';
 import type { MealPlan } from '../types';
 import MealPlanDisplay from './MealPlanDisplay';
 import { XIcon } from './icons/XIcon';
+import { useUser } from '../context/UserContext';
+import { getAccountType } from '../utils/accountType';
 
 interface MealPlanHistoryProps {
     userId: string;
@@ -26,6 +28,8 @@ export const MealPlanHistory: React.FC<MealPlanHistoryProps> = ({
     onClose,
     onSelectPlan,
 }) => {
+    const { user } = useUser();
+    const accountType = getAccountType(user);
     const [plans, setPlans] = useState<SavedMealPlan[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedPlan, setSelectedPlan] = useState<MealPlan | null>(null);
@@ -46,7 +50,12 @@ export const MealPlanHistory: React.FC<MealPlanHistoryProps> = ({
                 
                 setPlans(plansWithMetadata);
             } catch (error) {
-                console.error('Erro ao carregar histórico:', error);
+                try {
+              const { logger } = await import('../utils/logger');
+              logger.error('Erro ao carregar histórico', 'MealPlanHistory', error);
+            } catch {
+              console.error('Erro ao carregar histórico:', error);
+            }
             } finally {
                 setIsLoading(false);
             }
@@ -121,8 +130,8 @@ export const MealPlanHistory: React.FC<MealPlanHistoryProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
-                <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-3 sm:p-4 flex items-center justify-between z-10">
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+                    <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-3 sm:p-4 flex items-center justify-between z-10">
                     <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white truncate pr-2">
                         Histórico de Planos Alimentares
                     </h2>

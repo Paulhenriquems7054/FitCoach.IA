@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import type { User } from '../types';
 import { Goal } from '../types';
-import { saveUser, getUser, getCurrentUsername, loginUser } from '../services/databaseService';
+import { saveUser, getUser, getCurrentUsername, loginUser, getUserByUsername } from '../services/databaseService';
 import { checkAndResetLimits } from '../services/usageLimitsService';
 
 interface UserContextType {
@@ -55,19 +55,35 @@ const initialUser: User = {
 const loadStoredUser = async (): Promise<User | null> => {
   if (typeof window === 'undefined') return null;
   try {
-    // Primeiro, tentar carregar do Supabase se o usuário estiver autenticado
+    // 1) Se existe sessão local (Administrador, Desenvolvedor, Aluno, etc.), priorizar IndexedDB
+    const currentUsername = await getCurrentUsername();
+    if (currentUsername) {
+      const storedUser = await getUserByUsername(currentUsername);
+      if (storedUser) {
+        return {
+          ...initialUser,
+          ...storedUser,
+          weightHistory: Array.isArray(storedUser.weightHistory)
+            ? storedUser.weightHistory
+            : initialUser.weightHistory,
+          completedChallengeIds: Array.isArray(storedUser.completedChallengeIds)
+            ? storedUser.completedChallengeIds
+            : initialUser.completedChallengeIds,
+        };
+      }
+    }
+
+    // 2) Se não há sessão local, tentar carregar do Supabase (login por email/Paulo, etc.)
     try {
-      const { getSupabaseClient } = await import('../services/supabaseService');
+      const { getSupabaseClient, authService } = await import('../services/supabaseService');
       const supabase = getSupabaseClient();
       const { data: { user: authUser } } = await supabase.auth.getUser();
       
       if (authUser) {
-        const { getCurrentUserProfile } = await import('../services/supabaseService');
-        const supabaseUser = await getCurrentUserProfile();
+        const supabaseUser = await authService.getCurrentUserProfile();
         
         if (supabaseUser) {
           // Salvar no IndexedDB local também para sincronização
-          const { saveUser } = await import('../services/databaseService');
           await saveUser(supabaseUser);
           
           return {
@@ -82,24 +98,32 @@ const loadStoredUser = async (): Promise<User | null> => {
       }
     } catch (supabaseError) {
       // Se falhar ao carregar do Supabase, continuar com IndexedDB local
-      console.warn('Não foi possível carregar do Supabase, usando IndexedDB local:', supabaseError);
+      if (typeof window !== 'undefined' && (window as any).__logger) {
+        (window as any).__logger.warn('Não foi possível carregar do Supabase, usando IndexedDB local', 'UserContext', supabaseError);
+      } else {
+        console.warn('Não foi possível carregar do Supabase, usando IndexedDB local:', supabaseError);
+      }
     }
     
-    // Fallback: carregar do IndexedDB local
-    const { getUser } = await import('../services/databaseService');
-    const user = await getUser();
-    if (!user) return null;
+    // 3) Fallback: carregar primeiro usuário salvo no IndexedDB (modo legado/demo)
+    const fallbackUser = await getUser();
+    if (!fallbackUser) return null;
 
     return {
       ...initialUser,
-      ...user,
-      weightHistory: Array.isArray(user.weightHistory) ? user.weightHistory : initialUser.weightHistory,
-      completedChallengeIds: Array.isArray(user.completedChallengeIds)
-        ? user.completedChallengeIds
+      ...fallbackUser,
+      weightHistory: Array.isArray(fallbackUser.weightHistory) ? fallbackUser.weightHistory : initialUser.weightHistory,
+      completedChallengeIds: Array.isArray(fallbackUser.completedChallengeIds)
+        ? fallbackUser.completedChallengeIds
         : initialUser.completedChallengeIds,
     };
   } catch (error) {
-    console.warn('Não foi possível carregar os dados do usuário do banco de dados.', error);
+    // Usar logger se disponível
+    if (typeof window !== 'undefined' && (window as any).__logger) {
+      (window as any).__logger.warn('Não foi possível carregar os dados do usuário do banco de dados', 'UserContext', error);
+    } else {
+      console.warn('Não foi possível carregar os dados do usuário do banco de dados.', error);
+    }
     return null;
   }
 };
@@ -122,7 +146,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           setUser(loadedUser);
         }
       } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
+        // Usar logger se disponível
+        if (typeof window !== 'undefined' && (window as any).__logger) {
+          (window as any).__logger.error('Erro ao carregar usuário', 'UserContext', error);
+        } else {
+          console.error('Erro ao carregar usuário:', error);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -163,7 +192,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       try {
         await saveUser(user);
       } catch (error) {
-        console.error('Erro ao salvar dados do usuário no banco de dados:', error);
+        // Usar logger se disponível
+        if (typeof window !== 'undefined' && (window as any).__logger) {
+          (window as any).__logger.error('Erro ao salvar dados do usuário no banco de dados', 'UserContext', error);
+        } else {
+          console.error('Erro ao salvar dados do usuário no banco de dados:', error);
+        }
       }
     };
 

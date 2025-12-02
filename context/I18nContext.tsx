@@ -41,7 +41,12 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
           }
         }
       } catch (error) {
-        console.error('Erro ao carregar idioma:', error);
+        // Usar logger se disponível, senão console.error (contexto pode carregar antes do logger)
+        if (typeof window !== 'undefined' && (window as any).__logger) {
+          (window as any).__logger.error('Erro ao carregar idioma', 'I18nContext', error);
+        } else {
+          console.error('Erro ao carregar idioma:', error);
+        }
         // Fallback para localStorage se o banco não estiver pronto
         if (typeof window !== 'undefined') {
           const savedLang = localStorage.getItem('language');
@@ -64,7 +69,12 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
       try {
         await saveAppSetting('language', language);
       } catch (error) {
-        console.error('Erro ao salvar idioma:', error);
+        // Usar logger se disponível
+        if (typeof window !== 'undefined' && (window as any).__logger) {
+          (window as any).__logger.error('Erro ao salvar idioma', 'I18nContext', error);
+        } else {
+          console.error('Erro ao salvar idioma:', error);
+        }
         // Fallback para localStorage
         if (typeof window !== 'undefined') {
           localStorage.setItem('language', language);

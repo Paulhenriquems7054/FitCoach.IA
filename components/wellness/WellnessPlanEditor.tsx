@@ -54,13 +54,14 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
         calories: '',
     });
     const [exerciseSearch, setExerciseSearch] = useState('');
+    const [showExerciseList, setShowExerciseList] = useState(false);
 
     // Lista de exercícios disponíveis baseados nos GIFs
     const availableExercises = useMemo(() => getAllAvailableExercises(), []);
 
     // Filtrar exercícios baseado na busca
     const filteredExercises = useMemo(() => {
-        if (!exerciseSearch.trim()) return availableExercises.slice(0, 20); // Mostrar apenas os primeiros 20 se não houver busca
+        if (!exerciseSearch.trim()) return availableExercises.slice(0, 50); // Mostrar os primeiros exercícios quando não houver busca
         
         const searchLower = exerciseSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         return availableExercises.filter(ex => {
@@ -122,16 +123,15 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
 
     /**
      * Adiciona um exercício a um dia
+     *
+     * Importante: antes exigíamos que o exercício existisse na biblioteca de GIFs
+     * e bloqueávamos a adição caso não estivesse disponível.
+     * Isso fazia o botão parecer "não funcionar" para o usuário.
+     * Agora, permitimos cadastrar qualquer exercício digitado, independentemente de ter GIF.
      */
     const handleAddExercise = (dayIndex: number) => {
         if (!exerciseForm.name.trim()) {
-            alert('Por favor, selecione um exercício da lista');
-            return;
-        }
-
-        // Verificar se o exercício está disponível
-        if (!isExerciseAvailable(exerciseForm.name)) {
-            alert('Este exercício não possui GIF disponível. Por favor, selecione um exercício da lista.');
+            alert('Por favor, informe o nome do exercício.');
             return;
         }
 
@@ -653,11 +653,21 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                                 }
                                                             }
                                                         }}
-                                                        onFocus={() => setExerciseSearch(exerciseForm.name || '')}
+                                                        onFocus={() => {
+                                                            setShowExerciseList(true);
+                                                            // Ao focar, se não houver busca, mostramos a lista padrão (primeiros exercícios)
+                                                            if (!exerciseSearch && !exerciseForm.name) {
+                                                                setExerciseSearch('');
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            // Pequeno atraso para permitir clique nos itens da lista antes de esconder
+                                                            setTimeout(() => setShowExerciseList(false), 150);
+                                                        }}
                                                         className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                                         placeholder="Digite para buscar exercício..."
                                                     />
-                                                    {exerciseSearch && filteredExercises.length > 0 && (
+                                                    {showExerciseList && filteredExercises.length > 0 && (
                                                         <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-48 sm:max-h-60 overflow-y-auto">
                                                             {filteredExercises.map((exercise, idx) => (
                                                                 <button
@@ -666,6 +676,7 @@ export const WellnessPlanEditor: React.FC<WellnessPlanEditorProps> = ({
                                                                     onClick={() => {
                                                                         setExerciseForm({ ...exerciseForm, name: exercise });
                                                                         setExerciseSearch(exercise);
+                                                                        setShowExerciseList(false);
                                                                     }}
                                                                     className="w-full text-left px-3 sm:px-4 py-2 text-xs sm:text-sm hover:bg-primary-50 dark:hover:bg-primary-900/20 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 last:border-b-0"
                                                                 >

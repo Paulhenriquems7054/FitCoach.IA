@@ -10,6 +10,7 @@ import { XIcon } from './icons/XIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { useI18n } from '../context/I18nContext';
 import { useToast } from './ui/Toast';
+import { getAccountType } from '../utils/accountType';
 
 interface MealPlanDisplayProps {
   plan: MealPlan;
@@ -23,6 +24,7 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = memo(({ plan, observatio
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', explanation: '' });
   const [isExplanationLoading, setIsExplanationLoading] = useState(false);
+  const accountType = getAccountType(user);
 
   const handleExportPDF = async () => {
     if (!planRef.current) return;
@@ -71,22 +73,38 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = memo(({ plan, observatio
     }
   };
 
+  // Personal trainer: uso do plano apenas para consulta / leitura
+  const isPersonal = accountType === 'USER_PERSONAL';
+
   return (
     <>
       <Card>
         <div className="p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 sm:gap-4">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{t('meal_plan.title')}</h2>
-            <Button
-              onClick={handleExportPDF}
-              variant="secondary"
-              className="w-full sm:w-auto text-sm sm:text-base"
-              size="sm"
-            >
-              <DownloadIcon className="w-4 h-4 mr-2" />
-              {t('meal_plan.export_pdf')}
-            </Button>
+            {!isPersonal && (
+              <Button
+                onClick={handleExportPDF}
+                variant="secondary"
+                className="w-full sm:w-auto text-sm sm:text-base"
+                size="sm"
+              >
+                <DownloadIcon className="w-4 h-4 mr-2" />
+                {t('meal_plan.export_pdf')}
+              </Button>
+            )}
           </div>
+
+          {isPersonal && (
+            <div className="mb-4 rounded-lg border border-amber-300/70 bg-amber-50/80 dark:border-amber-500/60 dark:bg-amber-900/20 px-3 py-2 text-xs sm:text-sm text-amber-800 dark:text-amber-100">
+              <p className="font-semibold mb-0.5">
+                Uso apenas para acompanhamento dos alunos
+              </p>
+              <p>
+                Como Personal Trainer, este plano é exibido apenas para consulta. O registro diário de refeições e interações detalhadas são feitos pelo próprio aluno na conta dele.
+              </p>
+            </div>
+          )}
 
           <div ref={planRef} className="p-2">
               <div className="space-y-6">
@@ -97,9 +115,16 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = memo(({ plan, observatio
                             <h3 className="font-semibold text-base sm:text-lg text-primary-700 dark:text-primary-400">{meal.refeicao}</h3>
                             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{meal.horario_sugerido}</p>
                         </div>
-                        <Button size="sm" variant="secondary" onClick={() => handleExplainMeal(meal)} className="w-full sm:w-auto text-xs sm:text-sm">
+                        {!isPersonal && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleExplainMeal(meal)}
+                            className="w-full sm:w-auto text-xs sm:text-sm"
+                          >
                             {t('meal_plan.why_this_meal')}
-                        </Button>
+                          </Button>
+                        )}
                     </div>
                     <ul className="mt-3 list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
                         {meal.alimentos.map((food, index) => (

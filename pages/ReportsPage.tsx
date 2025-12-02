@@ -109,7 +109,12 @@ const ReportsPage: React.FC = () => {
                 showSuccess('Relatório gerado com sucesso!');
             }
         } catch (err: any) {
-            console.error(err);
+            try {
+              const { logger } = await import('../utils/logger');
+              logger.error('Erro ao gerar relatório', 'ReportsPage', err);
+            } catch {
+              console.error(err);
+            }
             const errorMessage = err?.message?.includes('API key') 
                 ? 'Chave de API não configurada. O relatório foi gerado em modo offline.'
                 : t('reports.error.generic');
@@ -144,7 +149,12 @@ const ReportsPage: React.FC = () => {
                 .save();
             showSuccess('PDF exportado com sucesso!');
         } catch (error) {
-            console.error('Erro ao exportar PDF:', error);
+            try {
+              const { logger } = await import('../utils/logger');
+              logger.error('Erro ao exportar PDF', 'ReportsPage', error);
+            } catch {
+              console.error('Erro ao exportar PDF:', error);
+            }
             showError('Erro ao exportar PDF. Tente novamente.');
         }
     };

@@ -12,12 +12,17 @@ import { DownloadIcon } from '../components/icons/DownloadIcon';
 import { KeyIcon } from '../components/icons/KeyIcon';
 import { Alert } from '../components/ui/Alert';
 import { useToast } from '../components/ui/Toast';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import type { User } from '../types';
 import { Goal } from '../types';
 import jsPDF from 'jspdf';
+import type { GymApiKeyConfig } from '../services/gymApiKeyService';
+import { getAllGymsWithApiConfig, updateGymApiKey } from '../services/gymApiKeyService';
+import type { GymSubscriptionInfo, SubscriptionStats, SubscriptionHistoryData } from '../services/gymSubscriptionService';
+import { getAllGymsWithSubscriptions, updateSubscriptionStatus, getSubscriptionStats, getSubscriptionHistory } from '../services/gymSubscriptionService';
 
 interface DashboardStats {
+  totalGyms: number; // Total de academias (apenas para desenvolvedor)
   totalStudents: number;
   totalTrainers: number;
   blockedStudents: number;
@@ -35,6 +40,7 @@ const AdminDashboardPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
+    totalGyms: 0,
     totalStudents: 0,
     totalTrainers: 0,
     blockedStudents: 0,
@@ -44,11 +50,39 @@ const AdminDashboardPage: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Estados para controle de API por academia
+  const [gymsApiConfig, setGymsApiConfig] = useState<GymApiKeyConfig[]>([]);
+  const [editingGymId, setEditingGymId] = useState<string | null>(null);
+  const [editingApiKey, setEditingApiKey] = useState<string>('');
+  const [editingEnabled, setEditingEnabled] = useState<boolean>(true);
+  const [globalApiKey, setGlobalApiKey] = useState<string>('');
+  const [isLoadingApiConfigs, setIsLoadingApiConfigs] = useState(false);
+  
+  // Estados para assinaturas (apenas desenvolvedor)
+  const [gymsSubscriptions, setGymsSubscriptions] = useState<GymSubscriptionInfo[]>([]);
+  const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(false);
+  const [editingSubscriptionId, setEditingSubscriptionId] = useState<string | null>(null);
+  const [subscriptionStats, setSubscriptionStats] = useState<SubscriptionStats>({
+    totalGyms: 0,
+    activeSubscriptions: 0,
+    canceledSubscriptions: 0,
+    expiredSubscriptions: 0,
+    pastDueSubscriptions: 0,
+    trialingSubscriptions: 0,
+    noSubscription: 0,
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [subscriptionHistory, setSubscriptionHistory] = useState<SubscriptionHistoryData[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   useEffect(() => {
     const loadDashboardData = async () => {
+      // Verificar se é desenvolvedor (deve ver dados de TODAS as academias)
+      const isDeveloper = user.username === 'Desenvolvedor' || user.username === 'dev123';
+      
       // Verificar se é administrador padrão (Administrador ou Desenvolvedor)
-      const isDefaultAdmin = user.username === 'Administrador' || user.username === 'Desenvolvedor';
+      const isDefaultAdmin = user.username === 'Administrador' || user.username === 'Desenvolvedor' || user.username === 'dev123' || user.gymRole === 'admin';
       
       // Determinar o gymId a usar
       let gymIdToUse = user.gymId;
@@ -57,84 +91,143 @@ const AdminDashboardPage: React.FC = () => {
         gymIdToUse = 'default-gym';
       }
       
-      if (!gymIdToUse) {
+      // Permitir acesso para admins mesmo sem gymId
+      if (!gymIdToUse && !isDefaultAdmin) {
         setError('Você não está associado a uma academia.');
         setIsLoading(false);
         return;
+      }
+      
+      // Garantir que admins sempre tenham um gymId (mesmo que seja o padrão)
+      if (isDefaultAdmin && !gymIdToUse) {
+        gymIdToUse = 'default-gym';
       }
 
       try {
         setIsLoading(true);
         
-        // Tentar migrar alunos antigos primeiro (apenas uma vez)
-        try {
-          const { migrateOldStudents } = await import('../services/migrationService');
-          const migrated = await migrateOldStudents(gymIdToUse);
-          if (migrated > 0) {
-            console.log(`Migrados ${migrated} alunos antigos`);
+        // Se for desenvolvedor, buscar dados de TODAS as academias
+        if (isDeveloper) {
+          const { getSupabaseClient } = await import('../services/supabaseService');
+          const supabase = getSupabaseClient();
+          
+          // Buscar todas as academias
+          const { data: gyms, error: gymsError } = await supabase
+            .from('gyms')
+            .select('id, name')
+            .order('name');
+          
+          if (gymsError) {
+            throw new Error(`Erro ao buscar academias: ${gymsError.message}`);
           }
-        } catch (error) {
-          console.warn('Erro ao migrar alunos antigos:', error);
+          
+          const totalGyms = gyms?.length || 0;
+          
+          // Agregar dados de todas as academias
+          let allStudents: User[] = [];
+          let allTrainers: User[] = [];
+          let allUsers: User[] = [];
+          
+          // Buscar dados de cada academia
+          for (const gym of gyms || []) {
+            try {
+              const [students, trainers, users] = await Promise.all([
+                getAllStudents(gym.id),
+                getAllTrainers(gym.id),
+                getAllUsers(gym.id),
+              ]);
+              
+              allStudents = [...allStudents, ...students];
+              allTrainers = [...allTrainers, ...trainers];
+              allUsers = [...allUsers, ...users];
+            } catch (error) {
+              console.warn(`Erro ao buscar dados da academia ${gym.name}:`, error);
+              // Continuar com outras academias mesmo se uma falhar
+            }
+          }
+          
+          // Calcular estatísticas agregadas
+          const blockedStudents = allStudents.filter(s => s.accessBlocked).length;
+          const activeStudents = allStudents.length - blockedStudents;
+
+          // Agrupar alunos por objetivo
+          const goalCounts: { [key: string]: number } = {};
+          allStudents.forEach(student => {
+            const goal = student.objetivo || 'Não definido';
+            goalCounts[goal] = (goalCounts[goal] || 0) + 1;
+          });
+
+          const studentsByGoal = Object.entries(goalCounts).map(([name, value]) => ({
+            name,
+            value,
+          }));
+
+          // Dados de atividade
+          const recentActivity = [
+            { name: 'Esta Semana', students: activeStudents, trainers: allTrainers.length },
+            { name: 'Este Mês', students: activeStudents, trainers: allTrainers.length },
+          ];
+
+          setStats({
+            totalGyms,
+            totalStudents: allStudents.length,
+            totalTrainers: allTrainers.length,
+            blockedStudents,
+            activeStudents,
+            studentsByGoal,
+            recentActivity,
+          });
+        } else {
+          // Para outros admins, buscar dados apenas da academia deles
+          // Tentar migrar alunos antigos primeiro (apenas uma vez)
+          try {
+            const { migrateOldStudents } = await import('../services/migrationService');
+            const migrated = await migrateOldStudents(gymIdToUse);
+            if (migrated > 0) {
+              console.log(`Migrados ${migrated} alunos antigos`);
+            }
+          } catch (error) {
+            console.warn('Erro ao migrar alunos antigos:', error);
+          }
+          
+          const [students, trainers, allUsers] = await Promise.all([
+            getAllStudents(gymIdToUse),
+            getAllTrainers(gymIdToUse),
+            getAllUsers(gymIdToUse),
+          ]);
+
+          // Calcular estatísticas
+          const blockedStudents = students.filter(s => s.accessBlocked).length;
+          const activeStudents = students.length - blockedStudents;
+
+          // Agrupar alunos por objetivo
+          const goalCounts: { [key: string]: number } = {};
+          students.forEach(student => {
+            const goal = student.objetivo || 'Não definido';
+            goalCounts[goal] = (goalCounts[goal] || 0) + 1;
+          });
+
+          const studentsByGoal = Object.entries(goalCounts).map(([name, value]) => ({
+            name,
+            value,
+          }));
+
+          // Dados de atividade
+          const recentActivity = [
+            { name: 'Esta Semana', students: activeStudents, trainers: trainers.length },
+            { name: 'Este Mês', students: activeStudents, trainers: trainers.length },
+          ];
+
+          setStats({
+            totalGyms: 0, // Não aplicável para admins de academia
+            totalStudents: students.length,
+            totalTrainers: trainers.length,
+            blockedStudents,
+            activeStudents,
+            studentsByGoal,
+            recentActivity,
+          });
         }
-        
-        // Debug: verificar dados antes da busca
-        console.log('AdminDashboard - Buscando alunos:', {
-          gymIdToUse,
-          userGymId: user.gymId,
-          username: user.username,
-          isDefaultAdmin: user.username === 'Administrador' || user.username === 'Desenvolvedor'
-        });
-        
-        const [students, trainers, allUsers] = await Promise.all([
-          getAllStudents(gymIdToUse),
-          getAllTrainers(gymIdToUse),
-          getAllUsers(gymIdToUse),
-        ]);
-
-        // Debug: verificar resultados
-        console.log('AdminDashboard - Resultados da busca:', {
-          studentsCount: students.length,
-          trainersCount: trainers.length,
-          allUsersCount: allUsers.length,
-          students: students.map(s => ({
-            username: s.username,
-            nome: s.nome,
-            gymId: s.gymId,
-            gymRole: s.gymRole,
-            isGymManaged: s.isGymManaged
-          }))
-        });
-
-        // Calcular estatísticas
-        const blockedStudents = students.filter(s => s.accessBlocked).length;
-        const activeStudents = students.length - blockedStudents;
-
-        // Agrupar alunos por objetivo
-        const goalCounts: { [key: string]: number } = {};
-        students.forEach(student => {
-          const goal = student.objetivo || 'Não definido';
-          goalCounts[goal] = (goalCounts[goal] || 0) + 1;
-        });
-
-        const studentsByGoal = Object.entries(goalCounts).map(([name, value]) => ({
-          name,
-          value,
-        }));
-
-        // Dados de atividade (exemplo - pode ser expandido com dados reais)
-        const recentActivity = [
-          { name: 'Esta Semana', students: activeStudents, trainers: trainers.length },
-          { name: 'Este Mês', students: activeStudents, trainers: trainers.length },
-        ];
-
-        setStats({
-          totalStudents: students.length,
-          totalTrainers: trainers.length,
-          blockedStudents,
-          activeStudents,
-          studentsByGoal,
-          recentActivity,
-        });
       } catch (err: any) {
         console.error('Erro ao carregar dados do dashboard:', err);
         setError(err.message || 'Erro ao carregar dados do dashboard');
@@ -144,7 +237,122 @@ const AdminDashboardPage: React.FC = () => {
     };
 
     loadDashboardData();
-  }, [user.gymId, user.username]);
+    
+    // Carregar configurações de API e assinaturas (apenas para desenvolvedor)
+    const isDeveloper = user.username === 'Desenvolvedor' || user.username === 'dev123';
+    if (isDeveloper) {
+      loadApiConfigs();
+      loadSubscriptions();
+      loadSubscriptionStats();
+      loadSubscriptionHistory();
+    }
+  }, [user.gymId, user.username, user.gymRole]);
+  
+  // Auto-refresh a cada 60 segundos (apenas para desenvolvedor)
+  useEffect(() => {
+    const isDeveloper = user.username === 'Desenvolvedor' || user.username === 'dev123';
+    if (!isDeveloper) return;
+    
+    const interval = setInterval(() => {
+      loadSubscriptionStats(true); // Force refresh (ignora cache)
+      loadSubscriptions();
+    }, 60000); // 60 segundos
+    
+    return () => clearInterval(interval);
+  }, [user.username]);
+  
+  // Função para carregar configurações de API
+  const loadApiConfigs = async () => {
+    setIsLoadingApiConfigs(true);
+    try {
+      const configs = await getAllGymsWithApiConfig();
+      setGymsApiConfig(configs);
+      
+      // Carregar chave global do .env (apenas para exibição, não editável)
+      const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+      setGlobalApiKey(envKey ? `${envKey.substring(0, 10)}...${envKey.substring(envKey.length - 4)}` : 'Não configurada');
+    } catch (error) {
+      console.error('Erro ao carregar configurações de API:', error);
+    } finally {
+      setIsLoadingApiConfigs(false);
+    }
+  };
+  
+  // Handler para salvar chave de API
+  const handleSaveApiKey = async (gymId: string) => {
+    try {
+      const result = await updateGymApiKey(gymId, editingApiKey || null, editingEnabled);
+      
+      if (result.success) {
+        showSuccess('Configuração de API atualizada com sucesso!');
+        setEditingGymId(null);
+        setEditingApiKey('');
+        // Recarregar lista
+        await loadApiConfigs();
+      } else {
+        showError(result.error || 'Erro ao atualizar configuração');
+      }
+    } catch (error: any) {
+      showError(error.message || 'Erro ao salvar configuração');
+    }
+  };
+  
+  // Função para carregar assinaturas
+  const loadSubscriptions = async () => {
+    setIsLoadingSubscriptions(true);
+    try {
+      const subscriptions = await getAllGymsWithSubscriptions();
+      setGymsSubscriptions(subscriptions);
+    } catch (error) {
+      console.error('Erro ao carregar assinaturas:', error);
+    } finally {
+      setIsLoadingSubscriptions(false);
+    }
+  };
+  
+  // Função para carregar estatísticas de assinaturas do Supabase
+  const loadSubscriptionStats = async (forceRefresh: boolean = false) => {
+    setIsLoadingStats(true);
+    try {
+      const stats = await getSubscriptionStats(forceRefresh);
+      setSubscriptionStats(stats);
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+  
+  // Função para carregar histórico de assinaturas
+  const loadSubscriptionHistory = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const history = await getSubscriptionHistory(30); // Últimos 30 dias
+      setSubscriptionHistory(history);
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+  
+  // Handler para atualizar status de assinatura
+  const handleUpdateSubscriptionStatus = async (subscriptionId: string, newStatus: 'active' | 'canceled' | 'expired' | 'past_due' | 'trialing') => {
+    try {
+      const result = await updateSubscriptionStatus(subscriptionId, newStatus);
+      
+      if (result.success) {
+        showSuccess('Status da assinatura atualizado com sucesso!');
+        setEditingSubscriptionId(null);
+        await loadSubscriptions();
+        await loadSubscriptionStats(true); // Atualizar estatísticas também (force refresh)
+      } else {
+        showError(result.error || 'Erro ao atualizar status');
+      }
+    } catch (error: any) {
+      showError(error.message || 'Erro ao atualizar status');
+    }
+  };
 
   const parseFileContent = async (file: File): Promise<any[]> => {
     return new Promise((resolve, reject) => {
@@ -350,6 +558,631 @@ const AdminDashboardPage: React.FC = () => {
     );
   }
 
+  // Se for desenvolvedor, mostrar dashboard focado em assinaturas e API
+  const isDeveloper = user.username === 'Desenvolvedor' || user.username === 'dev123';
+  
+  if (isDeveloper) {
+    // Usar estatísticas do Supabase (mais eficiente e preciso)
+    const {
+      totalGyms,
+      activeSubscriptions,
+      canceledSubscriptions,
+      expiredSubscriptions,
+      pastDueSubscriptions,
+      trialingSubscriptions,
+      noSubscription,
+    } = subscriptionStats;
+    
+    // Calcular total de ativas (active + trialing)
+    const totalActive = activeSubscriptions + trialingSubscriptions;
+    
+    return (
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 px-2 sm:px-4 py-4 sm:py-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+            🛠️ Painel do Desenvolvedor
+          </h1>
+          <p className="mt-2 text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-400">
+            Controle total de assinaturas e configurações de API das academias
+          </p>
+        </div>
+
+        {/* Estatísticas de Assinaturas */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+          <Card>
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">Total de Academias</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1 sm:mt-2">
+                    {isLoadingStats ? '...' : totalGyms}
+                  </p>
+                </div>
+                <div className="bg-amber-100 dark:bg-amber-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                  <ChartBarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-amber-600 dark:text-amber-400" />
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">Assinaturas Ativas</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400 mt-1 sm:mt-2">
+                    {isLoadingStats ? '...' : totalActive}
+                  </p>
+                  {!isLoadingStats && trialingSubscriptions > 0 && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      ({activeSubscriptions} ativas + {trialingSubscriptions} trial)
+                    </p>
+                  )}
+                </div>
+                <div className="bg-green-100 dark:bg-green-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                  <ShieldCheckIcon className="w-6 h-6 sm:w-8 sm:h-8 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">Canceladas</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-orange-600 dark:text-orange-400 mt-1 sm:mt-2">
+                    {isLoadingStats ? '...' : canceledSubscriptions}
+                  </p>
+                </div>
+                <div className="bg-orange-100 dark:bg-orange-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                  <CogIcon className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600 dark:text-orange-400" />
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">Expiradas</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-red-600 dark:text-red-400 mt-1 sm:mt-2">
+                    {isLoadingStats ? '...' : expiredSubscriptions}
+                  </p>
+                  {!isLoadingStats && pastDueSubscriptions > 0 && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      (+ {pastDueSubscriptions} atrasadas)
+                    </p>
+                  )}
+                </div>
+                <div className="bg-red-100 dark:bg-red-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                  <ShieldCheckIcon className="w-6 h-6 sm:w-8 sm:h-8 text-red-600 dark:text-red-400" />
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">Sem Assinatura</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-slate-600 dark:text-slate-400 mt-1 sm:mt-2">
+                    {isLoadingStats ? '...' : noSubscription}
+                  </p>
+                </div>
+                <div className="bg-slate-100 dark:bg-slate-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                  <UsersIcon className="w-6 h-6 sm:w-8 sm:h-8 text-slate-600 dark:text-slate-400" />
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Seção: Controle de Assinaturas */}
+        <Card>
+          <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  💳 Controle de Assinaturas
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Gerencie as assinaturas de todas as academias
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={loadSubscriptions}
+                  disabled={isLoadingSubscriptions}
+                >
+                  {isLoadingSubscriptions ? 'Carregando...' : '🔄 Atualizar Lista'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => loadSubscriptionStats(true)}
+                  disabled={isLoadingStats}
+                  title="Força atualização ignorando cache"
+                >
+                  {isLoadingStats ? 'Carregando...' : '📊 Atualizar Stats'}
+                </Button>
+              </div>
+            </div>
+
+            {isLoadingSubscriptions ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Carregando assinaturas...</p>
+              </div>
+            ) : gymsSubscriptions.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Nenhuma academia encontrada.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {gymsSubscriptions.map((gym) => (
+                  <div
+                    key={gym.gymId}
+                    className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-slate-900 dark:text-white mb-2">
+                          {gym.gymName}
+                        </h3>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[80px]">
+                              Status:
+                            </span>
+                            <span
+                              className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                gym.status === 'active' || gym.status === 'trialing'
+                                  ? 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                                  : gym.status === 'canceled'
+                                  ? 'text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20'
+                                  : gym.status === 'expired'
+                                  ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
+                                  : 'text-slate-700 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/20'
+                              }`}
+                            >
+                              {gym.status === 'active' ? '✓ Ativa' : 
+                               gym.status === 'trialing' ? '🧪 Trial' :
+                               gym.status === 'canceled' ? '✗ Cancelada' :
+                               gym.status === 'expired' ? '⏰ Expirada' :
+                               gym.status === 'past_due' ? '⚠️ Atrasada' :
+                               'Sem assinatura'}
+                            </span>
+                          </div>
+                          {gym.planDisplayName && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[80px]">
+                                Plano:
+                              </span>
+                              <span className="text-xs text-slate-600 dark:text-slate-300">
+                                {gym.planDisplayName}
+                              </span>
+                            </div>
+                          )}
+                          {gym.currentPeriodEnd && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[80px]">
+                                Válido até:
+                              </span>
+                              <span className="text-xs text-slate-600 dark:text-slate-300">
+                                {new Date(gym.currentPeriodEnd).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+                          )}
+                          {gym.adminUsername && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[80px]">
+                                Admin:
+                              </span>
+                              <span className="text-xs text-slate-600 dark:text-slate-300">
+                                {gym.adminUsername}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {gym.subscriptionId && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            if (editingSubscriptionId === gym.subscriptionId) {
+                              setEditingSubscriptionId(null);
+                            } else {
+                              setEditingSubscriptionId(gym.subscriptionId);
+                            }
+                          }}
+                        >
+                          {editingSubscriptionId === gym.subscriptionId ? 'Cancelar' : '✏️ Editar'}
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Formulário de Edição de Status */}
+                    {editingSubscriptionId === gym.subscriptionId && gym.subscriptionId && (
+                      <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+                            Status da Assinatura
+                          </label>
+                          <select
+                            value={gym.status}
+                            onChange={(e) => {
+                              const newStatus = e.target.value as any;
+                              handleUpdateSubscriptionStatus(gym.subscriptionId!, newStatus);
+                            }}
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          >
+                            <option value="active">Ativa</option>
+                            <option value="trialing">Trial</option>
+                            <option value="canceled">Cancelada</option>
+                            <option value="expired">Expirada</option>
+                            <option value="past_due">Atrasada</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Seção: Gráfico de Evolução das Assinaturas */}
+        <Card>
+          <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  📈 Evolução das Assinaturas (Últimos 30 dias)
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Acompanhe a evolução das assinaturas ao longo do tempo
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={loadSubscriptionHistory}
+                disabled={isLoadingHistory}
+              >
+                {isLoadingHistory ? 'Carregando...' : '🔄 Atualizar'}
+              </Button>
+            </div>
+
+            {isLoadingHistory ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Carregando histórico...</p>
+              </div>
+            ) : subscriptionHistory.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Nenhum dado histórico disponível ainda.
+                </p>
+              </div>
+            ) : (
+              <div className="w-full h-[350px] sm:h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart 
+                    data={subscriptionHistory} 
+                    margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.2)" />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="rgb(100 116 139)" 
+                      tick={{ fontSize: 11 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      interval="preserveStartEnd"
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        return `${date.getDate()}/${date.getMonth() + 1}`;
+                      }}
+                    />
+                    <YAxis 
+                      stroke="rgb(100 116 139)" 
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        borderColor: 'rgb(51 65 85)',
+                        color: '#fff',
+                        borderRadius: '0.5rem',
+                        fontSize: '12px',
+                      }}
+                      formatter={(value: number, name: string) => {
+                        const labels: { [key: string]: string } = {
+                          active: 'Ativas',
+                          trialing: 'Trial',
+                          canceled: 'Canceladas',
+                          expired: 'Expiradas',
+                          total: 'Total',
+                        };
+                        return [value, labels[name] || name];
+                      }}
+                      labelFormatter={(label) => {
+                        const date = new Date(label);
+                        return date.toLocaleDateString('pt-BR');
+                      }}
+                    />
+                    <Legend 
+                      wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                      formatter={(value: string) => {
+                        const labels: { [key: string]: string } = {
+                          active: 'Ativas',
+                          trialing: 'Trial',
+                          canceled: 'Canceladas',
+                          expired: 'Expiradas',
+                          total: 'Total',
+                        };
+                        return labels[value] || value;
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="active" 
+                      name="active"
+                      stroke="#10b981" 
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="trialing" 
+                      name="trialing"
+                      stroke="#3b82f6" 
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="canceled" 
+                      name="canceled"
+                      stroke="#f59e0b" 
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="expired" 
+                      name="expired"
+                      stroke="#ef4444" 
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="total" 
+                      name="total"
+                      stroke="#8b5cf6" 
+                      strokeWidth={3}
+                      strokeDasharray="5 5"
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Seção: Controle de API por Academia */}
+        <Card>
+          <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  🔑 Controle de API por Academia
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Gerencie as chaves de API do Gemini para cada academia
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={loadApiConfigs}
+                disabled={isLoadingApiConfigs}
+              >
+                {isLoadingApiConfigs ? 'Carregando...' : '🔄 Atualizar'}
+              </Button>
+            </div>
+
+            {/* Chave Global (Fallback) */}
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-1">
+                    Chave Global (Fallback)
+                  </h3>
+                  <p className="text-xs font-mono text-blue-700 dark:text-blue-300">
+                    {globalApiKey}
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                    Usada quando a academia não tem chave própria configurada. Configurada em <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">.env.local</code>
+                  </p>
+                </div>
+                <div className="ml-4">
+                  <span className="px-3 py-1 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 text-xs font-semibold rounded-full">
+                    Fallback
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Lista de Academias */}
+            {isLoadingApiConfigs ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Carregando academias...</p>
+              </div>
+            ) : gymsApiConfig.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Nenhuma academia encontrada. As academias serão exibidas aqui quando forem criadas.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {gymsApiConfig.map((gym) => (
+                  <div
+                    key={gym.gymId}
+                    className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-slate-900 dark:text-white mb-2">
+                          {gym.gymName}
+                        </h3>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[60px]">
+                              Status:
+                            </span>
+                            <span
+                              className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                gym.geminiApiEnabled
+                                  ? 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                                  : 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
+                              }`}
+                            >
+                              {gym.geminiApiEnabled ? '✓ Habilitada' : '✗ Desabilitada'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[60px]">
+                              Chave:
+                            </span>
+                            <span className="text-xs font-mono text-slate-600 dark:text-slate-300">
+                              {gym.geminiApiKey
+                                ? `${gym.geminiApiKey.substring(0, 12)}...${gym.geminiApiKey.substring(gym.geminiApiKey.length - 4)}`
+                                : 'Usando chave global'}
+                            </span>
+                          </div>
+                          {gym.lastUsed && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[60px]">
+                                Último uso:
+                              </span>
+                              <span className="text-xs text-slate-600 dark:text-slate-300">
+                                {new Date(gym.lastUsed).toLocaleString('pt-BR')}
+                              </span>
+                            </div>
+                          )}
+                          {gym.usageCount > 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[60px]">
+                                Uso total:
+                              </span>
+                              <span className="text-xs text-slate-600 dark:text-slate-300">
+                                {gym.usageCount} chamada(s)
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          if (editingGymId === gym.gymId) {
+                            setEditingGymId(null);
+                            setEditingApiKey('');
+                            setEditingEnabled(true);
+                          } else {
+                            setEditingGymId(gym.gymId);
+                            setEditingApiKey(gym.geminiApiKey || '');
+                            setEditingEnabled(gym.geminiApiEnabled);
+                          }
+                        }}
+                      >
+                        {editingGymId === gym.gymId ? 'Cancelar' : '✏️ Editar'}
+                      </Button>
+                    </div>
+
+                    {/* Formulário de Edição */}
+                    {editingGymId === gym.gymId && (
+                      <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+                            Chave de API do Gemini
+                          </label>
+                          <input
+                            type="password"
+                            value={editingApiKey}
+                            onChange={(e) => setEditingApiKey(e.target.value)}
+                            placeholder="Deixe vazio para usar chave global"
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          />
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Deixe vazio para usar a chave global configurada no sistema. A chave será mascarada por segurança.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editingEnabled}
+                              onChange={(e) => setEditingEnabled(e.target.checked)}
+                              className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            <span className="text-sm text-slate-700 dark:text-slate-200">
+                              Habilitar uso da API para esta academia
+                            </span>
+                          </label>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleSaveApiKey(gym.gymId)}
+                          >
+                            💾 Salvar
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setEditingGymId(null);
+                              setEditingApiKey('');
+                              setEditingEnabled(true);
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Dashboard original para outros administradores
   return (
     <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 px-2 sm:px-4 py-4 sm:py-6">
       {/* Header */}
@@ -363,7 +1196,25 @@ const AdminDashboardPage: React.FC = () => {
       </div>
 
       {/* Estatísticas Principais */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${(user.username === 'Desenvolvedor' || user.username === 'dev123') ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3 sm:gap-4`}>
+        {/* Card: Total de Academias (apenas para desenvolvedor) */}
+        {(user.username === 'Desenvolvedor' || user.username === 'dev123') && (
+          <Card>
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">Total de Academias</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1 sm:mt-2">
+                    {stats.totalGyms}
+                  </p>
+                </div>
+                <div className="bg-amber-100 dark:bg-amber-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                  <ChartBarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-amber-600 dark:text-amber-400" />
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
         <Card>
           <div className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
@@ -846,6 +1697,201 @@ const AdminDashboardPage: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* Seção: Controle de API por Academia - APENAS PARA DESENVOLVEDOR */}
+      {(user.username === 'Desenvolvedor' || user.username === 'dev123') && (
+        <Card>
+          <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  🔑 Controle de API por Academia
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Gerencie as chaves de API do Gemini para cada academia
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={loadApiConfigs}
+                disabled={isLoadingApiConfigs}
+              >
+                {isLoadingApiConfigs ? 'Carregando...' : '🔄 Atualizar'}
+              </Button>
+            </div>
+
+            {/* Chave Global (Fallback) */}
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-1">
+                    Chave Global (Fallback)
+                  </h3>
+                  <p className="text-xs font-mono text-blue-700 dark:text-blue-300">
+                    {globalApiKey}
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                    Usada quando a academia não tem chave própria configurada. Configurada em <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">.env.local</code>
+                  </p>
+                </div>
+                <div className="ml-4">
+                  <span className="px-3 py-1 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 text-xs font-semibold rounded-full">
+                    Fallback
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Lista de Academias */}
+            {isLoadingApiConfigs ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Carregando academias...</p>
+              </div>
+            ) : gymsApiConfig.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Nenhuma academia encontrada. As academias serão exibidas aqui quando forem criadas.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {gymsApiConfig.map((gym) => (
+                  <div
+                    key={gym.gymId}
+                    className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-slate-900 dark:text-white mb-2">
+                          {gym.gymName}
+                        </h3>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[60px]">
+                              Status:
+                            </span>
+                            <span
+                              className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                gym.geminiApiEnabled
+                                  ? 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                                  : 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
+                              }`}
+                            >
+                              {gym.geminiApiEnabled ? '✓ Habilitada' : '✗ Desabilitada'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[60px]">
+                              Chave:
+                            </span>
+                            <span className="text-xs font-mono text-slate-600 dark:text-slate-300">
+                              {gym.geminiApiKey
+                                ? `${gym.geminiApiKey.substring(0, 12)}...${gym.geminiApiKey.substring(gym.geminiApiKey.length - 4)}`
+                                : 'Usando chave global'}
+                            </span>
+                          </div>
+                          {gym.lastUsed && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[60px]">
+                                Último uso:
+                              </span>
+                              <span className="text-xs text-slate-600 dark:text-slate-300">
+                                {new Date(gym.lastUsed).toLocaleString('pt-BR')}
+                              </span>
+                            </div>
+                          )}
+                          {gym.usageCount > 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[60px]">
+                                Uso total:
+                              </span>
+                              <span className="text-xs text-slate-600 dark:text-slate-300">
+                                {gym.usageCount} chamada(s)
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          if (editingGymId === gym.gymId) {
+                            setEditingGymId(null);
+                            setEditingApiKey('');
+                            setEditingEnabled(true);
+                          } else {
+                            setEditingGymId(gym.gymId);
+                            setEditingApiKey(gym.geminiApiKey || '');
+                            setEditingEnabled(gym.geminiApiEnabled);
+                          }
+                        }}
+                      >
+                        {editingGymId === gym.gymId ? 'Cancelar' : '✏️ Editar'}
+                      </Button>
+                    </div>
+
+                    {/* Formulário de Edição */}
+                    {editingGymId === gym.gymId && (
+                      <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+                            Chave de API do Gemini
+                          </label>
+                          <input
+                            type="password"
+                            value={editingApiKey}
+                            onChange={(e) => setEditingApiKey(e.target.value)}
+                            placeholder="Deixe vazio para usar chave global"
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          />
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Deixe vazio para usar a chave global configurada no sistema. A chave será mascarada por segurança.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editingEnabled}
+                              onChange={(e) => setEditingEnabled(e.target.checked)}
+                              className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            <span className="text-sm text-slate-700 dark:text-slate-200">
+                              Habilitar uso da API para esta academia
+                            </span>
+                          </label>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleSaveApiKey(gym.gymId)}
+                          >
+                            💾 Salvar
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setEditingGymId(null);
+                              setEditingApiKey('');
+                              setEditingEnabled(true);
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
     </div>
   );
 };

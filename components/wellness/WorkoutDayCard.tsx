@@ -222,7 +222,15 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                                                         className="w-full h-full object-contain"
                                                         preloaded={preloadedGifs.has(gifPath)}
                                                         onError={(e) => {
-                                                            console.warn(`GIF não encontrado: ${gifPath}`);
+                                                            // Debug: GIF não encontrado (remover em produção)
+                                                            if (import.meta.env.DEV) {
+                                                              try {
+                                                                const { logger } = await import('../../utils/logger');
+                                                                logger.debug(`GIF não encontrado: ${gifPath}`, 'WorkoutDayCard');
+                                                              } catch {
+                                                                // Ignorar se logger não disponível
+                                                              }
+                                                            }
                                                         }}
                                                     />
                                                 </div>

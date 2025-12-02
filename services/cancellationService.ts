@@ -4,6 +4,8 @@
  */
 
 import { getSupabaseClient } from './supabaseService';
+import { cancelCaktoSubscription } from './caktoService';
+import { logger } from '../utils/logger';
 
 /**
  * Cancela uma assinatura ativa
@@ -28,14 +30,18 @@ export async function cancelSubscription(
     return { success: false, error: 'Assinatura não encontrada' };
   }
 
-  // Cancelar na Cakto
-  // Adaptado: usa payment_method_id ao invés de cakto_subscription_id
-  const caktoResult = await cancelCaktoSubscription(
-    subscription.payment_method_id || ''
-  );
+  // Cancelar na Cakto (se tiver payment_method_id)
+  if (subscription.payment_method_id || subscription.provider_payment_id) {
+    const paymentId = subscription.payment_method_id || subscription.provider_payment_id || '';
+    const caktoResult = await cancelCaktoSubscription(paymentId);
 
-  if (!caktoResult.success) {
-    return { success: false, error: 'Erro ao cancelar na plataforma de pagamento' };
+    if (!caktoResult.success) {
+      // Não bloquear cancelamento se falhar - o webhook pode processar depois
+      logger.warn('Erro ao cancelar na Cakto, mas continuando cancelamento local', 'cancellationService', { error: caktoResult.error });
+    }
+  } else {
+    // Assinatura via código de ativação - apenas cancelar localmente
+    logger.info('Cancelando assinatura via código de ativação (sem Cakto)', 'cancellationService');
   }
 
   // Atualizar status no banco
@@ -65,6 +71,15 @@ export async function cancelSubscription(
   // Se for plano anual, calcular reembolso proporcional
   if (planType === 'annual' || planType.includes('annual')) {
     await calculateProportionalRefund(subscription);
+  }
+
+  // Desabilitar API para academia (mas manter chave)
+  try {
+    const { autoSetupGymApiKey } = await import('./gymApiKeyService');
+    await autoSetupGymApiKey(userId, 'canceled');
+  } catch (apiKeyError) {
+    // Não bloquear cancelamento se falhar ao desabilitar API
+    logger.warn('Erro ao desabilitar API (não crítico)', 'cancellationService', apiKeyError);
   }
 
   // Enviar email de confirmação

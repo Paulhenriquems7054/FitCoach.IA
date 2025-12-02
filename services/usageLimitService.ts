@@ -10,9 +10,12 @@ import type { User } from '../types';
 
 export interface VoiceUsageStatus {
     canUse: boolean;
-    remainingDaily: number; // segundos restantes do limite diário
-    remainingUpsell: number; // segundos restantes do saldo comprado
-    totalRemaining: number; // total disponível
+    remainingDaily: number; // segundos restantes do limite diário (free)
+    remainingBoost: number; // segundos restantes do boost (Ajuda Rápida)
+    remainingReserve: number; // segundos restantes do banco de reserva
+    totalRemaining: number; // total disponível (soma de todos)
+    isUnlimited?: boolean;
+    unlimitedUntil?: Date;
     error?: string;
 }
 
@@ -34,59 +37,133 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
             return {
                 canUse: false,
                 remainingDaily: 0,
-                remainingUpsell: 0,
+                remainingBoost: 0,
+                remainingReserve: 0,
                 totalRemaining: 0,
                 error: 'Usuário não encontrado'
             };
         }
 
-        // Resetar contador se necessário
-        await resetDailyCountersIfNeeded(user);
-
         // Buscar dados atualizados do Supabase
         const supabase = getSupabaseClient();
         const { data: userData, error } = await supabase
             .from('users')
-            .select('voice_daily_limit_seconds, voice_used_today_seconds, voice_balance_upsell, last_usage_date')
+            .select('voice_daily_limit_seconds, voice_used_today_seconds, voice_balance_upsell, last_usage_date, boost_minutes_balance, boost_expires_at')
             .eq('id', user.id || '')
             .single();
 
+        const now = new Date();
+
+        // Se não encontrar no Supabase, usar dados locais como fallback simples
         if (error || !userData) {
-            // Se não encontrar no Supabase, usar dados locais
             const dailyLimit = user.voiceDailyLimitSeconds || 900;
             const usedToday = user.voiceUsedTodaySeconds || 0;
-            const upsellBalance = user.voiceBalanceUpsell || 0;
+            const reserveBalance = user.voiceBalanceUpsell || 0;
 
             const remainingDaily = Math.max(0, dailyLimit - usedToday);
-            const totalRemaining = remainingDaily + upsellBalance;
+            const totalRemaining = remainingDaily + reserveBalance;
 
             return {
                 canUse: totalRemaining > 0,
                 remainingDaily,
-                remainingUpsell: upsellBalance,
+                remainingBoost: 0,
+                remainingReserve: reserveBalance,
                 totalRemaining
             };
         }
 
-        const dailyLimit = userData.voice_daily_limit_seconds || 900;
-        const usedToday = userData.voice_used_today_seconds || 0;
-        const upsellBalance = userData.voice_balance_upsell || 0;
+        // Reset diário (free minutes) se necessário
+        const today = now.toISOString().split('T')[0];
+        const lastUsageDate = userData.last_usage_date ? new Date(userData.last_usage_date).toISOString().split('T')[0] : null;
+
+        let usedToday = userData.voice_used_today_seconds || 0;
+        if (lastUsageDate !== today) {
+            usedToday = 0;
+        }
+
+        const dailyLimit = userData.voice_daily_limit_seconds || 900; // 15 min padrão
+        const reserveBalance = userData.voice_balance_upsell || 0; // segundos
+
+        // Boost (Ajuda Rápida) - do campo boost_minutes_balance
+        let boostMinutes = userData.boost_minutes_balance || 0;
+        const boostExpiresAt = userData.boost_expires_at ? new Date(userData.boost_expires_at) : null;
+
+        if (boostExpiresAt && boostExpiresAt <= now) {
+            // Boost expirado: considerar como 0
+            boostMinutes = 0;
+        }
+
+        // Verificar recargas TURBO ativas na tabela recharges
+        // Isso garante que recargas ativas sejam consideradas mesmo se ainda não aplicadas ao boost
+        const { data: allTurboRecharges } = await supabase
+            .from('recharges')
+            .select('quantity, valid_until, expires_at')
+            .eq('user_id', user.id || '')
+            .eq('recharge_type', 'turbo')
+            .eq('status', 'active')
+            .order('created_at', { ascending: false });
+
+        // Filtrar recargas válidas (que não expiraram)
+        if (allTurboRecharges && allTurboRecharges.length > 0) {
+            for (const recharge of allTurboRecharges) {
+                const validUntil = recharge.valid_until || recharge.expires_at;
+                if (validUntil) {
+                    const validDate = new Date(validUntil);
+                    if (validDate > now) {
+                        // Adicionar quantidade da recarga (em minutos) ao boost
+                        const rechargeMinutes = recharge.quantity || 0;
+                        boostMinutes += rechargeMinutes;
+                    }
+                }
+            }
+        }
 
         const remainingDaily = Math.max(0, dailyLimit - usedToday);
-        const totalRemaining = remainingDaily + upsellBalance;
+        const remainingBoost = boostMinutes * 60; // Converter minutos para segundos
+        const remainingReserve = reserveBalance;
+
+        // Verificar ilimitado (Passe Livre 30 dias)
+        const { data: activePassLibre } = await supabase
+            .from('recharges')
+            .select('expires_at')
+            .eq('user_id', user.id || '')
+            .eq('recharge_type', 'pass_libre')
+            .eq('status', 'active')
+            .gt('expires_at', now.toISOString())
+            .order('expires_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        let isUnlimited = false;
+        let unlimitedUntil: Date | undefined;
+        if (activePassLibre?.expires_at) {
+            const exp = new Date(activePassLibre.expires_at);
+            if (exp > now) {
+                isUnlimited = true;
+                unlimitedUntil = exp;
+            }
+        }
+
+        const totalRemaining = isUnlimited
+            ? Number.MAX_SAFE_INTEGER
+            : remainingDaily + remainingBoost + remainingReserve;
 
         return {
             canUse: totalRemaining > 0,
             remainingDaily,
-            remainingUpsell: upsellBalance,
-            totalRemaining
+            remainingBoost,
+            remainingReserve,
+            totalRemaining,
+            isUnlimited,
+            unlimitedUntil
         };
     } catch (error) {
         logger.error('Erro ao verificar uso de voz', 'usageLimitService', error);
         return {
             canUse: false,
             remainingDaily: 0,
-            remainingUpsell: 0,
+            remainingBoost: 0,
+            remainingReserve: 0,
             totalRemaining: 0,
             error: 'Erro ao verificar limites de uso'
         };
@@ -108,7 +185,7 @@ export async function consumeVoiceSeconds(seconds: number): Promise<{ success: b
         // Buscar dados atuais
         const { data: userData, error: fetchError } = await supabase
             .from('users')
-            .select('voice_daily_limit_seconds, voice_used_today_seconds, voice_balance_upsell, last_usage_date')
+            .select('voice_daily_limit_seconds, voice_used_today_seconds, voice_balance_upsell, last_usage_date, boost_minutes_balance, boost_expires_at')
             .eq('id', user.id)
             .single();
 
@@ -116,52 +193,126 @@ export async function consumeVoiceSeconds(seconds: number): Promise<{ success: b
             return { success: false, error: 'Erro ao buscar dados do usuário' };
         }
 
-        // Resetar contador se necessário
-        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
         const lastUsageDate = userData.last_usage_date ? new Date(userData.last_usage_date).toISOString().split('T')[0] : null;
         
+        // Reset diário (free)
         let usedToday = userData.voice_used_today_seconds || 0;
-        let upsellBalance = userData.voice_balance_upsell || 0;
-        const dailyLimit = userData.voice_daily_limit_seconds || 900;
-
-        // Resetar se mudou o dia
         if (lastUsageDate !== today) {
             usedToday = 0;
         }
 
-        // Calcular quanto pode consumir
+        const dailyLimit = userData.voice_daily_limit_seconds || 900; // 15 min
+        let reserveBalance = userData.voice_balance_upsell || 0; // segundos
+
+        // Boost (Ajuda Rápida) - do campo boost_minutes_balance
+        let boostMinutes = userData.boost_minutes_balance || 0;
+        let boostExpiresAt = userData.boost_expires_at ? new Date(userData.boost_expires_at) : null;
+
+        if (boostExpiresAt && boostExpiresAt <= now) {
+            // Boost expirado
+            boostMinutes = 0;
+            boostExpiresAt = null;
+        }
+
+        // Verificar recargas TURBO ativas na tabela recharges
+        // Isso garante que recargas ativas sejam consideradas mesmo se ainda não aplicadas ao boost
+        const { data: allTurboRecharges } = await supabase
+            .from('recharges')
+            .select('quantity, valid_until, expires_at')
+            .eq('user_id', user.id)
+            .eq('recharge_type', 'turbo')
+            .eq('status', 'active')
+            .order('created_at', { ascending: false });
+
+        // Filtrar recargas válidas (que não expiraram)
+        if (allTurboRecharges && allTurboRecharges.length > 0) {
+            for (const recharge of allTurboRecharges) {
+                const validUntil = recharge.valid_until || recharge.expires_at;
+                if (validUntil) {
+                    const validDate = new Date(validUntil);
+                    if (validDate > now) {
+                        // Adicionar quantidade da recarga (em minutos) ao boost
+                        const rechargeMinutes = recharge.quantity || 0;
+                        boostMinutes += rechargeMinutes;
+                    }
+                }
+            }
+        }
+
+        // 1) Verificar ilimitado (Passe Livre 30 dias)
+        const { data: activePassLibre } = await supabase
+            .from('recharges')
+            .select('expires_at')
+            .eq('user_id', user.id)
+            .eq('recharge_type', 'pass_libre')
+            .eq('status', 'active')
+            .gt('expires_at', now.toISOString())
+            .order('expires_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (activePassLibre?.expires_at && new Date(activePassLibre.expires_at) > now) {
+            // Conversa ilimitada ativa: não desconta nenhum saldo
+            return { success: true };
+        }
+
+        // 2) Consumo em cascata: diário -> boost -> reserva
         const remainingDaily = Math.max(0, dailyLimit - usedToday);
         let toConsume = seconds;
         let newUsedToday = usedToday;
-        let newUpsellBalance = upsellBalance;
+        let newBoostMinutes = boostMinutes;
+        let newBoostExpiresAt = boostExpiresAt;
+        let newReserveBalance = reserveBalance;
 
-        // Primeiro consumir do limite diário
+        // 2.1 Free diário
         if (remainingDaily > 0) {
             const consumeFromDaily = Math.min(toConsume, remainingDaily);
             newUsedToday = usedToday + consumeFromDaily;
             toConsume -= consumeFromDaily;
         }
 
-        // Depois consumir do upsell
-        if (toConsume > 0 && upsellBalance > 0) {
-            const consumeFromUpsell = Math.min(toConsume, upsellBalance);
-            newUpsellBalance = upsellBalance - consumeFromUpsell;
-            toConsume -= consumeFromUpsell;
+        // 2.2 Boost (Ajuda Rápida) - em minutos
+        if (toConsume > 0 && boostMinutes > 0) {
+            const boostSeconds = boostMinutes * 60;
+            const consumeFromBoost = Math.min(toConsume, boostSeconds);
+            const remainingBoostSeconds = boostSeconds - consumeFromBoost;
+            newBoostMinutes = Math.floor(remainingBoostSeconds / 60);
+            toConsume -= consumeFromBoost;
+
+            // Se acabou o boost, limpar validade
+            if (newBoostMinutes <= 0) {
+                newBoostMinutes = 0;
+                newBoostExpiresAt = null;
+            }
         }
 
-        // Se ainda sobrar, não pode consumir
+        // 2.3 Banco de Reserva
+        if (toConsume > 0 && reserveBalance > 0) {
+            const consumeFromReserve = Math.min(toConsume, reserveBalance);
+            newReserveBalance = reserveBalance - consumeFromReserve;
+            toConsume -= consumeFromReserve;
+        }
+
+        // Se ainda sobrou, não pode consumir
         if (toConsume > 0) {
-            return { success: false, error: 'Limite insuficiente' };
+            return { success: false, error: 'LIMIT_REACHED' };
         }
 
         // Atualizar no Supabase
+        const updatePayload: Record<string, any> = {
+            voice_used_today_seconds: newUsedToday,
+            voice_balance_upsell: newReserveBalance,
+            last_usage_date: today
+        };
+
+        updatePayload.boost_minutes_balance = newBoostMinutes;
+        updatePayload.boost_expires_at = newBoostExpiresAt ? newBoostExpiresAt.toISOString() : null;
+
         const { error: updateError } = await supabase
             .from('users')
-            .update({
-                voice_used_today_seconds: newUsedToday,
-                voice_balance_upsell: newUpsellBalance,
-                last_usage_date: today
-            })
+            .update(updatePayload)
             .eq('id', user.id);
 
         if (updateError) {

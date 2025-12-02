@@ -55,7 +55,12 @@ export const AccessBlockChecker: React.FC = () => {
                     push('#/login');
                 }
             } catch (error) {
-                console.error('Erro ao verificar acesso:', error);
+                try {
+                  const { logger } = await import('../utils/logger');
+                  logger.error('Erro ao verificar acesso', 'AccessBlockChecker', error);
+                } catch {
+                  console.error('Erro ao verificar acesso:', error);
+                }
             }
         };
 

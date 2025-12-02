@@ -40,7 +40,7 @@ export interface Database {
           last_sync_at: string | null;
           gym_server_url: string | null;
           // Controle de Plano
-          plan_type: 'free' | 'monthly' | 'annual_vip' | 'academy_starter' | 'academy_growth' | 'academy_pro' | 'personal_team_5' | 'personal_team_15' | null;
+          plan_type: 'free' | 'monthly' | 'annual_vip' | 'academy_starter_mini' | 'academy_starter' | 'academy_growth' | 'academy_pro' | 'personal_team_5' | 'personal_team_15' | null;
           subscription_status: 'active' | 'inactive' | 'expired' | null;
           expiry_date: string | null;
           // Controle de Voz
@@ -501,7 +501,8 @@ export async function getActiveSubscription(userId?: string, userEmail?: string,
     .from('user_subscriptions')
     .select('*')
     .eq('user_id', targetUserId)
-    .eq('status', 'active')
+    // Considerar tanto assinaturas ativas quanto em período de teste ('trialing')
+    .in('status', ['active', 'trialing'])
     .maybeSingle();
 
   if (error) {
@@ -597,6 +598,17 @@ export async function createSubscription(
   if (error) {
     logger.error('Erro ao criar assinatura', 'supabaseService', error);
     throw new Error(`Erro ao criar assinatura: ${error.message}`);
+  }
+
+  // Criar chave de API automaticamente se for admin de academia
+  if (data) {
+    try {
+      const { autoSetupGymApiKey } = await import('./gymApiKeyService');
+      await autoSetupGymApiKey(targetUserId, 'active');
+    } catch (apiKeyError) {
+      // Não bloquear criação de assinatura se falhar ao criar chave
+      logger.warn('Erro ao criar chave de API automaticamente (não crítico)', 'supabaseService', apiKeyError);
+    }
   }
 
   return data;

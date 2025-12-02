@@ -14,16 +14,49 @@ import { resolveActiveApiKey } from "../constants/apiConfig";
 import { getAvailableExercisesPrompt } from "./exerciseGifService";
 import { logger } from "../utils/logger";
 import { generateJSONResponse } from "./iaController";
+import { getGymApiKey, recordApiUsage } from "./gymApiKeyService";
 
-// Função para obter a chave de API ativa (do localStorage ou env)
-const getApiKey = (): string | undefined => {
+// Função para obter a chave de API ativa (prioriza chave da academia, depois fallback global)
+const getApiKey = async (gymId?: string | null): Promise<string | undefined> => {
+  // 1. Tentar buscar chave da academia primeiro (se gymId fornecido)
+  if (gymId) {
+    try {
+      const gymApiKey = await getGymApiKey(gymId);
+      if (gymApiKey) {
+        logger.debug(`Usando chave de API da academia ${gymId}`, 'geminiService');
+        // Registrar uso da API para estatísticas
+        recordApiUsage(gymId).catch(err => {
+          logger.warn('Erro ao registrar uso de API', 'geminiService', err);
+        });
+        return gymApiKey;
+      }
+    } catch (error) {
+      logger.warn('Erro ao buscar chave de API da academia, usando fallback global', 'geminiService', error);
+    }
+  }
+  
+  // 2. Fallback para chave global (env)
   const envKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
-  return resolveActiveApiKey(envKey);
+  const resolvedKey = resolveActiveApiKey(envKey);
+  if (resolvedKey) {
+    logger.debug('Usando chave de API global (fallback)', 'geminiService');
+  }
+  return resolvedKey;
 };
 
-// Função para obter o cliente Gemini com a chave atual
-const getGeminiClient = (): GoogleGenAI => {
-  const apiKey = getApiKey();
+// Função para obter o cliente Gemini com a chave atual (síncrona para compatibilidade)
+const getGeminiClientSync = (): GoogleGenAI => {
+  const envKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+  const apiKey = resolveActiveApiKey(envKey);
+  if (!apiKey) {
+    throw new Error("API key for Gemini is not configured. Please set it up in Settings.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+// Função para obter o cliente Gemini com a chave da academia (assíncrona)
+const getGeminiClient = async (gymId?: string | null): Promise<GoogleGenAI> => {
+  const apiKey = await getApiKey(gymId);
   if (!apiKey) {
     throw new Error("API key for Gemini is not configured. Please set it up in Settings.");
   }
@@ -140,7 +173,7 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
         async () => {
             // Fallback para API externa APENAS se configurada e online
             const online = isOnline();
-            const apiKey = getApiKey();
+            const apiKey = await getApiKey(user.gymId);
             const hasApiKey = !!apiKey;
             
             if (!online || !hasApiKey) {
@@ -148,7 +181,7 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
             }
             
             try {
-                const ai = getGeminiClient();
+                const ai = await getGeminiClient(user.gymId);
                 const response = await ai.models.generateContent({
                     model: "gemini-1.5-flash", // Usando modelo estável
                     contents: prompt,
@@ -189,9 +222,9 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
 
 // --- CHAT ---
 let chat: Chat | null = null;
-export const startChat = (user: User, language: 'pt' | 'en' | 'es' = 'pt'): void => {
+export const startChat = async (user: User, language: 'pt' | 'en' | 'es' = 'pt'): Promise<void> => {
   const online = isOnline();
-  const apiKey = getApiKey();
+  const apiKey = await getApiKey(user.gymId);
   const hasApiKey = !!apiKey;
 
   if (!online || !hasApiKey) {
@@ -206,7 +239,9 @@ export const startChat = (user: User, language: 'pt' | 'en' | 'es' = 'pt'): void
       en: `You are FitCoach.IA, a friendly and intelligent training agent. You are chatting with ${user.nome}, who is ${user.idade} years old and their main goal is "${user.objetivo}". Keep this information in mind to provide personalized answers, remembering the history of this conversation. Answer questions about workouts, exercises, gym, and health in a clear, educational, and motivating way.`,
       es: `Eres FitCoach.IA, un agente de entrenamiento inteligente y amigable. Estás hablando con ${user.nome}, que tiene ${user.idade} años y su objetivo principal es "${user.objetivo}". Ten en cuenta esta información para dar respuestas personalizadas, recordando el historial de esta conversación. Responde preguntas sobre entrenamientos, ejercicios, gimnasio y salud de forma clara, educativa y motivadora.`
   }
-  const ai = getGeminiClient();
+  
+  // Obter cliente Gemini com chave da academia
+  const ai = await getGeminiClient(user.gymId);
   chat = ai.chats.create({
     model: 'gemini-1.5-flash', // Modelo estável
     config: { 
@@ -331,8 +366,8 @@ const moderationSchema = {
     required: ["is_safe", "reason"]
 };
 
-export const moderateContent = async (content: string): Promise<ModerationResult> => {
-    const apiKey = getApiKey();
+export const moderateContent = async (content: string, gymId?: string | null): Promise<ModerationResult> => {
+    const apiKey = await getApiKey(gymId);
     if (!apiKey) throw new Error("API key for Gemini is not configured. Please set it up in Settings.");
 
     const prompt = `
@@ -350,18 +385,18 @@ export const moderateContent = async (content: string): Promise<ModerationResult
     `;
 
     try {
-        const ai = getGeminiClient();
-        const response = await ai.models.generateContent({
-            model: "gemini-1.5-flash", // Modelo estável
-            contents: prompt,
-            config: {
+        const ai = await getGeminiClient(gymId);
+        const model = ai.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: moderationSchema,
                 temperature: 0.1,
-            },
+            } as any,
         });
-        
-        const jsonText = response.text.trim();
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const jsonText = response.text().trim();
         return JSON.parse(jsonText) as ModerationResult;
     } catch (error: unknown) {
         logger.error("Erro ao chamar API do Gemini para moderação de conteúdo", 'geminiService', error);
@@ -487,7 +522,7 @@ export const generateWellnessPlan = async (user: User): Promise<WellnessPlan> =>
 // --- AI COACH TIP ---
 
 export const getAICoachTip = async (user: User): Promise<string> => {
-    const apiKey = getApiKey();
+    const apiKey = await getApiKey(user.gymId);
     if (!apiKey) {
         // Retornar dica genérica quando não há API key
         const timeOfDay = new Date().getHours() < 12 ? 'manhã' : new Date().getHours() < 18 ? 'tarde' : 'noite';
@@ -510,9 +545,17 @@ export const getAICoachTip = async (user: User): Promise<string> => {
     `;
     
     try {
-        const ai = getGeminiClient();
-        const response = await ai.models.generateContent({ model: "gemini-1.5-flash", contents: prompt }); // Modelo estável
-        return response.text.trim();
+        const ai = await getGeminiClient(user.gymId);
+        // Usar a API de alto nível recomendada para texto
+        const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        if (!text || !text.trim()) {
+            const timeOfDayFallback = new Date().getHours() < 12 ? 'manhã' : new Date().getHours() < 18 ? 'tarde' : 'noite';
+            return `Bom ${timeOfDayFallback}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
+        }
+        return text.trim();
     } catch (error: any) {
         // Silenciar erros de API key inválida e retornar dica genérica
         const isApiKeyError = error?.error?.code === 400 && error?.error?.message?.includes('API key');
@@ -543,7 +586,7 @@ const progressAnalysisSchema = {
 };
 
 export const analyzeProgress = async (user: User): Promise<ProgressAnalysis> => {
-    const apiKey = getApiKey();
+    const apiKey = await getApiKey(user.gymId);
     if (!apiKey) throw new Error("API key is not configured. Please set it up in Settings.");
     const prompt = `
         Analise o histórico de peso do usuário para o objetivo de "${user.objetivo}".
@@ -556,7 +599,7 @@ export const analyzeProgress = async (user: User): Promise<ProgressAnalysis> => 
         5. Sugira 2 áreas de melhoria.
         Retorne estritamente no formato JSON.
     `;
-    const ai = getGeminiClient();
+    const ai = await getGeminiClient(user.gymId);
     const response = await ai.models.generateContent({
         model: "gemini-1.5-flash", // Modelo estável
         contents: prompt,
@@ -567,16 +610,18 @@ export const analyzeProgress = async (user: User): Promise<ProgressAnalysis> => 
 
 // --- EXPLAIN MEAL ---
 export const explainMeal = async (mealName: string, user: User): Promise<string> => {
-    const apiKey = getApiKey();
+    const apiKey = await getApiKey(user.gymId);
     if (!apiKey) throw new Error("API key is not configured. Please set it up in Settings.");
     const prompt = `
         Explique de forma científica e simples por que a refeição "${mealName}" é uma boa escolha para o usuário, considerando seu objetivo de "${user.objetivo}".
         Fale sobre os macronutrientes principais da refeição e como eles ajudam a atingir o objetivo.
         Seja breve (2-3 frases) e educativo.
     `;
-    const ai = getGeminiClient();
-    const response = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
-    return response.text.trim();
+    const ai = await getGeminiClient(user.gymId);
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" }); // usar modelo estável de texto
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim();
 };
 
 // --- FOOD SUBSTITUTION ---
@@ -599,14 +644,14 @@ const foodSubstitutionsSchema = {
 };
 
 export const getFoodSubstitutions = async (food: string, user: User): Promise<FoodSubstitution[]> => {
-    const apiKey = getApiKey();
+    const apiKey = await getApiKey(user.gymId);
     if (!apiKey) throw new Error("API key is not configured. Please set it up in Settings.");
     const prompt = `
         Para o alimento "${food}", sugira 3 substituições mais saudáveis e alinhadas com o objetivo do usuário de "${user.objetivo}".
         Para cada sugestão, forneça uma justificativa clara e concisa.
         Retorne estritamente no formato JSON.
     `;
-    const ai = getGeminiClient();
+    const ai = await getGeminiClient(user.gymId);
     const response = await ai.models.generateContent({
         model: "gemini-1.5-flash", // Modelo estável
         contents: prompt,

@@ -14,14 +14,13 @@ import {
 } from '../constants/apiConfig';
 import { resetAssistantSession } from '../services/assistantService';
 import { saveAppSetting, getAppSetting } from '../services/databaseService';
-import { setUseLocalAI, shouldUseLocalAI } from '../services/iaController';
-import { testLocalIA } from '../services/localAIService';
-import { configureGymServer, getGymServerUrlConfig, checkServerAvailability } from '../services/syncService';
 import { useToast } from '../components/ui/Toast';
 import { saveGymBranding, loadGymBranding, loadGymConfig, saveGymConfig, getAppName } from '../services/gymConfigService';
 import { deleteUserAccount } from '../services/accountDeletionService';
 import { Alert } from '../components/ui/Alert';
 import type { GymBranding, Gym } from '../types';
+import { getCompanyByUserId, type Company } from '../services/companyService';
+import { logger } from '../utils/logger';
 
 const SettingsPage: React.FC = () => {
     const { user } = useUser();
@@ -38,11 +37,6 @@ const SettingsPage: React.FC = () => {
     const [freeApiKey, setFreeApiKeyState] = useState<string>(DEFAULT_FREE_API_KEY);
     const [providerLink, setProviderLinkState] = useState<string>(DEFAULT_PROVIDER_LINK);
     const [isLoading, setIsLoading] = useState(true);
-    const [useLocalAI, setUseLocalAIState] = useState<boolean>(true);
-    const [localAITestResult, setLocalAITestResult] = useState<{ success: boolean; message: string } | null>(null);
-    const [isTestingLocalAI, setIsTestingLocalAI] = useState<boolean>(false);
-    const [gymServerUrl, setGymServerUrlState] = useState<string>('');
-    const [isCheckingServer, setIsCheckingServer] = useState<boolean>(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     
@@ -50,6 +44,8 @@ const SettingsPage: React.FC = () => {
     const isAdmin = user.gymRole === 'admin' || user.username === 'Administrador' || user.username === 'Desenvolvedor';
     const [gym, setGym] = useState<Gym | null>(null);
     const [isEditingGym, setIsEditingGym] = useState(false);
+    const [company, setCompany] = useState<Company | null>(null);
+    const [isLoadingCompany, setIsLoadingCompany] = useState(false);
     const [gymFormData, setGymFormData] = useState({
         name: '',
         appName: '',
@@ -76,7 +72,6 @@ const SettingsPage: React.FC = () => {
                 const savedPaidKey = await getAppSetting<string>(PAID_API_KEY_STORAGE_KEY, '');
                 const savedFreeKey = await getAppSetting<string>(FREE_API_KEY_STORAGE_KEY, DEFAULT_FREE_API_KEY);
                 const savedProviderLink = await getAppSetting<string>(PROVIDER_LINK_STORAGE_KEY, DEFAULT_PROVIDER_LINK);
-                const savedGymServerUrl = getGymServerUrlConfig();
 
                 if (savedApiMode === 'paid' || savedApiMode === 'free') {
                     setApiModeState(savedApiMode);
@@ -84,11 +79,6 @@ const SettingsPage: React.FC = () => {
                 setPaidApiKeyState(savedPaidKey || '');
                 setFreeApiKeyState(savedFreeKey || DEFAULT_FREE_API_KEY);
                 setProviderLinkState(savedProviderLink || DEFAULT_PROVIDER_LINK);
-                setGymServerUrlState(savedGymServerUrl || '');
-                
-                // Carregar preferência de IA Local
-                const savedUseLocalAI = shouldUseLocalAI();
-                setUseLocalAIState(savedUseLocalAI);
 
                 // Carregar branding personalizado
                 const savedBranding = loadGymBranding();
@@ -123,7 +113,12 @@ const SettingsPage: React.FC = () => {
                     }
                 }
             } catch (error) {
-                console.error('Erro ao carregar configurações:', error);
+                try {
+                  const { logger } = await import('../utils/logger');
+                  logger.error('Erro ao carregar configurações', 'SettingsPage', error);
+                } catch {
+                  console.error('Erro ao carregar configurações:', error);
+                }
                 // Fallback para localStorage
                 if (typeof window !== 'undefined') {
                     const stored = window.localStorage.getItem(API_MODE_STORAGE_KEY);
@@ -141,6 +136,27 @@ const SettingsPage: React.FC = () => {
 
         loadSettings();
     }, []);
+
+    // Carregar empresa (código mestre) se for admin
+    useEffect(() => {
+        const loadCompany = async () => {
+            if (!isAdmin || !user.id) return;
+            
+            setIsLoadingCompany(true);
+            try {
+                const result = await getCompanyByUserId(user.id);
+                if (result.success && result.company) {
+                    setCompany(result.company);
+                }
+            } catch (error) {
+                logger.error('Erro ao carregar empresa', 'SettingsPage', error);
+            } finally {
+                setIsLoadingCompany(false);
+            }
+        };
+
+        loadCompany();
+    }, [isAdmin, user.id]);
 
     const [isDirty, setIsDirty] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -261,7 +277,12 @@ const SettingsPage: React.FC = () => {
             }, 1500);
         } catch (error) {
             showError('Erro ao salvar personalização');
-            console.error(error);
+            try {
+              const { logger } = await import('../utils/logger');
+              logger.error('Erro ao salvar personalização', 'SettingsPage', error);
+            } catch {
+              console.error(error);
+            }
         }
     };
 
@@ -395,7 +416,12 @@ const SettingsPage: React.FC = () => {
             setStatusMessage('Configurações salvas com sucesso!');
             setErrorMessage(null);
         } catch (error) {
-            console.error('Erro ao salvar configurações', error);
+            try {
+              const { logger } = await import('../utils/logger');
+              logger.error('Erro ao salvar configurações', 'SettingsPage', error);
+            } catch {
+              console.error('Erro ao salvar configurações', error);
+            }
             setErrorMessage('Não foi possível salvar as configurações. Tente novamente.');
             setStatusMessage(null);
         }
@@ -469,6 +495,93 @@ const SettingsPage: React.FC = () => {
                     </div>
                 </Card>
             </div>
+
+            {/* Seção: Código Mestre - Apenas para administradores com empresa B2B */}
+            {isAdmin && (
+                <Card>
+                    <div className="p-4 sm:p-6">
+                        <div className="mb-6">
+                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
+                                🔑 Código Mestre da Academia
+                            </h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                Distribua este código para seus alunos ativarem acesso Premium gratuitamente.
+                            </p>
+                        </div>
+
+                        {isLoadingCompany ? (
+                            <div className="text-center py-4">
+                                <p className="text-sm text-slate-600 dark:text-slate-400">Carregando...</p>
+                            </div>
+                        ) : company ? (
+                            <div className="space-y-4">
+                                <div className="bg-gradient-to-r from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/20 p-4 rounded-lg border border-primary-200 dark:border-primary-800">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                        Seu Código Mestre:
+                                    </label>
+                                    <div className="flex items-center gap-3">
+                                        <code className="flex-1 px-4 py-3 bg-white dark:bg-slate-800 border-2 border-primary-500 rounded-lg text-lg font-bold text-primary-700 dark:text-primary-400 text-center tracking-wider">
+                                            {company.masterCode}
+                                        </code>
+                                        <Button
+                                            variant="primary"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(company.masterCode);
+                                                showSuccess('Código copiado para a área de transferência!');
+                                            }}
+                                            className="whitespace-nowrap"
+                                        >
+                                            📋 Copiar
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg">
+                                        <span className="text-slate-600 dark:text-slate-400 block mb-1">Plano:</span>
+                                        <span className="font-semibold text-slate-900 dark:text-white">{company.planName}</span>
+                                    </div>
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg">
+                                        <span className="text-slate-600 dark:text-slate-400 block mb-1">Licenças Disponíveis:</span>
+                                        <span className="font-semibold text-slate-900 dark:text-white">
+                                            {company.maxLicenses} alunos
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex-shrink-0 mt-0.5">
+                                            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-1">
+                                                Como distribuir o código
+                                            </h3>
+                                            <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
+                                                <li>Envie o código mestre para seus alunos via WhatsApp, email ou impresso</li>
+                                                <li>Os alunos devem acessar a página de ativação no app</li>
+                                                <li>Após ativar, eles terão acesso Premium gratuito enquanto sua assinatura estiver ativa</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center py-4">
+                                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                                    Você ainda não possui um código mestre.
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-500">
+                                    Adquira um plano B2B na página Premium para receber seu código mestre automaticamente.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </Card>
+            )}
 
             {/* Seção: Configuração da Academia - Apenas para administradores */}
             {isAdmin && (
@@ -981,7 +1094,7 @@ const SettingsPage: React.FC = () => {
                 </div>
             </Card>
 
-            {/* Seção: Integração com APIs de IA */}
+            {/* Seção: Integração com APIs de IA - Informações */}
             <Card>
                 <div className="p-4 sm:p-6">
                     <div className="mb-6">
@@ -989,277 +1102,54 @@ const SettingsPage: React.FC = () => {
                             🤖 Integração com APIs de IA
                         </h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Configure seus acessos a modelos pagos ou gratuitos e defina facilmente o endpoint do provedor escolhido.
+                            As configurações de API são gerenciadas pelo desenvolvedor. Esta seção exibe apenas informações sobre o modo atual.
                         </p>
                     </div>
 
-                    <div className="space-y-6">
-                            {/* Status Atual */}
-                            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-                                <div className="flex items-center justify-between flex-wrap gap-3">
-                                    <div>
-                                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Modo Atual</span>
-                                        <p className="text-base font-semibold text-slate-900 dark:text-white mt-1">
-                                            {apiMode === 'paid' ? (
-                                                <span className="text-emerald-600 dark:text-emerald-400">API Paga</span>
-                                            ) : (
-                                                <span className="text-primary-600 dark:text-primary-400">API Gratuita</span>
-                                            )}
-                                        </p>
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={handleActivateFreeApi}
-                                    >
-                                        Alternar para Gratuita
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Modo de Utilização */}
-                            <div className="space-y-3">
-                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                                    Modo de Utilização
-                                </h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setApiMode('free')}
-                                        className={`rounded-lg border-2 px-4 py-4 text-left transition-all ${
-                                            apiMode === 'free'
-                                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 shadow-sm'
-                                                : 'border-slate-300 dark:border-slate-600 hover:border-primary-400 dark:hover:border-primary-500 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                                        }`}
-                                    >
-                                        <span className="block font-semibold text-base mb-1">API Gratuita</span>
-                                        <span className="block text-sm text-slate-500 dark:text-slate-400">
-                                            Ideal para testes e integrações com limites menores.
-                                        </span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setApiMode('paid')}
-                                        className={`rounded-lg border-2 px-4 py-4 text-left transition-all ${
-                                            apiMode === 'paid'
-                                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 shadow-sm'
-                                                : 'border-slate-300 dark:border-slate-600 hover:border-emerald-400 dark:hover:border-emerald-500 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                                        }`}
-                                    >
-                                        <span className="block font-semibold text-base mb-1">API Paga</span>
-                                        <span className="block text-sm text-slate-500 dark:text-slate-400">
-                                            Utilize modelos avançados com performance corporativa.
-                                        </span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Endpoint do Provedor */}
-                            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <div className="space-y-4">
+                        {/* Status Atual - Apenas Informação */}
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center justify-between flex-wrap gap-3">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
-                                        Endpoint do Provedor
-                                    </label>
-                                    <input
-                                        type="url"
-                                        value={providerLink}
-                                        onChange={(event) => setProviderLink(event.target.value)}
-                                        placeholder={DEFAULT_PROVIDER_LINK}
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                                    />
-                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                                        Use o link oficial do provedor escolhido. Padrão:{' '}
-                                        <span className="font-medium text-primary-600 dark:text-primary-400">{DEFAULT_PROVIDER_LINK}</span>
-                                    </p>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    size="sm"
-                                    disabled={!providerLink}
-                                    onClick={handleOpenProviderLink}
-                                >
-                                    Abrir Página do Modelo
-                                </Button>
-                            </div>
-
-                            {/* Chaves de API */}
-                            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                                    Chaves de API
-                                </h3>
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                            Chave para API Paga
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={paidApiKey}
-                                            onChange={(event) => setPaidApiKey(event.target.value)}
-                                            placeholder="Insira sua chave premium aqui"
-                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                            Chave para API Gratuita
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={freeApiKey}
-                                            onChange={(event) => setFreeApiKey(event.target.value)}
-                                            placeholder="Insira a chave gratuita ou de testes"
-                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={handleUseDefaultFreeKey}
-                                            className="whitespace-nowrap"
-                                        >
-                                            Usar Demo
-                                        </Button>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                                            Padrão:{' '}
-                                            <span className="font-medium text-primary-600 dark:text-primary-400">{DEFAULT_FREE_API_KEY}</span>
-                                        </p>
-                                    </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </Card>
-
-            {/* Seção: IA Local Offline */}
-            <Card>
-                <div className="p-4 sm:p-6">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                        🖥️ IA Local Offline
-                    </h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                            Use IA localmente sem depender de APIs externas. Requer Ollama instalado e rodando.
-                        </p>
-                        
-                        <div className="space-y-4">
-                            <label className="flex items-center gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={useLocalAI}
-                                    onChange={(e) => {
-                                        setUseLocalAIState(e.target.checked);
-                                        setUseLocalAI(e.target.checked);
-                                    }}
-                                    className="w-5 h-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800"
-                                />
-                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    Usar IA Local Offline (Ollama)
-                                </span>
-                            </label>
-                            
-                            {useLocalAI && (
-                                <div className="ml-8 space-y-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                                    <p className="text-xs text-slate-600 dark:text-slate-400">
-                                        Quando habilitado, o app tentará usar IA Local primeiro. 
-                                        Se não estiver disponível, fará fallback automático para a API externa.
-                                    </p>
-                                    
-                                    <div className="flex items-center gap-3">
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            disabled={isTestingLocalAI}
-                                            onClick={async () => {
-                                                setIsTestingLocalAI(true);
-                                                setLocalAITestResult(null);
-                                                const result = await testLocalIA();
-                                                setLocalAITestResult(result);
-                                                setIsTestingLocalAI(false);
-                                            }}
-                                        >
-                                            {isTestingLocalAI ? 'Testando...' : 'Testar IA Local'}
-                                        </Button>
-                                        
-                                        {localAITestResult && (
-                                            <span className={`text-sm ${localAITestResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                                {localAITestResult.success ? '✓' : '✗'} {localAITestResult.message}
-                                            </span>
+                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Modo Atual</span>
+                                    <p className="text-base font-semibold text-slate-900 dark:text-white mt-1">
+                                        {apiMode === 'paid' ? (
+                                            <span className="text-emerald-600 dark:text-emerald-400">API Paga</span>
+                                        ) : (
+                                            <span className="text-primary-600 dark:text-primary-400">API Gratuita</span>
                                         )}
-                                    </div>
-                                    
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
-                                        <p><strong>Para instalar:</strong></p>
-                                        <p>Windows: Execute <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">local-server\install_model.ps1</code></p>
-                                        <p>Linux/macOS: Execute <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">local-server/install_model.sh</code></p>
-                                    </div>
-                                </div>
-                            )}
-                    </div>
-                </div>
-            </Card>
-
-            {/* Seção: Configuração do Servidor da Academia */}
-            {(user.gymRole === 'admin' || user.gymRole === 'trainer' || user.gymRole === 'student') && (
-                <Card>
-                    <div className="p-4 sm:p-6">
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                            🌐 Servidor da Academia
-                        </h2>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                                Configure a URL do servidor da academia para sincronização de dados e bloqueio de acesso.
-                            </p>
-                            <div className="mt-4 space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
-                                        URL do Servidor
-                                    </label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="url"
-                                            value={gymServerUrl}
-                                            onChange={(e) => setGymServerUrlState(e.target.value)}
-                                            placeholder="http://192.168.1.100:3001"
-                                            className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                                        />
-                                        <Button
-                                            onClick={async () => {
-                                                if (!gymServerUrl.trim()) {
-                                                    showError('Por favor, informe a URL do servidor');
-                                                    return;
-                                                }
-                                                setIsCheckingServer(true);
-                                                try {
-                                                    configureGymServer(gymServerUrl.trim());
-                                                    const isAvailable = await checkServerAvailability();
-                                                    if (isAvailable) {
-                                                        showSuccess('Servidor configurado e disponível!');
-                                                    } else {
-                                                        showError('Servidor configurado, mas não está disponível. Verifique a URL e se o servidor está rodando.');
-                                                    }
-                                                } catch (error: any) {
-                                                    showError(error.message || 'Erro ao configurar servidor');
-                                                } finally {
-                                                    setIsCheckingServer(false);
-                                                }
-                                            }}
-                                            variant="secondary"
-                                            disabled={isCheckingServer || !gymServerUrl.trim()}
-                                        >
-                                            {isCheckingServer ? 'Verificando...' : 'Testar & Salvar'}
-                                        </Button>
-                                    </div>
-                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                                        Exemplo: http://192.168.1.100:3001 ou http://localhost:3001
                                     </p>
+                                </div>
+                                <div className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 rounded-md">
+                                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                                        Gerenciado pelo Desenvolvedor
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Informações sobre o Provedor */}
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 mt-0.5">
+                                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-1">
+                                        Configuração Técnica
+                                    </h3>
+                                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                                        As chaves de API, endpoints e configurações de provedor são definidas pelo desenvolvedor através de variáveis de ambiente e configurações do sistema. 
+                                        Para alterações, entre em contato com o suporte técnico.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </Card>
-            )}
+                </div>
+            </Card>
 
             {/* Botão de Salvar Configurações Gerais */}
             {isDirty && (

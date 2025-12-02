@@ -77,7 +77,8 @@ export async function checkSubscriptionStatus(
     }
 
     // Verificar status da assinatura
-    if (subscription.status !== 'active') {
+    const isPremiumStatus = subscription.status === 'active' || subscription.status === 'trialing';
+    if (!isPremiumStatus) {
       return {
         isActive: false,
         planType: null,
@@ -199,6 +200,7 @@ function getPlanLimits(planType: string): { voiceMinutesDaily: number } {
   const limits: Record<string, { voiceMinutesDaily: number }> = {
     monthly: { voiceMinutesDaily: 15 },
     annual_vip: { voiceMinutesDaily: 15 },
+    academy_starter_mini: { voiceMinutesDaily: 15 },
     academy_starter: { voiceMinutesDaily: 15 },
     academy_growth: { voiceMinutesDaily: 15 },
     academy_pro: { voiceMinutesDaily: 15 },

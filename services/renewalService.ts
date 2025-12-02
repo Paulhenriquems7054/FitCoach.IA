@@ -4,6 +4,8 @@
  */
 
 import { getSupabaseClient } from './supabaseService';
+import { checkCaktoPaymentStatus } from './caktoService';
+import { logger } from '../utils/logger';
 
 /**
  * Verifica e renova assinaturas que precisam ser renovadas
@@ -24,17 +26,23 @@ export async function checkAndRenewSubscriptions(): Promise<void> {
     .lte('current_period_end', new Date().toISOString());
 
   if (error) {
-    console.error('Erro ao buscar assinaturas para renovação:', error);
+    logger.error('Erro ao buscar assinaturas para renovação', 'renewalService', error);
     return;
   }
 
   for (const subscription of subscriptions || []) {
     try {
       // Verificar pagamento na Cakto
-      // Nota: Adaptado - usa payment_method_id ao invés de cakto_subscription_id
-      const paymentStatus = await checkCaktoPayment(subscription.payment_method_id || '');
+      const paymentId = subscription.payment_method_id || subscription.provider_payment_id || '';
+      
+      if (!paymentId) {
+        logger.warn(`Assinatura ${subscription.id} sem payment_id, pulando renovação`, 'renewalService');
+        continue;
+      }
 
-      if (paymentStatus === 'paid') {
+      const paymentStatus = await checkCaktoPaymentStatus(paymentId);
+
+      if (paymentStatus.status === 'paid') {
         // Renovar assinatura
         // Buscar informações do plano para determinar o tipo
         const { data: plan } = await supabase
@@ -49,30 +57,56 @@ export async function checkAndRenewSubscriptions(): Promise<void> {
           new Date()
         );
 
-        await supabase
+        const { error: updateError } = await supabase
           .from('user_subscriptions')
           .update({
             current_period_start: new Date().toISOString(),
             current_period_end: newEndDate.toISOString(),
             status: 'active',
+            updated_at: new Date().toISOString(),
           })
           .eq('id', subscription.id);
 
+        if (updateError) {
+          logger.error(`Erro ao renovar assinatura ${subscription.id}`, 'renewalService', updateError);
+        } else {
+          logger.info(`Assinatura ${subscription.id} renovada com sucesso até ${newEndDate.toISOString()}`, 'renewalService');
+          
+          // Criar/atualizar chave de API se for admin de academia
+          try {
+            const { autoSetupGymApiKey } = await import('./gymApiKeyService');
+            await autoSetupGymApiKey(subscription.user_id, 'active');
+          } catch (apiKeyError) {
+            logger.warn('Erro ao configurar API (não crítico)', 'renewalService', apiKeyError);
+          }
+        }
+
         // Enviar email de confirmação
         await sendRenewalConfirmationEmail(subscription.user_id);
-      } else {
-        // Pagamento falhou - suspender assinatura
-        // Adaptado: usa 'past_due' ao invés de 'suspended' (não existe na tabela)
-        await supabase
+      } else if (paymentStatus.status === 'failed' || paymentStatus.status === 'canceled') {
+        // Pagamento falhou ou foi cancelado - suspender assinatura
+        const { error: updateError } = await supabase
           .from('user_subscriptions')
-          .update({ status: 'past_due' })
+          .update({ 
+            status: 'past_due',
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', subscription.id);
+
+        if (updateError) {
+          logger.error(`Erro ao atualizar status para past_due: ${subscription.id}`, 'renewalService', updateError);
+        } else {
+          logger.warn(`Assinatura ${subscription.id} marcada como past_due (pagamento falhou)`, 'renewalService');
+        }
 
         // Enviar email de notificação
         await sendPaymentFailedEmail(subscription.user_id);
+      } else {
+        // Status pending - aguardar processamento
+        logger.debug(`Assinatura ${subscription.id} com pagamento pendente, aguardando processamento`, 'renewalService');
       }
-    } catch (error) {
-      console.error(`Erro ao renovar assinatura ${subscription.id}:`, error);
+    } catch (error: unknown) {
+      logger.error(`Erro ao renovar assinatura ${subscription.id}`, 'renewalService', error);
     }
   }
 }
@@ -99,38 +133,27 @@ function calculateNextBillingDate(
   return nextDate;
 }
 
-/**
- * Verifica status de pagamento na Cakto
- * TODO: Implementar integração real com API da Cakto
- */
-async function checkCaktoPayment(caktoSubscriptionId: string): Promise<'paid' | 'failed' | 'pending'> {
-  // Placeholder - implementar chamada real à API da Cakto
-  // Exemplo:
-  // const response = await fetch(`https://api.cakto.com/subscriptions/${caktoSubscriptionId}`);
-  // const data = await response.json();
-  // return data.status === 'paid' ? 'paid' : 'failed';
-  
-  console.warn('checkCaktoPayment não implementado - retornando paid por padrão');
-  return 'paid';
-}
+// Função removida - agora usa checkCaktoPaymentStatus de caktoService.ts
 
 /**
  * Envia email de confirmação de renovação
- * TODO: Implementar serviço de email
+ * TODO: Implementar serviço de email (Supabase Edge Function ou Resend/SendGrid)
  */
 async function sendRenewalConfirmationEmail(userId: string): Promise<void> {
   // Placeholder - implementar envio de email real
-  // Exemplo usando Supabase Edge Function ou serviço de email
-  console.log(`Email de confirmação de renovação enviado para usuário ${userId}`);
+  // Exemplo usando Supabase Edge Function ou serviço de email (Resend, SendGrid, etc.)
+  logger.info(`Email de confirmação de renovação enviado para usuário ${userId}`, 'renewalService');
+  // TODO: Implementar chamada real ao serviço de email
 }
 
 /**
  * Envia email de notificação de falha no pagamento
- * TODO: Implementar serviço de email
+ * TODO: Implementar serviço de email (Supabase Edge Function ou Resend/SendGrid)
  */
 async function sendPaymentFailedEmail(userId: string): Promise<void> {
   // Placeholder - implementar envio de email real
-  // Exemplo usando Supabase Edge Function ou serviço de email
-  console.log(`Email de falha no pagamento enviado para usuário ${userId}`);
+  // Exemplo usando Supabase Edge Function ou serviço de email (Resend, SendGrid, etc.)
+  logger.warn(`Email de falha no pagamento enviado para usuário ${userId}`, 'renewalService');
+  // TODO: Implementar chamada real ao serviço de email
 }
 

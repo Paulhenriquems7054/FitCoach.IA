@@ -20,6 +20,30 @@ export function useSubscription() {
       return;
     }
 
+    // Usuário desenvolvedor prioritário: sempre Premium, sem limites
+    if (user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor') {
+      const devStatus: SubscriptionStatus = {
+        isActive: true,
+        planType: 'developer',
+        features: {
+          photoAnalysis: true,
+          workoutAnalysis: true,
+          customWorkouts: true,
+          textChat: true,
+          voiceChat: true,
+          voiceMinutesDaily: Infinity,
+          voiceMinutesTotal: Infinity,
+          voiceUnlimitedUntil: undefined,
+        },
+        expiresAt: null,
+        canUpgrade: false,
+      };
+      setStatus(devStatus);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -32,7 +56,7 @@ export function useSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, user?.username]);
 
   useEffect(() => {
     refresh();

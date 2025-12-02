@@ -730,17 +730,14 @@ export async function startAssistantAudioSession(
     return;
   }
 
-  // Verificar permissão do microfone antes de tentar usar (opcional, alguns navegadores não suportam)
+  // Verificar permissão do microfone (apenas para log). **Não** bloqueamos aqui,
+  // para permitir que o navegador mostre o popup de permissão normalmente
+  // quando chamarmos getUserMedia / Web Speech API.
   try {
     const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-    if (permissionStatus.state === 'denied') {
-      onError('Permissão do microfone foi negada. Por favor, permita o acesso ao microfone nas configurações do navegador e recarregue a página.');
-      return;
-    }
     logger.info(`Status da permissão do microfone: ${permissionStatus.state}`, 'assistantService');
   } catch (permError) {
-    // Alguns navegadores não suportam navigator.permissions.query, continuar normalmente
-    // A permissão será solicitada automaticamente quando getUserMedia for chamado
+    // Alguns navegadores não suportam navigator.permissions.query; seguir normalmente.
     logger.debug('Não foi possível verificar permissão do microfone (navegador pode não suportar)', 'assistantService');
   }
 
