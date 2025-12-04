@@ -83,7 +83,9 @@ serve(async (req: Request) => {
         await handleRecharge({ plan, transactionId, amountPaid, customerEmail, body });
         break;
       case "personal":
-        await handlePersonalTrainerPlan({ plan, transactionId, amountPaid, customerEmail, body });
+        // Planos Personal Trainer foram removidos - não existem mais na página de vendas nem na Cakto
+        console.warn("Plano Personal Trainer recebido mas foi removido:", plan.slug);
+        // Não processar - apenas logar para auditoria
         break;
       default:
         console.warn("plan_group desconhecido:", plan.plan_group);

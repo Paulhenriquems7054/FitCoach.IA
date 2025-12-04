@@ -104,9 +104,8 @@ const PremiumPage: React.FC = () => {
     };
     
     // Separar planos por categoria
-    // NOTA: Planos B2C foram removidos - não existem mais na página de vendas nem na Cakto
+    // NOTA: Planos B2C e Personal Trainer foram removidos - não existem mais na página de vendas nem na Cakto
     const b2bPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'b2b'), [allPlans]);
-    const personalPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'personal'), [allPlans]);
 
     // Rolar para a oferta específica quando vier de #/premium?product=...
     useEffect(() => {
@@ -467,46 +466,7 @@ const PremiumPage: React.FC = () => {
                         </div>
                     )}
 
-                    {/* PLANOS PERSONAL TRAINER */}
-                    {personalPlans.length > 0 && (
-                        <div>
-                            <div className="text-center mb-6">
-                                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
-                                    Planos para Personal Trainers
-                                </h2>
-                                <p className="text-slate-600 dark:text-slate-400">
-                                    Entregue Nutricionista + Personal Trainer IA junto com seu treino
-                                </p>
-                            </div>
-                            
-                            <HowItWorksSection
-                                title="Como funciona para personal trainers"
-                                steps={[
-                                    '1. O personal contrata um dos planos para personal trainers.',
-                                    '2. Após a ativação, o personal recebe um Código de Equipe exclusivo (ex: PERSONAL-ABC123).',
-                                    '3. O personal envia esse código para os clientes (WhatsApp, grupos, redes sociais, etc.).',
-                                    '4. O cliente entra no app FitCoach.IA, informa o código e passa a ter acesso Premium.',
-                                    '5. Enquanto o personal mantiver a assinatura ativa, os clientes continuam com acesso Premium sem pagar nada a mais.'
-                                ]}
-                                icon={<BoltIcon className="w-6 h-6 text-amber-500" />}
-                            />
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-stretch mt-6 max-w-4xl mx-auto">
-                                {personalPlans.map((plan) => {
-                                    const isPopular = plan.name === 'personal_team_15';
-                                    return (
-                                        <PlanCard
-                                            key={plan.id}
-                                            plan={plan}
-                                            badge={isPopular ? 'MAIS VANTAJOSO' : undefined}
-                                            badgeColor={isPopular ? 'green' : undefined}
-                                            highlight={isPopular}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
+                    {/* NOTA: Planos Personal Trainer foram removidos - não existem mais na página de vendas nem na Cakto */}
 
                     {/* Seção de Recargas */}
                     <div className="mt-8 sm:mt-12">
