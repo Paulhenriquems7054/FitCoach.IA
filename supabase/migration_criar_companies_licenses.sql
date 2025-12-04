@@ -59,6 +59,15 @@ CREATE INDEX IF NOT EXISTS idx_companies_plan_type ON public.companies(plan_type
 CREATE INDEX IF NOT EXISTS idx_companies_owner_id ON public.companies(owner_id);
 CREATE INDEX IF NOT EXISTS idx_companies_subscription_id ON public.companies(subscription_id);
 
+-- Criar função update_updated_at_column se não existir
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Trigger para updated_at
 DROP TRIGGER IF EXISTS update_companies_updated_at ON public.companies;
 CREATE TRIGGER update_companies_updated_at 
@@ -179,10 +188,10 @@ LEFT JOIN public.users u ON u.id = c.owner_id;
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================
 
--- Habilitar RLS
+-- Habilitar RLS (apenas em tabelas, não em views)
 ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.companies_summary ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.company_licenses ENABLE ROW LEVEL SECURITY;
+-- NOTA: companies_summary é uma VIEW, não uma TABLE, então RLS não se aplica
 
 -- Política: Companies podem ver seus próprios dados
 DROP POLICY IF EXISTS "Companies can view own data" ON public.companies;
@@ -194,11 +203,7 @@ CREATE POLICY "Companies can view own data"
       SELECT 1 FROM public.users
       WHERE users.id = auth.uid()
         AND users.gym_role = 'admin'
-        AND users.gym_id IN (
-          SELECT g.id FROM public.gyms g
-          INNER JOIN public.companies c ON c.owner_id = users.id
-          WHERE c.id = companies.id
-        )
+        AND users.gym_id = companies.id::text
     )
   );
 
@@ -228,10 +233,7 @@ CREATE POLICY "Company admins can view licenses"
             SELECT 1 FROM public.users
             WHERE users.id = auth.uid()
               AND users.gym_role = 'admin'
-              AND users.gym_id IN (
-                SELECT g.id FROM public.gyms g
-                WHERE g.owner_id = c.owner_id
-              )
+              AND users.gym_id = c.id::text
           )
         )
     )
