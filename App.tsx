@@ -13,6 +13,7 @@ import { getCurrentUsername } from './services/databaseService';
 import { InviteCodeEntry } from './components/InviteCodeEntry';
 import { LoginOrRegister } from './components/LoginOrRegister';
 import { authService } from './services/supabaseService';
+import { Logo } from './components/Logo';
 
 // Lazy load das páginas para reduzir o bundle inicial
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -365,18 +366,24 @@ const App: React.FC = () => {
         if (inviteFlowState === 'choice') {
             // Tela inicial: escolha de fluxo (aluno de academia, professor, B2C individual)
             return (
-                <ToastProvider>
-                    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 px-4">
-                        <Card className="w-full max-w-xl">
-                            <div className="p-6 sm:p-8 space-y-6">
-                                <div className="text-center space-y-2">
-                                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                                        Como você quer usar o FitCoach.IA?
-                                    </h1>
-                                    <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
-                                        Escolha a opção que melhor descreve você para continuarmos.
-                                    </p>
-                                </div>
+                <GymBrandingProvider>
+                    <ToastProvider>
+                        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 px-4">
+                            <Card className="w-full max-w-xl">
+                                <div className="p-6 sm:p-8 space-y-6">
+                                    {/* Logo do FitCoach.IA */}
+                                    <div className="flex justify-center mb-4">
+                                        <Logo size="lg" />
+                                    </div>
+                                    
+                                    <div className="text-center space-y-2">
+                                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+                                            Como você quer usar o FitCoach.IA?
+                                        </h1>
+                                        <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
+                                            Escolha a opção que melhor descreve você para continuarmos.
+                                        </p>
+                                    </div>
 
                                 <div className="grid gap-4">
                                     {/* Aluno de academia parceira */}
@@ -437,10 +444,11 @@ const App: React.FC = () => {
                                         Já tenho uma conta
                                     </button>
                                 </div>
-                            </div>
-                        </Card>
-                    </div>
-                </ToastProvider>
+                                </div>
+                            </Card>
+                        </div>
+                    </ToastProvider>
+                </GymBrandingProvider>
             );
         }
 
