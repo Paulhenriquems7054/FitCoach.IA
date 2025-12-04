@@ -6,7 +6,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { User } from '../types';
 import { logger } from '../utils/logger';
-import { activateUserWithCode } from './activationCodeService';
+import { validateAndActivateCode } from './activationCodeService';
 
 // Tipos para Supabase
 export interface Database {
@@ -1160,7 +1160,7 @@ export const authFlowService = {
 
     // 6. Se NÃO for cupom (fluxo B2B / activation_code), ativar assinatura via código (empresa B2B ou código legado)
     if (!isCoupon) {
-      const activationResult = await activateUserWithCode(finalUser.id, couponCode);
+      const activationResult = await validateAndActivateCode(finalUser.id, couponCode);
       if (!activationResult.success) {
         logger.warn('Erro ao ativar usuário com código de acesso', 'authFlowService', { error: activationResult.error });
         throw new Error(activationResult.error || 'Erro ao ativar código de acesso. Verifique se o código é válido e se a academia possui vagas disponíveis.');

@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { useUser } from '../context/UserContext';
-import { activateUserWithCode } from '../services/activationCodeService';
+import { validateAndActivateCode } from '../services/activationCodeService';
 import { validatePromotionalCode, applyPromotionalCode } from '../services/promotionalCodeService';
 
 export function ActivationScreen() {
@@ -27,7 +27,7 @@ export function ActivationScreen() {
     setError(null);
 
     try {
-      const result = await activateUserWithCode(user.id, code);
+      const result = await validateAndActivateCode(user.id, code);
 
       if (result.success) {
         setSuccess(true);
