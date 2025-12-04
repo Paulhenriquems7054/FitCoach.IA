@@ -125,8 +125,8 @@ const App: React.FC = () => {
     const [hasSeenPresentation, setHasSeenPresentation] = useState<boolean | null>(null);
     const [isInitialized, setIsInitialized] = useState(false);
 
-    // Estados para fluxo de cupom
-    const [inviteFlowState, setInviteFlowState] = useState<'code' | 'register' | null>(null);
+    // Estados para fluxo de acesso inicial (convite / código / cadastro)
+    const [inviteFlowState, setInviteFlowState] = useState<'choice' | 'code' | 'register' | null>(null);
     const [validatedCouponCode, setValidatedCouponCode] = useState<string | null>(null);
 
     // Rotas públicas (não requerem autenticação)
@@ -229,9 +229,9 @@ const App: React.FC = () => {
             window.location.hash = '#/presentation';
             return <PageLoader />;
         } else if (!isLoggedIn) {
-            // Já viu apresentação mas não está logado: iniciar fluxo de cupom
+            // Já viu apresentação mas não está logado: iniciar fluxo de escolha (academia x B2C)
             if (inviteFlowState === null) {
-                setInviteFlowState('code');
+                setInviteFlowState('choice');
             }
         } else {
             // Logado: redirecionar para home
@@ -360,8 +360,90 @@ const App: React.FC = () => {
         );
     }
 
-    // Fluxo de cupom de acesso (primeiro acesso sem login)
+    // Fluxo de acesso inicial (primeiro acesso sem login)
     if (!isLoggedIn && inviteFlowState !== null && path !== '/login' && path !== '/presentation') {
+        if (inviteFlowState === 'choice') {
+            // Tela inicial: escolha de fluxo (aluno de academia, professor, B2C individual)
+            return (
+                <ToastProvider>
+                    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 px-4">
+                        <Card className="w-full max-w-xl">
+                            <div className="p-6 sm:p-8 space-y-6">
+                                <div className="text-center space-y-2">
+                                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+                                        Como você quer usar o FitCoach.IA?
+                                    </h1>
+                                    <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
+                                        Escolha a opção que melhor descreve você para continuarmos.
+                                    </p>
+                                </div>
+
+                                <div className="grid gap-4">
+                                    {/* Aluno de academia parceira */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setInviteFlowState('code')}
+                                        className="text-left rounded-lg border border-primary-200 dark:border-primary-700 bg-white/90 dark:bg-slate-900/80 p-4 hover:shadow-md hover:border-primary-400 transition-all"
+                                    >
+                                        <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
+                                            Sou aluno de uma academia parceira
+                                        </h2>
+                                        <p className="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                                            Vou usar um código da minha academia para ter acesso Premium incluso no meu plano.
+                                        </p>
+                                    </button>
+
+                                    {/* Professor / personal da academia */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setInviteFlowState('code')}
+                                        className="text-left rounded-lg border border-sky-200 dark:border-sky-700 bg-white/90 dark:bg-slate-900/80 p-4 hover:shadow-md hover:border-sky-400 transition-all"
+                                    >
+                                        <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
+                                            Sou professor ou personal da academia
+                                        </h2>
+                                        <p className="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                                            Vou usar o código da academia para acessar meus alunos e treinos (sem gerenciar cobranças).
+                                        </p>
+                                    </button>
+
+                                    {/* B2C individual */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            // Fluxo B2C: pode ir direto para tela de planos ou login
+                                            window.location.hash = '#/premium';
+                                        }}
+                                        className="text-left rounded-lg border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/80 p-4 hover:shadow-md hover:border-slate-400 transition-all"
+                                    >
+                                        <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
+                                            Quero usar o app individualmente
+                                        </h2>
+                                        <p className="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                                            Vou conhecer os planos para pessoa física e assinar direto pelo app.
+                                        </p>
+                                    </button>
+                                </div>
+
+                                <div className="pt-2 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            // Acesso direto ao login clássico
+                                            window.location.hash = '#/login';
+                                        }}
+                                        className="text-xs sm:text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
+                                    >
+                                        Já tenho uma conta
+                                    </button>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                </ToastProvider>
+            );
+        }
+
         if (inviteFlowState === 'code') {
             return (
                 <ToastProvider>

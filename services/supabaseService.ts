@@ -6,6 +6,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { User } from '../types';
 import { logger } from '../utils/logger';
+import { activateUserWithCode } from './activationCodeService';
 
 // Tipos para Supabase
 export interface Database {
@@ -839,11 +840,9 @@ export const authFlowService = {
   ): Promise<{ user: User; couponId: string }> {
     const supabase = getSupabaseClient();
 
-    // 1. Validar cupom
+    // 1. Tentar validar como CUPOM (fluxo B2C). Se não for cupom válido, trataremos como código de ativação (B2B / activation_code).
     const couponValidation = await couponService.validateCoupon(couponCode);
-    if (!couponValidation.success) {
-      throw new Error(couponValidation.message || 'Cupom inválido');
-    }
+    const isCoupon = !!couponValidation.success;
 
     // 2. Criar usuário no Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -897,7 +896,8 @@ export const authFlowService = {
       {
         ...userData,
         username,
-        planType: (couponValidation.planLinked as any) || 'free',
+        // Se for cupom válido (B2C), já definimos o planType. Caso contrário, deixamos como 'free'
+        planType: (isCoupon ? (couponValidation.planLinked as any) : 'free') || 'free',
         subscriptionStatus: 'active',
         expiryDate: undefined, // Será definido pelo plano
       },
@@ -938,7 +938,7 @@ export const authFlowService = {
           p_user_id: userId,
           p_nome: userData.nome || username,
           p_username: username,
-          p_plan_type: (couponValidation.planLinked as any) || 'free',
+          p_plan_type: (isCoupon ? (couponValidation.planLinked as any) : 'free') || 'free',
           p_subscription_status: 'active',
           p_user_data: {
             idade: userData.idade || 0,
@@ -1012,49 +1012,51 @@ export const authFlowService = {
       throw new Error(userError?.message || 'Erro ao criar perfil. Verifique se a política RLS está configurada corretamente.');
     }
 
-    // 4. Criar vínculo com cupom (trigger incrementará contadores automaticamente)
-    // Verificar se o vínculo já existe antes de criar
-    const { data: existingLink, error: checkError } = await supabase
-      .from('user_coupon_links')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('coupon_id', couponValidation.couponId!)
-      .maybeSingle();
-
-    if (!existingLink && !checkError) {
-      // Vínculo não existe, criar
-      const { error: linkError } = await supabase
+    // 4. Se for um CUPOM válido (B2C), criar vínculo com cupom (trigger incrementará contadores automaticamente)
+    if (isCoupon && couponValidation.couponId) {
+      // Verificar se o vínculo já existe antes de criar
+      const { data: existingLink, error: checkError } = await supabase
         .from('user_coupon_links')
-        .insert({
-          user_id: userId,
-          coupon_id: couponValidation.couponId!,
-        });
+        .select('id')
+        .eq('user_id', userId)
+        .eq('coupon_id', couponValidation.couponId)
+        .maybeSingle();
 
-      if (linkError) {
-        // Se for erro de duplicata (pode ter sido criado entre a verificação e a inserção), ignorar
-        if (linkError.code === '23505') {
-          logger.info('Vínculo com cupom já existe (criado entre verificação e inserção)', 'authFlowService');
+      if (!existingLink && !checkError) {
+        // Vínculo não existe, criar
+        const { error: linkError } = await supabase
+          .from('user_coupon_links')
+          .insert({
+            user_id: userId,
+            coupon_id: couponValidation.couponId,
+          });
+
+        if (linkError) {
+          // Se for erro de duplicata (pode ter sido criado entre a verificação e a inserção), ignorar
+          if (linkError.code === '23505') {
+            logger.info('Vínculo com cupom já existe (criado entre verificação e inserção)', 'authFlowService');
+          } else {
+            logger.error('Erro ao vincular cupom', 'authFlowService', linkError);
+            logger.warn('Usuário criado mas vínculo com cupom falhou', 'authFlowService');
+          }
         } else {
-          logger.error('Erro ao vincular cupom', 'authFlowService', linkError);
-          logger.warn('Usuário criado mas vínculo com cupom falhou', 'authFlowService');
+          logger.info('Vínculo com cupom criado com sucesso', 'authFlowService');
         }
-      } else {
-        logger.info('Vínculo com cupom criado com sucesso', 'authFlowService');
-      }
-    } else if (existingLink) {
-      logger.info('Vínculo com cupom já existe, pulando criação', 'authFlowService');
-    } else if (checkError) {
-      logger.warn('Erro ao verificar vínculo existente, tentando criar mesmo assim', 'authFlowService', checkError);
-      // Tentar criar mesmo assim (pode ser erro de RLS)
-      const { error: linkError } = await supabase
-        .from('user_coupon_links')
-        .insert({
-          user_id: userId,
-          coupon_id: couponValidation.couponId!,
-        });
+      } else if (existingLink) {
+        logger.info('Vínculo com cupom já existe, pulando criação', 'authFlowService');
+      } else if (checkError) {
+        logger.warn('Erro ao verificar vínculo existente, tentando criar mesmo assim', 'authFlowService', checkError);
+        // Tentar criar mesmo assim (pode ser erro de RLS)
+        const { error: linkError } = await supabase
+          .from('user_coupon_links')
+          .insert({
+            user_id: userId,
+            coupon_id: couponValidation.couponId,
+          });
 
-      if (linkError && linkError.code !== '23505') {
-        logger.error('Erro ao vincular cupom após verificação falhar', 'authFlowService', linkError);
+        if (linkError && linkError.code !== '23505') {
+          logger.error('Erro ao vincular cupom após verificação falhar', 'authFlowService', linkError);
+        }
       }
     }
 
@@ -1113,7 +1115,7 @@ export const authFlowService = {
           weightHistory: userData.weightHistory || [],
           role: userData.role || 'user',
           subscription: 'free',
-          planType: (couponValidation.planLinked as any) || 'free',
+          planType: (isCoupon ? (couponValidation.planLinked as any) : 'free') || 'free',
           subscriptionStatus: 'active',
         };
       } else {
@@ -1138,7 +1140,7 @@ export const authFlowService = {
             weightHistory: userData.weightHistory || [],
             role: userData.role || 'user',
             subscription: 'free',
-            planType: (couponValidation.planLinked as any) || 'free',
+          planType: (isCoupon ? (couponValidation.planLinked as any) : 'free') || 'free',
             subscriptionStatus: 'active',
           };
         }
@@ -1155,12 +1157,21 @@ export const authFlowService = {
     if (!finalUser.nome) {
       finalUser.nome = userData.nome || username;
     }
-    
-    // 6. Retornar usuário
+
+    // 6. Se NÃO for cupom (fluxo B2B / activation_code), ativar assinatura via código (empresa B2B ou código legado)
+    if (!isCoupon) {
+      const activationResult = await activateUserWithCode(finalUser.id, couponCode);
+      if (!activationResult.success) {
+        logger.warn('Erro ao ativar usuário com código de acesso', 'authFlowService', { error: activationResult.error });
+        throw new Error(activationResult.error || 'Erro ao ativar código de acesso. Verifique se o código é válido e se a academia possui vagas disponíveis.');
+      }
+    }
+
+    // 7. Retornar usuário
     logger.info(`Usuário retornado após registro: ${finalUser.username} (${finalUser.id})`, 'authFlowService');
     return {
       user: finalUser,
-      couponId: couponValidation.couponId!,
+      couponId: isCoupon ? (couponValidation.couponId || '') : '',
     };
   },
 };

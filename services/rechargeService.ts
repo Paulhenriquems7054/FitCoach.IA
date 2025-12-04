@@ -73,7 +73,7 @@ export async function applyRecharge(
           boostExpiresAt = null;
         }
 
-        const newBoostMinutes = currentBoost + 20; // +20 minutos de Ajuda Rápida
+        const newBoostMinutes = currentBoost + 30; // +30 minutos de Sessão Turbo (conforme especificação)
         const newExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
         await supabase

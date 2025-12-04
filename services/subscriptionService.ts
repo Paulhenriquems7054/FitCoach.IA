@@ -235,3 +235,133 @@ function getDailyResetTime(): Date {
   return now;
 }
 
+/**
+ * Interface para status de acesso do usuário
+ */
+export interface AccessStatus {
+  hasAccess: boolean;
+  source: 'b2c' | 'academy' | 'personal' | null;
+  plan: any | null;
+  features: {
+    photoAnalysis: boolean;
+    workoutAnalysis: boolean;
+    customWorkouts: boolean;
+    textChat: boolean;
+    voiceChat: boolean;
+    voiceMinutesDaily: number;
+  };
+}
+
+/**
+ * Verifica o acesso do usuário (B2C, Academia ou Personal Trainer)
+ * Esta é a função principal para verificar acesso premium
+ */
+export async function checkUserAccess(
+  userId: string,
+  userEmail: string
+): Promise<AccessStatus> {
+  const supabase = getSupabaseClient();
+
+  try {
+    // 1. Verificar assinatura B2C direta
+    const { data: b2cSubscription } = await supabase
+      .from('user_subscriptions')
+      .select('*, app_plans(*)')
+      .eq('user_email', userEmail)
+      .eq('status', 'active')
+      .single();
+
+    if (b2cSubscription) {
+      return {
+        hasAccess: true,
+        source: 'b2c',
+        plan: b2cSubscription,
+        features: getFeaturesForPlan(b2cSubscription.app_plans),
+      };
+    }
+
+    // 2. Verificar vínculo com academia
+    const { data: academyLink } = await supabase
+      .from('student_academy_links')
+      .select(`
+        *,
+        academy_subscriptions (
+          *,
+          app_plans (*)
+        )
+      `)
+      .eq('student_user_id', userId)
+      .eq('status', 'active')
+      .single();
+
+    if (academyLink) {
+      const academy = academyLink.academy_subscriptions;
+      
+      // Verificar se a assinatura da academia ainda está ativa
+      if (academy && academy.status === 'active') {
+        return {
+          hasAccess: true,
+          source: 'academy',
+          plan: academy,
+          features: getFeaturesForPlan(academy.app_plans),
+        };
+      } else {
+        // Academia cancelou ou expirou
+        return {
+          hasAccess: false,
+          source: null,
+          plan: null,
+          features: getFreeTierFeaturesForAccess(),
+        };
+      }
+    }
+
+    // 3. Verificar vínculo com personal trainer (se implementado)
+    // TODO: Implementar verificação de personal trainer quando necessário
+
+    // 4. Sem acesso Premium
+    return {
+      hasAccess: false,
+      source: null,
+      plan: null,
+      features: getFreeTierFeaturesForAccess(),
+    };
+  } catch (error) {
+    logger.error('Erro ao verificar acesso do usuário', 'subscriptionService', error);
+    return {
+      hasAccess: false,
+      source: null,
+      plan: null,
+      features: getFreeTierFeaturesForAccess(),
+    };
+  }
+}
+
+/**
+ * Retorna as features baseadas no plano
+ */
+function getFeaturesForPlan(plan: any): AccessStatus['features'] {
+  return {
+    photoAnalysis: true,
+    workoutAnalysis: true,
+    customWorkouts: true,
+    textChat: true,
+    voiceChat: true,
+    voiceMinutesDaily: plan?.minutes_voice_per_day || 15,
+  };
+}
+
+/**
+ * Retorna as features do plano gratuito (para AccessStatus)
+ */
+function getFreeTierFeaturesForAccess(): AccessStatus['features'] {
+  return {
+    photoAnalysis: false,
+    workoutAnalysis: false,
+    customWorkouts: false,
+    textChat: false,
+    voiceChat: false,
+    voiceMinutesDaily: 0,
+  };
+}
+
