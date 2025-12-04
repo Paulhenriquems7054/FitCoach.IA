@@ -104,7 +104,7 @@ const PremiumPage: React.FC = () => {
     };
     
     // Separar planos por categoria
-    const b2cPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'b2c'), [allPlans]);
+    // NOTA: Planos B2C foram removidos - não existem mais na página de vendas nem na Cakto
     const b2bPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'b2b'), [allPlans]);
     const personalPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'personal'), [allPlans]);
 
@@ -425,35 +425,8 @@ const PremiumPage: React.FC = () => {
                 </div>
             ) : (
                 <div className="space-y-8 sm:space-y-12">
-                    {/* PLANOS B2C - CONSUMIDOR FINAL */}
-                    {b2cPlans.length > 0 && (
-                        <div>
-                            <div className="text-center mb-6">
-                                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
-                                    Planos para Você
-                                </h2>
-                                <p className="text-slate-600 dark:text-slate-400">
-                                    Escolha o plano ideal para seus objetivos pessoais
-                                </p>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-stretch max-w-5xl mx-auto">
-                                {b2cPlans.map((plan) => {
-                                    const isAnnual = plan.name === 'annual_vip';
-                                    return (
-                                        <PlanCard
-                                            key={plan.id}
-                                            plan={plan}
-                                            /* Removido o selo "RECOMENDADO" para evitar corte visual do card em alguns layouts */
-                                            highlight={isAnnual}
-                                            showYearlyPrice={isAnnual}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
+                    {/* NOTA: Planos B2C foram removidos - não existem mais na página de vendas nem na Cakto */}
+                    
                     {/* PLANOS B2B - ACADEMIAS */}
                     {b2bPlans.length > 0 && (
                         <div>

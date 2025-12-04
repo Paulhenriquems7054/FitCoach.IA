@@ -75,7 +75,9 @@ serve(async (req: Request) => {
         await handleAcademyPlan({ plan, transactionId, amountPaid, customerEmail, body });
         break;
       case "b2c":
-        await handleB2CPlan({ plan, transactionId, amountPaid, customerEmail, body });
+        // Planos B2C foram removidos - não existem mais na página de vendas nem na Cakto
+        console.warn("Plano B2C recebido mas foi removido:", plan.slug);
+        // Não processar - apenas logar para auditoria
         break;
       case "recarga":
         await handleRecharge({ plan, transactionId, amountPaid, customerEmail, body });
