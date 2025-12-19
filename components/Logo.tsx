@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { useGymBrandingContext } from './GymBrandingProvider';
 
 interface LogoProps {
@@ -9,7 +9,7 @@ interface LogoProps {
 
 /**
  * Componente de Logo do Academia.IA
- * Utiliza o vídeo como logo principal ou logo da academia se disponível
+ * Utiliza imagem estática como logo principal ou logo da academia se disponível
  */
 export const Logo: React.FC<LogoProps> = ({ 
   size = 'md', 
@@ -17,7 +17,6 @@ export const Logo: React.FC<LogoProps> = ({
   className = '' 
 }) => {
   const { logo, appName, colors, hasBranding } = useGymBrandingContext();
-  const videoRef = useRef<HTMLVideoElement>(null);
   
   const sizeClasses = {
     sm: 'w-8 h-8',
@@ -26,92 +25,81 @@ export const Logo: React.FC<LogoProps> = ({
     xl: 'w-24 h-24',
   };
 
-  // Configurar velocidade do vídeo quando carregar
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = 0.5; // 50% da velocidade normal (mais lento)
-    }
-  }, []);
+  // Imagem do logo (sem container circular)
+  // Garantir que sempre use uma imagem, nunca vídeo
+  const logoUrlForImage = hasBranding && logo ? logo : '/icons/play_store_512.png';
+  const isVideoUrlForImage = logoUrlForImage && (logoUrlForImage.endsWith('.mp4') || logoUrlForImage.endsWith('.webm') || logoUrlForImage.endsWith('.mov') || logoUrlForImage.includes('video'));
+  const finalLogoUrlForImage = isVideoUrlForImage ? '/icons/play_store_512.png' : logoUrlForImage;
+  
+  const logoImage = (
+    <img
+      src={finalLogoUrlForImage}
+      alt={`${appName} Logo`}
+      className={`${sizeClasses[size]} object-contain ${className}`}
+      onError={(e) => {
+        // Fallback para logo padrão se a imagem principal não carregar
+        const target = e.target as HTMLImageElement;
+        if (target.src !== '/icons/favicon.svg' && target.src !== '/icons/play_store_512.png') {
+          target.src = '/icons/play_store_512.png';
+        }
+      }}
+    />
+  );
 
-  // Se tiver logo da academia, usar ele
-  if (hasBranding && logo) {
-    return (
-      <div className={`flex items-center gap-2 ${className}`}>
-        <div className={`${sizeClasses[size]} rounded-full overflow-hidden border-2 shadow-lg flex-shrink-0 flex items-center justify-center bg-white`} style={{ borderColor: `${colors.primary}30` }}>
-          <img
-            src={logo}
-            alt={`${appName} Logo`}
-            className="w-full h-full object-contain"
-            style={{
-              maxWidth: '85%',
-              maxHeight: '85%'
-            }}
-          />
-        </div>
-        {showText && (
-          <div className="flex flex-col">
-            <span className="font-extrabold leading-none" style={{ color: colors.primary }}>
-              {appName.split(' ')[0]}
-            </span>
-            {appName.split(' ').length > 1 && (
-              <span className="text-slate-800 dark:text-slate-200 font-extrabold leading-none">
-                {appName.split(' ').slice(1).join(' ')}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    );
+  // Se não mostrar texto, retornar apenas a imagem do logo
+  if (!showText) {
+    return logoImage;
   }
 
-  // Logo padrão (vídeo)
+  // Container do logo com círculo (apenas quando há texto)
+  // Garantir que sempre use uma imagem, nunca vídeo
+  const logoUrl = hasBranding && logo ? logo : '/icons/play_store_512.png';
+  // Se o logo for um vídeo, usar fallback para imagem
+  const isVideoUrl = logoUrl && (logoUrl.endsWith('.mp4') || logoUrl.endsWith('.webm') || logoUrl.endsWith('.mov') || logoUrl.includes('video'));
+  const finalLogoUrl = isVideoUrl ? '/icons/play_store_512.png' : logoUrl;
+  
+  const logoContainer = (
+    <div className={`${sizeClasses[size]} rounded-full overflow-hidden border-2 shadow-lg flex-shrink-0 flex items-center justify-center bg-slate-900/30`} style={{ borderColor: `${colors.primary}30` }}>
+      <img
+        src={finalLogoUrl}
+        alt={`${appName} Logo`}
+        className="w-full h-full object-contain"
+        style={{
+          maxWidth: '85%',
+          maxHeight: '85%'
+        }}
+        onError={(e) => {
+          // Fallback para favicon se a imagem principal não carregar
+          const target = e.target as HTMLImageElement;
+          if (target.src !== '/icons/favicon.svg' && target.src !== '/icons/play_store_512.png') {
+            target.src = '/icons/play_store_512.png';
+          }
+        }}
+      />
+    </div>
+  );
+
+  // Se mostrar texto, retornar logo + texto
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <div className={`${sizeClasses[size]} rounded-full overflow-hidden border-2 shadow-lg flex-shrink-0 flex items-center justify-center bg-slate-900/30`} style={{ borderColor: `${colors.primary}30` }}>
-        <video
-          ref={videoRef}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-contain"
-          style={{
-            maxWidth: '85%',
-            maxHeight: '85%'
-          }}
-          onLoadedMetadata={(e) => {
-            const video = e.target as HTMLVideoElement;
-            if (video) {
-              video.playbackRate = 0.5; // 50% da velocidade normal
-            }
-          }}
-        >
-          <source src="/icons/FITCOACH.IA.mp4" type="video/mp4" />
-          {/* Fallback para navegadores que não suportam vídeo */}
-          <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-blue-500 flex items-center justify-center text-white font-bold text-xs">
-            A.IA
-          </div>
-        </video>
-      </div>
-      {showText && (
-        <div className="flex flex-col">
-          <span className="font-extrabold leading-none" style={{ color: colors.primary }}>
-            {appName.split(' ')[0]}
+      {logoContainer}
+      <div className="flex flex-col">
+        <span className="font-extrabold leading-none" style={{ color: colors.primary }}>
+          {appName.split(' ')[0]}
+        </span>
+        {appName.split(' ').length > 1 && (
+          <span className="text-slate-800 dark:text-slate-200 font-extrabold leading-none">
+            {appName.split(' ').slice(1).join(' ')}
           </span>
-          {appName.split(' ').length > 1 && (
-            <span className="text-slate-800 dark:text-slate-200 font-extrabold leading-none">
-              {appName.split(' ').slice(1).join(' ')}
-            </span>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
 
 /**
- * Componente de Logo apenas com texto (sem vídeo)
- * Útil para casos onde o vídeo não é necessário
+ * Componente de Logo apenas com texto
+ * Útil para casos onde apenas o texto é necessário
  */
 export const LogoText: React.FC<{ className?: string }> = ({ className = '' }) => {
   const { appName, colors } = useGymBrandingContext();

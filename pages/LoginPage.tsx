@@ -286,13 +286,29 @@ const LoginPage: React.FC = () => {
 
     const handleValidateCoupon = async () => {
         if (!signupCouponCode.trim()) {
-            setSignupError('Por favor, informe o código de convite');
+            setSignupError('Por favor, informe o código de convite ou código mestre');
             setCouponValidated(false);
             setValidatedCouponPlan(null);
             return;
         }
 
         setSignupError(null);
+        
+        // Primeiro, tentar validar como código mestre (master_code)
+        const { validateMasterCode } = await import('../services/masterCodeService');
+        const masterCodeValidation = await validateMasterCode(signupCouponCode.trim().toUpperCase());
+        
+        if (masterCodeValidation.isValid && masterCodeValidation.company) {
+            // Código mestre válido
+            setCouponValidated(true);
+            setValidatedCouponPlan(masterCodeValidation.company.planType);
+            showSuccess(`Código mestre válido! Você será vinculado à academia: ${masterCodeValidation.company.name}`);
+            // Avançar para a etapa 2 (criação de conta)
+            setSignupStep(2);
+            return;
+        }
+        
+        // Se não for código mestre, tentar validar como cupom
         const validation = await validateCoupon(signupCouponCode.trim());
         
         if (validation.isValid && validation.coupon) {
@@ -304,7 +320,8 @@ const LoginPage: React.FC = () => {
         } else {
             setCouponValidated(false);
             setValidatedCouponPlan(null);
-            const errorMsg = validation.error || 'Código de convite inválido';
+            // Mostrar erro do código mestre se cupom também falhar
+            const errorMsg = masterCodeValidation.error || validation.error || 'Código de convite ou código mestre inválido';
             setSignupError(errorMsg);
             showError(errorMsg);
         }
@@ -317,9 +334,9 @@ const LoginPage: React.FC = () => {
         setIsSigningUp(true);
 
         try {
-            // Fluxo de convite: obrigar validação de cupom antes de criar conta
+            // Fluxo de convite: obrigar validação de cupom ou código mestre antes de criar conta
             if (!couponValidated || !signupCouponCode.trim()) {
-                setSignupError('Valide seu código de convite antes de concluir o cadastro.');
+                setSignupError('Valide seu código de convite ou código mestre antes de concluir o cadastro.');
                 setIsSigningUp(false);
                 return;
             }
@@ -362,17 +379,30 @@ const LoginPage: React.FC = () => {
                 return;
             }
 
-            // Validar cupom se fornecido
+            // Validar cupom ou código mestre se fornecido
             let couponPlan: string | null = null;
+            let isMasterCode = false;
+            
             if (signupCouponCode.trim()) {
-                const validation = await validateCoupon(signupCouponCode.trim());
-                if (!validation.isValid) {
-                    setSignupError(validation.error || 'Código de convite inválido');
-                    setIsSigningUp(false);
-                    return;
-                }
-                if (validation.coupon) {
-                    couponPlan = validation.coupon.planLinked;
+                // Primeiro, tentar validar como código mestre
+                const { validateMasterCode } = await import('../services/masterCodeService');
+                const masterCodeValidation = await validateMasterCode(signupCouponCode.trim().toUpperCase());
+                
+                if (masterCodeValidation.isValid && masterCodeValidation.company) {
+                    // É código mestre válido
+                    isMasterCode = true;
+                    couponPlan = masterCodeValidation.company.planType;
+                } else {
+                    // Se não for código mestre, tentar validar como cupom
+                    const validation = await validateCoupon(signupCouponCode.trim());
+                    if (!validation.isValid) {
+                        setSignupError(validation.error || 'Código de convite ou código mestre inválido');
+                        setIsSigningUp(false);
+                        return;
+                    }
+                    if (validation.coupon) {
+                        couponPlan = validation.coupon.planLinked;
+                    }
                 }
             }
 
@@ -512,12 +542,28 @@ const LoginPage: React.FC = () => {
                 // Não lançar erro - permitir que o cadastro continue
             }
 
-            // Aplicar cupom (obrigatório neste fluxo)
-            if (signupCouponCode.trim() && couponPlan) {
-                const applyResult = await applyCouponToUser(signupCouponCode.trim(), userId);
-                if (!applyResult.success) {
-                    logger.warn('Erro ao aplicar cupom', 'LoginPage', { error: applyResult.error });
-                    // Não bloquear o cadastro se falhar aplicar o cupom
+            // Aplicar cupom ou vincular via código mestre (obrigatório neste fluxo)
+            if (signupCouponCode.trim()) {
+                // Primeiro, tentar vincular via código mestre
+                const { validateMasterCode, linkUserToCompanyByMasterCode } = await import('../services/masterCodeService');
+                const masterCodeValidation = await validateMasterCode(signupCouponCode.trim().toUpperCase());
+                
+                if (masterCodeValidation.isValid && masterCodeValidation.company) {
+                    // Vincular usuário à academia via código mestre
+                    const linkResult = await linkUserToCompanyByMasterCode(signupCouponCode.trim().toUpperCase(), userId);
+                    if (!linkResult.success) {
+                        logger.warn('Erro ao vincular via código mestre', 'LoginPage', { error: linkResult.error });
+                        // Não bloquear o cadastro se falhar vincular
+                    } else {
+                        logger.info(`Usuário ${userId} vinculado à academia ${linkResult.companyId} via master_code`, 'LoginPage');
+                    }
+                } else if (couponPlan) {
+                    // Se não for código mestre, tentar aplicar cupom
+                    const applyResult = await applyCouponToUser(signupCouponCode.trim(), userId);
+                    if (!applyResult.success) {
+                        logger.warn('Erro ao aplicar cupom', 'LoginPage', { error: applyResult.error });
+                        // Não bloquear o cadastro se falhar aplicar o cupom
+                    }
                 }
             }
 
@@ -976,6 +1022,13 @@ const LoginPage: React.FC = () => {
                                 src="/icons/play_store_512.png"
                                 alt="Logo FitCoach.IA"
                                 className="h-16 w-auto object-contain sm:h-20"
+                                onError={(e) => {
+                                    // Garantir que sempre use uma imagem, nunca vídeo
+                                    const target = e.target as HTMLImageElement;
+                                    if (target.src !== '/icons/favicon.svg') {
+                                        target.src = '/icons/favicon.svg';
+                                    }
+                                }}
                             />
                             <button
                                 onClick={handleToggleTheme}
@@ -1270,33 +1323,47 @@ const LoginPage: React.FC = () => {
 
             {/* Modal de Cadastro */}
             {showSignup && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4" aria-modal="true">
-                    <Card className="w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-y-auto animate-fade-in-up">
-                        <div className="p-3 sm:p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4" aria-modal="true">
+            <Card className="w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-y-auto animate-fade-in-up">
+            <div className="p-3 sm:p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
                             <h2 className="text-base sm:text-lg font-bold flex items-center gap-2 truncate pr-2">
-                                ✨ Acesso com Código de Convite
+                                ✨ Acesso com Código de Convite ou Código Mestre
                             </h2>
                             <button
-                                type="button"
-                                onClick={() => {
-                                    setShowSignup(false);
-                                    setSignupName('');
-                                    setSignupEmail('');
-                                    setSignupPassword('');
-                                    setSignupConfirmPassword('');
-                                    setSignupCouponCode('');
-                                    setSignupError(null);
-                                    setSignupSuccess(null);
-                                    setCouponValidated(false);
-                                    setValidatedCouponPlan(null);
-                                    setSignupStep(1);
-            setSignupStep(1);
+                            type="button"
+                            onClick={() => {
+                            setShowSignup(false);
+                            setSignupName('');
+                            setSignupEmail('');
+                            setSignupPassword('');
+                            setSignupConfirmPassword('');
+                            setSignupCouponCode('');
+                            setSignupError(null);
+                            setSignupSuccess(null);
+                            setCouponValidated(false);
+                            setValidatedCouponPlan(null);
+                            setSignupStep(1);
                                 }}
                                 className="p-1 sm:p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0"
                                 aria-label="Fechar"
                             >
                                 <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500" />
                             </button>
+                        </div>
+                        {/* Logo do sistema no topo da modal de código de convite */}
+                        <div className="flex justify-center mt-4">
+                            <img
+                                src="/icons/play_store_512.png"
+                                alt="Logo FitCoach.IA"
+                                className="h-16 w-auto object-contain sm:h-20"
+                                onError={(e) => {
+                                    // Garantir que sempre use uma imagem, nunca vídeo
+                                    const target = e.target as HTMLImageElement;
+                                    if (target.src !== '/icons/favicon.svg') {
+                                        target.src = '/icons/favicon.svg';
+                                    }
+                                }}
+                            />
                         </div>
                         <div className="p-4 sm:p-6">
                             {signupError && (
@@ -1314,11 +1381,11 @@ const LoginPage: React.FC = () => {
                             {signupStep === 1 && (
                                 <form onSubmit={(e) => { e.preventDefault(); handleValidateCoupon(); }} className="space-y-4">
                                     <p className="text-sm text-slate-600 dark:text-slate-400">
-                                        Primeiro, insira o código de convite fornecido pela sua academia ou personal.
+                                        Primeiro, insira o código de convite ou código mestre fornecido pela sua academia ou personal.
                                     </p>
                                     <div>
                                         <label htmlFor="couponCode" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Código de Convite *
+                                            Código de Convite ou Código Mestre *
                                         </label>
                                         <div className="flex gap-2">
                                             <input
