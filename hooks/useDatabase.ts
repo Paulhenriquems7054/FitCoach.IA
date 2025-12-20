@@ -23,13 +23,41 @@ export function useDatabase() {
 
         const initialize = async () => {
             try {
-                await initDatabase();
-                await migrateFromLocalStorage();
-                await initializeDefaultUsers(); // Criar usuários padrão se não existirem
+                console.log('[useDatabase] Iniciando inicialização do banco de dados...');
+                
+                // Adicionar timeout para evitar travamento infinito
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    setTimeout(() => {
+                        reject(new Error('Timeout ao inicializar banco de dados (15s)'));
+                    }, 15000);
+                });
+
+                await Promise.race([
+                    (async () => {
+                        console.log('[useDatabase] Chamando initDatabase...');
+                        await initDatabase();
+                        console.log('[useDatabase] initDatabase concluído');
+                        
+                        console.log('[useDatabase] Chamando migrateFromLocalStorage...');
+                        await migrateFromLocalStorage();
+                        console.log('[useDatabase] migrateFromLocalStorage concluído');
+                        
+                        console.log('[useDatabase] Chamando initializeDefaultUsers...');
+                        await initializeDefaultUsers();
+                        console.log('[useDatabase] initializeDefaultUsers concluído');
+                        
+                        isInitialized = true;
+                        setIsReady(true);
+                        console.log('[useDatabase] Inicialização completa!');
+                    })(),
+                    timeoutPromise
+                ]);
+            } catch (err) {
+                console.error('[useDatabase] Erro ao inicializar banco de dados:', err);
+                // Mesmo com erro, permitir que o app continue (modo degradado)
+                // Isso evita que o app fique travado em tela preta
                 isInitialized = true;
                 setIsReady(true);
-            } catch (err) {
-                console.error('Erro ao inicializar banco de dados:', err);
                 setError(err as Error);
             }
         };

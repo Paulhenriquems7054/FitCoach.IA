@@ -11,6 +11,19 @@ interface DatabaseInitializerProps {
  */
 export const DatabaseInitializer: React.FC<DatabaseInitializerProps> = ({ children }) => {
     const { isReady, error } = useDatabase();
+    const [showTimeoutWarning, setShowTimeoutWarning] = React.useState(false);
+
+    React.useEffect(() => {
+        // Mostrar aviso se demorar mais de 8 segundos
+        const timeout = setTimeout(() => {
+            if (!isReady && !error) {
+                setShowTimeoutWarning(true);
+                console.warn('[DatabaseInitializer] Inicialização está demorando mais que o esperado...');
+            }
+        }, 8000);
+
+        return () => clearTimeout(timeout);
+    }, [isReady, error]);
 
     if (error) {
         return (
@@ -20,8 +33,14 @@ export const DatabaseInitializer: React.FC<DatabaseInitializerProps> = ({ childr
                         Erro ao Inicializar Banco de Dados
                     </h2>
                     <p className="text-slate-600 dark:text-slate-400 mb-4">
-                        Não foi possível inicializar o banco de dados local. Por favor, recarregue a página.
+                        Não foi possível inicializar o banco de dados local. O app continuará em modo limitado.
                     </p>
+                    <details className="mb-4 text-xs text-slate-500">
+                        <summary className="cursor-pointer mb-2">Detalhes do erro</summary>
+                        <pre className="mt-2 p-2 bg-slate-100 dark:bg-slate-700 rounded overflow-auto">
+                            {error.toString()}
+                        </pre>
+                    </details>
                     <button
                         onClick={() => window.location.reload()}
                         className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
@@ -44,6 +63,11 @@ export const DatabaseInitializer: React.FC<DatabaseInitializerProps> = ({ childr
                         <p className="text-slate-600 dark:text-slate-400">
                             Inicializando banco de dados...
                         </p>
+                        {showTimeoutWarning && (
+                            <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
+                                Isso está demorando mais que o normal. Verifique o console do navegador.
+                            </p>
+                        )}
                     </div>
                     <div className="space-y-2">
                         <Skeleton className="h-4 w-full" />

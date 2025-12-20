@@ -7,6 +7,7 @@ import { UserProvider } from './context/UserContext';
 import { I18nProvider } from './context/I18nContext';
 import { DeviceProvider } from './context/DeviceContext';
 import { DatabaseInitializer } from './components/DatabaseInitializer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Service Worker management
 // Importante: em desenvolvimento NÃO fazemos nada com service workers
@@ -44,17 +45,25 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
             scope: '/' 
           })
           .then((registration) => {
-            console.log('[SW] Service Worker registered successfully');
-            // Force immediate update
-            registration.update();
-            // Check for updates every 5 minutes
-            setInterval(() => {
-              registration.update();
-            }, 300000);
+            if (registration) {
+              console.log('[SW] Service Worker registered successfully');
+              // Force immediate update if method exists
+              if (registration.update && typeof registration.update === 'function') {
+                registration.update();
+              }
+              // Check for updates every 5 minutes
+              setInterval(() => {
+                if (registration && registration.update && typeof registration.update === 'function') {
+                  registration.update();
+                }
+              }, 300000);
+            }
           })
           .catch((registrationError) => {
-            // Only log errors in production
-            console.error('[SW] Registration failed:', registrationError);
+            // Only log errors in production, and ignore "disabled in development" errors
+            if (import.meta.env.PROD && !registrationError.message?.includes('disabled in development')) {
+              console.error('[SW] Registration failed:', registrationError);
+            }
           });
       }, 100);
     });
@@ -72,16 +81,18 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <DatabaseInitializer>
-      <DeviceProvider>
-        <ThemeProvider>
-          <UserProvider>
-            <I18nProvider>
-              <App />
-            </I18nProvider>
-          </UserProvider>
-        </ThemeProvider>
-      </DeviceProvider>
-    </DatabaseInitializer>
+    <ErrorBoundary>
+      <DatabaseInitializer>
+        <DeviceProvider>
+          <ThemeProvider>
+            <UserProvider>
+              <I18nProvider>
+                <App />
+              </I18nProvider>
+            </UserProvider>
+          </ThemeProvider>
+        </DeviceProvider>
+      </DatabaseInitializer>
+    </ErrorBoundary>
   </React.StrictMode>
 );

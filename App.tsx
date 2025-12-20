@@ -1,5 +1,5 @@
 
-import React, { Suspense, lazy, useState, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { Layout } from './components/layout/Layout';
 import { useRouter } from './hooks/useRouter';
 import { Skeleton } from './components/ui/Skeleton';
@@ -16,6 +16,19 @@ import { authService } from './services/supabaseService';
 import { Logo } from './components/Logo';
 import { Gender } from './types';
 import { getAccountType } from './utils/accountType';
+
+// Função auxiliar para normalizar path do hash
+const normalizePath = (hash: string) => {
+  if (!hash || hash === '#') {
+    return '';
+  }
+  if (hash === '#/') {
+    return '/';
+  }
+  const hashWithoutQuery = hash.split('?')[0];
+  const newPath = hashWithoutQuery.substring(1);
+  return newPath.startsWith('/') ? newPath : `/${newPath}`;
+};
 
 // Lazy load das páginas para reduzir o bundle inicial
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -49,15 +62,25 @@ const Onboarding = lazy(() => import('./components/Onboarding'));
 
 // Componente de loading
 const PageLoader = () => (
-    <div className="container mx-auto px-4 py-8">
-        <Card>
-            <div className="p-6 space-y-4">
-                <Skeleton className="h-8 w-1/3" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-5/6" />
-                <Skeleton className="h-4 w-4/6" />
-            </div>
-        </Card>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="container mx-auto px-4 py-8 max-w-md">
+            <Card>
+                <div className="p-6 space-y-4">
+                    <div className="text-center mb-4">
+                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+                            FitCoach.IA
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-400">
+                            Carregando...
+                        </p>
+                    </div>
+                    <Skeleton className="h-8 w-1/3" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-5/6" />
+                    <Skeleton className="h-4 w-4/6" />
+                </div>
+            </Card>
+        </div>
     </div>
 );
 
@@ -136,6 +159,12 @@ const App: React.FC = () => {
     // Estados para fluxo de acesso inicial (convite / código / cadastro)
     const [inviteFlowState, setInviteFlowState] = useState<'choice' | 'code' | 'register' | null>(null);
     const [validatedCouponCode, setValidatedCouponCode] = useState<string | null>(null);
+    
+    // Ref para evitar múltiplos redirecionamentos simultâneos
+    const redirectingRef = useRef(false);
+    const lastRedirectHashRef = useRef<string>('');
+    const loginCheckRef = useRef(false);
+    const lastLogKeyRef = useRef<string>('');
 
     // Rotas públicas (não requerem autenticação)
     const publicRoutes = ['/premium', '/presentation', '/login', '/landing'];
@@ -196,8 +225,10 @@ const App: React.FC = () => {
         window.addEventListener('landing-seen', handleLandingSeen);
         window.addEventListener('presentation-seen', handlePresentationSeen);
 
-        // Aplicar otimizações específicas do dispositivo
-        applyDeviceOptimizations(device);
+        // Aplicar otimizações específicas do dispositivo (apenas uma vez)
+        if (typeof window !== 'undefined') {
+            applyDeviceOptimizations(device);
+        }
 
         // Verificar se há token na URL para login automático
         const checkTokenLogin = () => {
@@ -212,25 +243,51 @@ const App: React.FC = () => {
             }
         };
 
-        // Verificar se usuário está realmente logado
+        // Verificar se usuário está realmente logado (apenas uma vez)
         const checkLogin = async () => {
+            // Evitar múltiplas execuções
+            if (loginCheckRef.current || isInitialized) {
+                return;
+            }
+            
+            loginCheckRef.current = true;
+            
             try {
-                // Primeiro tentar verificar no Supabase Auth
-                const supabaseUser = await authService.getCurrentUserProfile();
-                if (supabaseUser) {
-                    setUser(supabaseUser);
-                    setIsLoggedIn(true);
-                    setIsInitialized(true);
-                    return;
-                }
+                console.log('[App] Verificando login...');
+                
+                // Adicionar timeout para evitar travamento
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    setTimeout(() => {
+                        reject(new Error('Timeout ao verificar login (5s)'));
+                    }, 5000);
+                });
 
-                // Fallback para IndexedDB
-                const currentUsername = await getCurrentUsername();
-                setIsLoggedIn(!!currentUsername && currentUsername.trim() !== '');
+                await Promise.race([
+                    (async () => {
+                        // Primeiro tentar verificar no Supabase Auth
+                        const supabaseUser = await authService.getCurrentUserProfile();
+                        if (supabaseUser) {
+                            console.log('[App] Usuário encontrado no Supabase');
+                            setUser(supabaseUser);
+                            setIsLoggedIn(true);
+                            setIsInitialized(true);
+                            return;
+                        }
+
+                        // Fallback para IndexedDB
+                        console.log('[App] Verificando IndexedDB...');
+                        const currentUsername = await getCurrentUsername();
+                        setIsLoggedIn(!!currentUsername && currentUsername.trim() !== '');
+                        console.log('[App] Login verificado:', !!currentUsername);
+                    })(),
+                    timeoutPromise
+                ]);
             } catch (error) {
+                console.warn('[App] Erro ao verificar login, assumindo não logado:', error);
                 setIsLoggedIn(false);
             } finally {
                 setIsInitialized(true);
+                console.log('[App] Inicialização concluída');
             }
         };
         
@@ -242,51 +299,102 @@ const App: React.FC = () => {
             window.removeEventListener('landing-seen', handleLandingSeen);
             window.removeEventListener('presentation-seen', handlePresentationSeen);
         };
-    }, [device]);
+    }, []); // Removido 'device' das dependências para evitar re-execuções
+
+    // Lógica de redirecionamento simplificada - apenas para fluxo inicial
+    // IMPORTANTE: useEffect DEVE vir ANTES de qualquer return condicional (regras dos hooks do React)
+    // CRÍTICO: Apenas redirecionar no fluxo inicial (landing -> presentation -> login)
+    useEffect(() => {
+        // Não redirecionar se ainda está inicializando ou já está redirecionando
+        if (!isInitialized || hasSeenLanding === null || hasSeenPresentation === null || redirectingRef.current) {
+            return;
+        }
+
+        // Apenas redirecionar no fluxo inicial, não após login
+        const currentHash = window.location.hash;
+        const currentPath = normalizePath(currentHash);
+        let targetPath = '';
+        
+        // Se usuário está logado e path está vazio OU hash está vazio, redirecionar para home
+        // MAS apenas se não estiver já em #/ ou /
+        if (isLoggedIn && (!currentPath || currentPath === '') && currentHash !== '#/' && currentHash !== '') {
+            targetPath = '#/';
+        }
+        // Apenas fluxo inicial: landing -> presentation -> login
+        else if (!isLoggedIn) {
+            if (!hasSeenLanding && currentPath !== '/landing' && currentHash !== '#/landing') {
+                targetPath = '#/landing';
+            } else if (hasSeenLanding && !hasSeenPresentation && currentPath !== '/presentation' && currentPath !== '/landing' && currentHash !== '#/presentation') {
+                targetPath = '#/presentation';
+            } else if (hasSeenLanding && hasSeenPresentation && 
+                       currentPath !== '/login' && currentPath !== '/landing' && currentPath !== '/presentation' && currentPath !== '/premium' && currentHash !== '#/login') {
+                targetPath = '#/login';
+            }
+        }
+
+        // Só redirecionar se for diferente do hash atual E diferente do último hash que tentamos navegar
+        // E não estiver redirecionando no momento
+        // E se o hash atual não for já o target (evitar loop)
+        if (targetPath && currentHash !== targetPath && lastRedirectHashRef.current !== targetPath && !redirectingRef.current) {
+            console.log('[App] Redirecionando para:', targetPath, 'de', currentHash);
+            redirectingRef.current = true;
+            lastRedirectHashRef.current = targetPath;
+            window.location.hash = targetPath;
+            // Resetar flag após delay maior para evitar loops
+            setTimeout(() => {
+                redirectingRef.current = false;
+            }, 1000);
+        } else {
+            // Se não há targetPath ou já estamos na rota correta, garantir que não estamos redirecionando
+            redirectingRef.current = false;
+        }
+    }, [hasSeenLanding, hasSeenPresentation, isLoggedIn, isInitialized]); // Removido 'user' das dependências
 
     // Aguardar inicialização antes de decidir roteamento
+    // IMPORTANTE: Este return vem DEPOIS de todos os hooks
     if (!isInitialized || hasSeenLanding === null || hasSeenPresentation === null) {
+        console.log('[App] Aguardando inicialização...', { isInitialized, hasSeenLanding, hasSeenPresentation });
         return <PageLoader />;
     }
 
-    // Se path está vazio (sem hash), decidir baseado no fluxo: Landing → Vídeo → Login
-    if (!path || path === '') {
-        if (!hasSeenLanding) {
-            // Primeiro acesso: mostrar landing (logo)
-            window.location.hash = '#/landing';
-            return <PageLoader />;
-        } else if (!hasSeenPresentation) {
-            // Viu landing mas não viu vídeo: redirecionar para apresentação (vídeo)
-            window.location.hash = '#/presentation';
-            return <PageLoader />;
-        } else if (!isLoggedIn) {
-            // Viu landing e vídeo mas não está logado: redirecionar para login
-            window.location.hash = '#/login';
-            return <PageLoader />;
-        } else {
-            // Logado: redirecionar para home
-            window.location.hash = '#/';
+    // Debug: Log do estado atual (apenas uma vez por mudança de estado)
+    const logKey = `${path}-${isLoggedIn}-${isInitialized}`;
+    if (lastLogKeyRef.current !== logKey) {
+        console.log('[App] Estado atual:', { 
+            path, 
+            isLoggedIn, 
+            hasSeenLanding, 
+            hasSeenPresentation, 
+            isInitialized,
+            redirectingRef: redirectingRef.current,
+            userRole: user?.gymRole,
+            username: user?.username
+        });
+        lastLogKeyRef.current = logKey;
+    }
+
+    // Se usuário está logado, não precisa verificar landing/presentation
+    // Ir direto para a home ou rota solicitada
+    if (!isLoggedIn) {
+        // Usuário não logado: verificar fluxo inicial
+        // Mostrar loader durante redirecionamentos apenas se não estiver logado
+        const isRedirecting = 
+            (!path || path === '') ||
+            (!hasSeenLanding && path !== '/landing') ||
+            (hasSeenLanding && !hasSeenPresentation && path !== '/presentation' && path !== '/landing') ||
+            (hasSeenLanding && hasSeenPresentation && 
+             path !== '/login' && path !== '/landing' && path !== '/presentation' && path !== '/premium');
+        
+        if (isRedirecting) {
+            console.log('[App] Redirecionando (usuário não logado)...', { path, hasSeenLanding, hasSeenPresentation });
             return <PageLoader />;
         }
-    }
-
-    // Lógica de primeiro acesso: garantir fluxo correto
-    // Se não viu landing, só permitir /landing
-    if (!hasSeenLanding && path !== '/landing') {
-        window.location.hash = '#/landing';
-        return <PageLoader />;
-    }
-    
-    // Se viu landing mas não viu apresentação, só permitir /presentation e /landing
-    if (hasSeenLanding && !hasSeenPresentation && path !== '/presentation' && path !== '/landing') {
-        window.location.hash = '#/presentation';
-        return <PageLoader />;
-    }
-    
-    // Se viu landing e apresentação mas não está logado, permitir apenas /login, /landing, /presentation
-    if (hasSeenLanding && hasSeenPresentation && !isLoggedIn && path !== '/login' && path !== '/landing' && path !== '/presentation' && path !== '/premium') {
-        window.location.hash = '#/login';
-        return <PageLoader />;
+    } else {
+        // Usuário logado: se path está vazio, tratar como '/' (home)
+        if (!path || path === '') {
+            console.log('[App] Usuário logado com path vazio, tratando como home...');
+            // Não fazer nada aqui, deixar o useEffect redirecionar ou renderizar como '/'
+        }
     }
 
     // Se for rota pública, permitir acesso sem verificar autenticação
@@ -309,39 +417,42 @@ const App: React.FC = () => {
         return <PageLoader />;
     }
 
+    // Normalizar path vazio para '/' antes de todas as verificações
+    const normalizedPath = !path || path === '' ? '/' : path;
+    
     // Verificar se é aluno tentando acessar rotas administrativas ou restritas (apenas se logado)
-    const isStudent = isLoggedIn && user.gymRole === 'student';
+    const isStudent = isLoggedIn && user?.gymRole === 'student';
     const adminRoutes = ['/gym-admin', '/student-management', '/professional'];
     const restrictedRoutes = ['/privacy', '/configuracoes'];
-    const isAccessingAdminRoute = adminRoutes.includes(path);
-    const isAccessingRestrictedRoute = restrictedRoutes.includes(path);
+    const isAccessingAdminRoute = adminRoutes.includes(normalizedPath);
+    const isAccessingRestrictedRoute = restrictedRoutes.includes(normalizedPath);
 
-    // Se aluno tentar acessar rota administrativa ou restrita, redirecionar para home
-    // (exceto welcome-survey que é permitida)
-    if (isStudent && (isAccessingAdminRoute || isAccessingRestrictedRoute) && path !== '/welcome-survey') {
-        window.location.hash = '#/';
-        return null;
+    // Se aluno tentar acessar rota administrativa ou restrita, mostrar loader (redirecionamento será feito pelo useEffect)
+    if (isStudent && (isAccessingAdminRoute || isAccessingRestrictedRoute) && normalizedPath !== '/welcome-survey') {
+        console.log('[App] Bloqueado: Aluno tentando acessar rota administrativa');
+        return <PageLoader />;
     }
 
     // Verificar se é admin (apenas se estiver logado)
-    const isDefaultAdmin = isLoggedIn && (user.username === 'Administrador' || user.username === 'Desenvolvedor');
-    const isAdmin = isLoggedIn && (user.gymRole === 'admin' || isDefaultAdmin);
-    const isDeveloper = isLoggedIn && (user.username === 'Desenvolvedor' || user.username === 'dev123');
+    const isDefaultAdmin = isLoggedIn && (user?.username === 'Administrador' || user?.username === 'Desenvolvedor');
+    const isAdmin = isLoggedIn && (user?.gymRole === 'admin' || isDefaultAdmin);
+    const isDeveloper = isLoggedIn && (user?.username === 'Desenvolvedor' || user?.username === 'dev123');
 
-    // Se for desenvolvedor, redirecionar para admin-dashboard se não estiver lá
-    if (isDeveloper && path !== '/admin-dashboard') {
-        window.location.hash = '#/admin-dashboard';
-        return null;
+    // Se for desenvolvedor, mostrar loader (redirecionamento será feito pelo useEffect)
+    // Permitir '/' (home) para desenvolvedores também
+    if (isDeveloper && normalizedPath !== '/admin-dashboard' && normalizedPath !== '/') {
+        console.log('[App] Bloqueado: Desenvolvedor precisa ir para admin-dashboard');
+        return <PageLoader />;
     }
 
     // Rotas permitidas para administradores
     const adminAllowedRoutes = ['/', '/privacy', '/configuracoes', '/perfil', '/student-management', '/gym-admin', '/permissions', '/premium'];
-    const isAdminAccessingStudentRoute = isAdmin && !isDeveloper && !adminAllowedRoutes.includes(path) && path !== '/admin-dashboard';
+    const isAdminAccessingStudentRoute = isAdmin && !isDeveloper && !adminAllowedRoutes.includes(normalizedPath) && normalizedPath !== '/admin-dashboard';
 
-    // Se admin tentar acessar rota de aluno, redirecionar para dashboard
+    // Se admin tentar acessar rota de aluno, mostrar loader (redirecionamento será feito pelo useEffect)
     if (isAdminAccessingStudentRoute) {
-        window.location.hash = '#/';
-        return null;
+        console.log('[App] Bloqueado: Admin tentando acessar rota de aluno');
+        return <PageLoader />;
     }
 
     // Verificar se usuário precisa responder a enquete (APENAS APÓS LOGIN)
@@ -370,18 +481,38 @@ const App: React.FC = () => {
         const isUserNeedingSurvey = (
             (isStudent || accountType === 'USER_B2C') && 
             !hasAnsweredSurvey && 
-            path !== '/welcome-survey'
+            normalizedPath !== '/welcome-survey'
         );
 
-        // Se usuário não respondeu a enquete, redirecionar
+        // Se usuário não respondeu a enquete, mostrar loader (redirecionamento será feito pelo useEffect)
         if (isUserNeedingSurvey) {
-            window.location.hash = '#/welcome-survey';
-            return null;
+            console.log('[App] Bloqueado: Usuário precisa responder enquete', { isStudent, accountType, hasAnsweredSurvey, normalizedPath });
+            // Redirecionar para welcome-survey se ainda não estiver lá
+            if (normalizedPath !== '/welcome-survey' && !redirectingRef.current) {
+                window.location.hash = '#/welcome-survey';
+                redirectingRef.current = true;
+                setTimeout(() => {
+                    redirectingRef.current = false;
+                }, 1000);
+            }
+            return <PageLoader />;
         }
     }
 
+    // Debug: Se chegou até aqui, deve renderizar
+    console.log('[App] ✅ Todas as verificações passadas, renderizando página...', { 
+        normalizedPath, 
+        isLoggedIn, 
+        isStudent, 
+        isAdmin, 
+        isDeveloper,
+        userRole: user?.gymRole,
+        username: user?.username
+    });
+
     const renderPage = () => {
-        switch (path) {
+        // Usar normalizedPath que já foi definido acima
+        switch (normalizedPath) {
             case '/generator': return <GeneratorPage />;
             case '/analyzer': return <AnalyzerPage />;
             case '/reports': return <ReportsPage />;
@@ -420,7 +551,7 @@ const App: React.FC = () => {
 
 
     // Página de Landing (Logo)
-    if (path === '/landing') {
+    if (normalizedPath === '/landing') {
         return (
             <GymBrandingProvider>
                 <Suspense fallback={<PageLoader />}>
@@ -431,7 +562,7 @@ const App: React.FC = () => {
     }
 
     // Página de Apresentação (Vídeo)
-    if (path === '/presentation') {
+    if (normalizedPath === '/presentation') {
         return (
             <Suspense fallback={<PageLoader />}>
                 <VideoPresentationPage />
@@ -440,7 +571,7 @@ const App: React.FC = () => {
     }
 
     // Fluxo de acesso inicial (primeiro acesso sem login)
-    if (!isLoggedIn && inviteFlowState !== null && path !== '/login' && path !== '/presentation') {
+    if (!isLoggedIn && inviteFlowState !== null && normalizedPath !== '/login' && normalizedPath !== '/presentation') {
         if (inviteFlowState === 'choice') {
             // Tela inicial: escolha de fluxo (aluno de academia, professor, B2C individual)
             return (
@@ -574,7 +705,7 @@ const App: React.FC = () => {
         }
     }
 
-    if (path === '/login') {
+    if (normalizedPath === '/login') {
         return (
             <ToastProvider>
                 <Suspense fallback={<PageLoader />}>
@@ -584,7 +715,7 @@ const App: React.FC = () => {
         );
     }
 
-    if (path === '/welcome-survey') {
+    if (normalizedPath === '/welcome-survey') {
         return (
             <Suspense fallback={<PageLoader />}>
                 <WelcomeSurveyPage />
@@ -592,7 +723,7 @@ const App: React.FC = () => {
         );
     }
 
-    if (path === '/onboarding') {
+    if (normalizedPath === '/onboarding') {
         return (
             <Suspense fallback={<PageLoader />}>
                 <Onboarding 
@@ -602,7 +733,7 @@ const App: React.FC = () => {
                         const userData = {
                             nome: profile.name,
                             idade: profile.age,
-                            genero: profile.gender === Gender.Male ? 'Masculino' : profile.gender === Gender.Female ? 'Feminino' : 'Masculino',
+                            genero: (profile.gender === Gender.Male ? 'Masculino' : profile.gender === Gender.Female ? 'Feminino' : 'Masculino') as 'Masculino' | 'Feminino',
                             peso: profile.weight,
                             altura: profile.height,
                             objetivo: profile.goal,
@@ -623,6 +754,13 @@ const App: React.FC = () => {
             </Suspense>
         );
     }
+
+    // Debug final antes de renderizar
+    console.log('[App] Renderizando página principal...', { 
+        path, 
+        isLoggedIn, 
+        willRender: renderPage() !== null 
+    });
 
     return (
         <GymBrandingProvider>
