@@ -79,14 +79,22 @@ type AnswerValue =
 
 const SURVEY_VERSION = 'v2'; // Atualizado para v2 com nova estrutura
 const LEGACY_STORAGE_KEYS = ['nutriIA_enquete', 'enqueteRespondida', 'nutriIA_enquete_v1'];
-// Função para obter a chave de storage específica do usuário
+// Função para obter a chave de storage específica do usuário E do domínio
 const getStorageKey = (username?: string) => {
   const userSuffix = username ? `_${username}` : '';
-  return `nutriIA_enquete_${SURVEY_VERSION}${userSuffix}`;
+  // Adicionar sufixo do domínio para evitar conflitos entre localhost e produção
+  const domainSuffix = typeof window !== 'undefined' 
+    ? `_${window.location.hostname.replace(/\./g, '_')}` 
+    : '';
+  return `nutriIA_enquete_${SURVEY_VERSION}${userSuffix}${domainSuffix}`;
 };
 const getStorageFlag = (username?: string) => {
   const userSuffix = username ? `_${username}` : '';
-  return `nutriIA_enquete_${SURVEY_VERSION}_done${userSuffix}`;
+  // Adicionar sufixo do domínio para evitar conflitos entre localhost e produção
+  const domainSuffix = typeof window !== 'undefined' 
+    ? `_${window.location.hostname.replace(/\./g, '_')}` 
+    : '';
+  return `nutriIA_enquete_${SURVEY_VERSION}_done${userSuffix}${domainSuffix}`;
 };
 
 // Estrutura completa da enquete conforme especificação
@@ -361,7 +369,7 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
   const [showSummary, setShowSummary] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Obter chaves de storage específicas do usuário
+  // Obter chaves de storage específicas do usuário E do domínio
   const STORAGE_KEY = getStorageKey(user?.username);
   const STORAGE_FLAG = getStorageFlag(user?.username);
 
@@ -375,6 +383,14 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
       // Limpar versões antigas apenas se não houver username (compatibilidade)
       if (!user?.username) {
         LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+        // Limpar também flags antigas sem sufixo de domínio (migração)
+        const oldFlag = `nutriIA_enquete_${SURVEY_VERSION}_done`;
+        if (localStorage.getItem(oldFlag)) {
+          // Se existe flag antiga, migrar para nova chave com domínio
+          const newFlag = getStorageFlag();
+          localStorage.setItem(newFlag, localStorage.getItem(oldFlag)!);
+          localStorage.removeItem(oldFlag);
+        }
       }
       const hasAnswered = localStorage.getItem(STORAGE_FLAG);
       setShowSurvey(!hasAnswered);
