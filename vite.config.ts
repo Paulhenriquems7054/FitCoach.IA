@@ -33,8 +33,29 @@ export default defineConfig(({ mode }) => {
           host: 'localhost',
           port: 3000,
           clientPort: 3000,
-          // Melhorar estabilidade do HMR
-          overlay: true
+          // Desabilitar overlay de erro para evitar problemas visuais
+          overlay: false
+        },
+        // Proxy para redirecionar /api para o backend
+        proxy: {
+          '/api': {
+            target: env.VITE_AI_BACKEND_URL || 'http://localhost:3001',
+            changeOrigin: true,
+            secure: false,
+            rewrite: (path) => path.replace(/^\/api/, ''),
+            configure: (proxy, _options) => {
+              proxy.on('error', (err, _req, res) => {
+                // Em desenvolvimento, não falhar se o backend não estiver rodando
+                if (mode === 'development') {
+                  console.warn('[Vite Proxy] Backend não disponível:', err.message);
+                  if (res && !res.headersSent) {
+                    res.writeHead(503, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Backend não disponível em desenvolvimento' }));
+                  }
+                }
+              });
+            },
+          },
         },
         // Ensure static assets are served with correct MIME types
         middlewareMode: false,
@@ -90,9 +111,14 @@ self.addEventListener('fetch', () => {
         },
       ],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
-        'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY)
+        // Definir process.env para compatibilidade (mas preferir import.meta.env)
+        'process.env': JSON.stringify({
+          API_KEY: env.VITE_GEMINI_API_KEY || '',
+          GEMINI_API_KEY: env.VITE_GEMINI_API_KEY || '',
+        }),
+        'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || ''),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || ''),
+        'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || '')
       },
       resolve: {
         alias: {

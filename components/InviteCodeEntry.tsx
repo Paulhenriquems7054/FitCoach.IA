@@ -3,7 +3,9 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Alert } from './ui/Alert';
 import { couponService, type CouponValidationError } from '../services/supabaseService';
+import { activateB2BCode } from '../services/b2bCodeService';
 import { useToast } from './ui/Toast';
+import { useUser } from '../context/UserContext';
 
 interface InviteCodeEntryProps {
   onCodeValidated: (couponCode: string) => void;
@@ -15,6 +17,7 @@ export const InviteCodeEntry: React.FC<InviteCodeEntryProps> = ({ onCodeValidate
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
+  const { user } = useUser();
 
   const errorMessages: Record<CouponValidationError, string> = {
     CUPOM_INEXISTENTE: 'Código de convite não encontrado',
@@ -38,18 +41,42 @@ export const InviteCodeEntry: React.FC<InviteCodeEntryProps> = ({ onCodeValidate
     setIsValidating(true);
 
     try {
+      // Primeiro tentar validar como cupom (código de academia existente)
       const result = await couponService.validateCoupon(code.trim().toUpperCase());
 
       if (result.success) {
         showToast('Código válido! Redirecionando...', 'success');
         onCodeValidated(code.trim().toUpperCase());
-      } else {
-        const errorMessage = result.error 
-          ? errorMessages[result.error] || result.message || 'Código inválido'
-          : result.message || 'Código inválido';
-        setError(errorMessage);
-        showToast(errorMessage, 'error');
+        return;
       }
+
+      // Se não for cupom, tentar validar como código B2B
+      if (user?.id) {
+        try {
+          const b2bResult = await activateB2BCode(code.trim().toUpperCase(), user.id);
+          
+          if (b2bResult.success) {
+            showToast('Código B2B ativado com sucesso!', 'success');
+            onCodeValidated(code.trim().toUpperCase());
+            return;
+          } else {
+            // Se falhar, continuar com erro do cupom
+            setError(b2bResult.error || 'Código inválido');
+            showToast(b2bResult.error || 'Código inválido', 'error');
+            return;
+          }
+        } catch (b2bError) {
+          // Se der erro ao validar B2B, continuar com erro do cupom
+          console.warn('Erro ao validar código B2B:', b2bError);
+        }
+      }
+
+      // Se nenhum funcionou, mostrar erro
+      const errorMessage = result.error 
+        ? errorMessages[result.error] || result.message || 'Código inválido'
+        : result.message || 'Código inválido';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
     } catch (err) {
       let errorMessage = 'Erro ao validar código';
       

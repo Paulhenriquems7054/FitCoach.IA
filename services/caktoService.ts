@@ -58,7 +58,7 @@ export async function cancelCaktoSubscription(paymentId: string): Promise<{ succ
     logger.info(`Cancelando assinatura no Cakto: ${paymentId}`, 'caktoService');
     
     // Tentar usar API do Cakto se disponível
-    const caktoApiKey = import.meta.env.VITE_CAKTO_API_KEY || process.env.CAKTO_API_KEY;
+    const caktoApiKey = import.meta.env.VITE_CAKTO_API_KEY || undefined;
     
     if (caktoApiKey) {
       try {
@@ -188,7 +188,7 @@ export async function checkCaktoPaymentStatus(paymentId: string): Promise<{
     }
     
     // 2. Tentar consultar API do Cakto se disponível
-    const caktoApiKey = import.meta.env.VITE_CAKTO_API_KEY || process.env.CAKTO_API_KEY;
+    const caktoApiKey = import.meta.env.VITE_CAKTO_API_KEY || undefined;
     
     if (caktoApiKey) {
       try {

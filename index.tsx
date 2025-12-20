@@ -53,15 +53,14 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
             }, 300000);
           })
           .catch((registrationError) => {
-            // Silently ignore service worker errors in development
             // Only log errors in production
-            if (import.meta.env.PROD) {
-              console.error('[SW] Registration failed:', registrationError);
-            }
-            // In development, do nothing - service workers are disabled
+            console.error('[SW] Registration failed:', registrationError);
           });
       }, 100);
     });
+} else if ('serviceWorker' in navigator && import.meta.env.DEV) {
+  // Development: Explicitly do nothing to avoid any errors
+  // The override in index.html already prevents registration
 }
 
 

@@ -3,6 +3,8 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { XIcon } from './icons/XIcon';
 import { useToast } from './ui/Toast';
+import { initiateSubscriptionCheckout } from '../services/paymentService';
+import { useUser } from '../context/UserContext';
 
 interface CheckoutModalProps {
     isOpen: boolean;
@@ -15,35 +17,7 @@ interface CheckoutModalProps {
     onSuccess?: () => void;
 }
 
-/**
- * Mapeia o nome interno do plano para o link de checkout da Cakto.
- * Esses IDs vêm da documentação / configuração da Cakto.
- */
-const getCaktoPaymentLink = (planName: string): string | null => {
-    const baseUrl = 'https://pay.cakto.com.br/';
-
-    const mapping: Record<string, string> = {
-        // Planos B2C
-        monthly: 'zeygxve_668421',
-        annual_vip: 'wvbkepi_668441',
-
-        // Planos B2B (Academias)
-        academy_starter: 'cemyp2n_668537',
-        academy_growth: 'vi6djzq_668541',
-        academy_pro: '3dis6ds_668546',
-
-        // Planos Personal Trainer
-        personal_team_5: '3dgheuc_666289',
-        personal_team_15: '3etp85e_666303',
-    };
-
-    const checkoutId = mapping[planName];
-    if (!checkoutId) {
-        return null;
-    }
-
-    return `${baseUrl}${checkoutId}`;
-};
+// Função removida - agora usa paymentService
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     isOpen,
@@ -56,6 +30,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     onSuccess
 }) => {
     const { showSuccess, showError, showInfo } = useToast();
+    const { user } = useUser();
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly'); // Mantido apenas para UI de resumo
     const [isProcessing, setIsProcessing] = useState(false);
 
@@ -70,17 +45,27 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }, [isOpen]);
 
     const handleCheckout = async () => {
+        if (!user?.id) {
+            showError('Você precisa estar logado para assinar um plano.');
+            return;
+        }
+
         setIsProcessing(true);
         try {
-            const url = getCaktoPaymentLink(planName);
+            // Usar o novo serviço de pagamento
+            const { checkoutUrl } = await initiateSubscriptionCheckout(
+                planName,
+                user.id,
+                user.username || undefined
+            );
 
-            if (!url) {
+            if (!checkoutUrl) {
                 showError('Não foi possível encontrar o link de pagamento para este plano. Verifique a configuração da Cakto.');
                 return;
             }
 
             // Abrir checkout da Cakto em nova aba
-            const win = window.open(url, '_blank', 'noopener,noreferrer');
+            const win = window.open(checkoutUrl, '_blank', 'noopener,noreferrer');
             if (!win) {
                 // Popup bloqueado: orientar o usuário a clicar manualmente
                 showInfo('Seu navegador bloqueou a janela de pagamento. Verifique o bloqueador de popups ou copie o link de pagamento da Cakto.');
@@ -92,8 +77,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             onClose();
             onSuccess?.();
             showSuccess('Após concluir o pagamento na Cakto, sua assinatura será ativada automaticamente.');
-        } catch {
-            showError('Erro ao abrir o pagamento da Cakto. Tente novamente.');
+        } catch (error: any) {
+            showError(error.message || 'Erro ao abrir o pagamento da Cakto. Tente novamente.');
         } finally {
             setIsProcessing(false);
         }

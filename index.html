@@ -62,6 +62,14 @@
     }
   })();
 </script>
+<style>
+  /* Ocultar overlay de erro do Vite */
+  vite-error-overlay {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+</style>
 </head>
   <body class="bg-gray-50 dark:bg-slate-900 font-sans">
     <div id="root"></div>
@@ -143,6 +151,29 @@
           window.location.reload();
         }
       });
+      
+      // Remover overlay de erro do Vite se aparecer
+      (function() {
+        function removeViteOverlay() {
+          const overlay = document.querySelector('vite-error-overlay');
+          if (overlay) {
+            overlay.remove();
+          }
+        }
+        
+        // Remover imediatamente
+        removeViteOverlay();
+        
+        // Observar mudanças no DOM para remover se aparecer depois
+        const observer = new MutationObserver(function(mutations) {
+          removeViteOverlay();
+        });
+        
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+      })();
     </script>
   </body>
 </html>

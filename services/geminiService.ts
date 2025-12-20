@@ -1,67 +1,46 @@
 
-import { GoogleGenAI, Type, Chat } from "@google/genai";
-import type { User, GeminiMealPlanResponse, MealAnalysisResponse, Recipe, ModerationResult, WellnessPlan, ProgressAnalysis, FoodSubstitution } from "../types";
-import { 
-  generateMealPlanOffline, 
-  analyzeMealPhotoOffline, 
-  searchRecipesOffline, 
+import type {
+  User,
+  GeminiMealPlanResponse,
+  MealAnalysisResponse,
+  Recipe,
+  ModerationResult,
+  WellnessPlan,
+  ProgressAnalysis,
+  FoodSubstitution,
+} from "../types";
+import { Type, GoogleGenAI, Chat } from '@google/genai';
+import {
+  generateMealPlanOffline,
+  analyzeMealPhotoOffline,
+  searchRecipesOffline,
   getCachedMealPlan,
   generateWellnessPlanOffline,
   generateWeeklyReportOffline,
-  isOnline 
+  isOnline,
 } from "./offlineService";
-import { resolveActiveApiKey } from "../constants/apiConfig";
 import { getAvailableExercisesPrompt } from "./exerciseGifService";
 import { logger } from "../utils/logger";
 import { generateJSONResponse } from "./iaController";
-import { getGymApiKey, recordApiUsage } from "./gymApiKeyService";
 
-// Função para obter a chave de API ativa (prioriza chave da academia, depois fallback global)
-const getApiKey = async (gymId?: string | null): Promise<string | undefined> => {
-  // 1. Tentar buscar chave da academia primeiro (se gymId fornecido)
-  if (gymId) {
-    try {
-      const gymApiKey = await getGymApiKey(gymId);
-      if (gymApiKey) {
-        logger.debug(`Usando chave de API da academia ${gymId}`, 'geminiService');
-        // Registrar uso da API para estatísticas
-        recordApiUsage(gymId).catch(err => {
-          logger.warn('Erro ao registrar uso de API', 'geminiService', err);
-        });
-        return gymApiKey;
-      }
-    } catch (error) {
-      logger.warn('Erro ao buscar chave de API da academia, usando fallback global', 'geminiService', error);
-    }
-  }
-  
-  // 2. Fallback para chave global (env)
-  const envKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
-  const resolvedKey = resolveActiveApiKey(envKey);
-  if (resolvedKey) {
-    logger.debug('Usando chave de API global (fallback)', 'geminiService');
-  }
-  return resolvedKey;
-};
+const AI_BACKEND_BASE =
+  import.meta.env.VITE_AI_BACKEND_URL || "/api";
 
-// Função para obter o cliente Gemini com a chave atual (síncrona para compatibilidade)
-const getGeminiClientSync = (): GoogleGenAI => {
-  const envKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
-  const apiKey = resolveActiveApiKey(envKey);
-  if (!apiKey) {
-    throw new Error("API key for Gemini is not configured. Please set it up in Settings.");
-  }
-  return new GoogleGenAI({ apiKey });
-};
+// Cache para evitar múltiplas tentativas quando o backend não está disponível
+let backendUnavailableUntil: number | null = null;
+const BACKEND_UNAVAILABLE_DURATION = 60000; // 1 minuto
 
-// Função para obter o cliente Gemini com a chave da academia (assíncrona)
-const getGeminiClient = async (gymId?: string | null): Promise<GoogleGenAI> => {
-  const apiKey = await getApiKey(gymId);
-  if (!apiKey) {
-    throw new Error("API key for Gemini is not configured. Please set it up in Settings.");
-  }
-  return new GoogleGenAI({ apiKey });
-};
+function isBackendUnavailable(): boolean {
+  if (backendUnavailableUntil === null) return false;
+  if (Date.now() < backendUnavailableUntil) return true;
+  // Cache expirado, resetar
+  backendUnavailableUntil = null;
+  return false;
+}
+
+function markBackendUnavailable(): void {
+  backendUnavailableUntil = Date.now() + BACKEND_UNAVAILABLE_DURATION;
+}
 
 // --- MEAL PLAN ---
 
@@ -171,33 +150,58 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
         prompt,
         systemPrompt,
         async () => {
-            // Fallback para API externa APENAS se configurada e online
-            const online = isOnline();
-            const apiKey = await getApiKey(user.gymId);
-            const hasApiKey = !!apiKey;
-            
-            if (!online || !hasApiKey) {
-                return null; // Não tentar API se offline ou sem key
+            // Fallback para backend de IA (proxy seguro)
+            if (!isOnline()) {
+              return null;
             }
-            
+            // Verificar se backend está marcado como indisponível
+            if (isBackendUnavailable()) {
+              return null;
+            }
             try {
-                const ai = await getGeminiClient(user.gymId);
-                const response = await ai.models.generateContent({
-                    model: "gemini-1.5-flash", // Usando modelo estável
-                    contents: prompt,
-                    config: {
-                      responseMimeType: "application/json",
-                      responseSchema: mealPlanSchema,
-                      temperature: 0.7,
-                    },
-                });
-                
-                const jsonText = response.text.trim();
-                const parsedJson = JSON.parse(jsonText);
-                return parsedJson as GeminiMealPlanResponse;
-            } catch (error) {
-                logger.warn('Falha no fallback para API externa em generateMealPlan', 'geminiService', error);
+              const res = await fetch(`${AI_BACKEND_BASE}/ai/text`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  userId: user.id,
+                  gymId: user.gymId ?? null,
+                  feature: "meal_plan",
+                  model: "gemini-1.5-flash",
+                  prompt,
+                }),
+              });
+
+              if (!res.ok) {
+                // Se for 503 (Service Unavailable), marcar backend como indisponível
+                if (res.status === 503) {
+                  markBackendUnavailable();
+                }
+                const text = await res.text();
+                // Só logar se não for 503 (para evitar spam no console)
+                if (res.status !== 503) {
+                  logger.warn(
+                    `Falha no backend de IA em generateMealPlan: ${res.status} ${text}`,
+                    "geminiService",
+                  );
+                }
                 return null;
+              }
+
+              const data = await res.json();
+              const text: string = data.text || "";
+              if (!text.trim()) {
+                return null;
+              }
+              return JSON.parse(text) as GeminiMealPlanResponse;
+            } catch (error) {
+              logger.warn(
+                "Erro ao chamar backend de IA em generateMealPlan",
+                "geminiService",
+                error,
+              );
+              return null;
             }
         }
     );
@@ -522,54 +526,75 @@ export const generateWellnessPlan = async (user: User): Promise<WellnessPlan> =>
 // --- AI COACH TIP ---
 
 export const getAICoachTip = async (user: User): Promise<string> => {
-    const apiKey = await getApiKey(user.gymId);
-    if (!apiKey) {
-        // Retornar dica genérica quando não há API key
-        const timeOfDay = new Date().getHours() < 12 ? 'manhã' : new Date().getHours() < 18 ? 'tarde' : 'noite';
-        return `Bom ${timeOfDay}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
-    }
+  const timeOfDay =
+    new Date().getHours() < 12
+      ? "manhã"
+      : new Date().getHours() < 18
+      ? "tarde"
+      : "noite";
 
-    // Verificar se está online antes de tentar usar a API
-    if (!isOnline()) {
-        const timeOfDay = new Date().getHours() < 12 ? 'manhã' : new Date().getHours() < 18 ? 'tarde' : 'noite';
-        return `Bom ${timeOfDay}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
-    }
+  // Verificar se está online antes de tentar usar a API
+  if (!isOnline()) {
+    return `Bom ${timeOfDay}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
+  }
 
-    const timeOfDay = new Date().getHours() < 12 ? 'manhã' : new Date().getHours() < 18 ? 'tarde' : 'noite';
-
-    const prompt = `
+  const prompt = `
         Aja como um coach de bem-estar. Crie uma dica rápida, motivacional e acionável para ${user.nome}.
         A dica deve ser relevante para o objetivo de "${user.objetivo}" e para o período do dia atual (${timeOfDay}).
         Seja breve (1-2 frases) e inspirador.
         Exemplo para "perder peso" de manhã: "Comece o dia com um copo d'água para ativar seu metabolismo e hidratar o corpo!"
     `;
-    
-    try {
-        const ai = await getGeminiClient(user.gymId);
-        // Usar a API de alto nível recomendada para texto
-        const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        if (!text || !text.trim()) {
-            const timeOfDayFallback = new Date().getHours() < 12 ? 'manhã' : new Date().getHours() < 18 ? 'tarde' : 'noite';
-            return `Bom ${timeOfDayFallback}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
-        }
-        return text.trim();
-    } catch (error: any) {
-        // Silenciar erros de API key inválida e retornar dica genérica
-        const isApiKeyError = error?.error?.code === 400 && error?.error?.message?.includes('API key');
-        if (isApiKeyError) {
-            // Não logar erro de API key inválida, apenas retornar fallback
-            const timeOfDay = new Date().getHours() < 12 ? 'manhã' : new Date().getHours() < 18 ? 'tarde' : 'noite';
-            return `Bom ${timeOfDay}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
-        }
-        // Para outros erros, logar mas ainda retornar fallback
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.warn("Erro ao obter dica do coach (usando fallback)", 'geminiService', error);
-        const timeOfDay = new Date().getHours() < 12 ? 'manhã' : new Date().getHours() < 18 ? 'tarde' : 'noite';
-        return `Bom ${timeOfDay}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
+
+  // Verificar se backend está marcado como indisponível
+  if (isBackendUnavailable()) {
+    return `Bom ${timeOfDay}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
+  }
+
+  try {
+    const res = await fetch(`${AI_BACKEND_BASE}/ai/text`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId: user.id,
+        gymId: user.gymId ?? null,
+        feature: "coach_tip",
+        model: "gemini-1.5-flash",
+        prompt,
+      }),
+    });
+
+    if (!res.ok) {
+      // Se for 503 (Service Unavailable), marcar backend como indisponível
+      if (res.status === 503) {
+        markBackendUnavailable();
+      }
+      const text = await res.text();
+      // Só logar se não for 503 (para evitar spam no console)
+      if (res.status !== 503) {
+        logger.warn(
+          `Falha no backend de IA em getAICoachTip: ${res.status} ${text}`,
+          "geminiService",
+        );
+      }
+      return `Bom ${timeOfDay}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
     }
+
+    const data = await res.json();
+    const tip: string = data.text || "";
+    if (!tip.trim()) {
+      return `Bom ${timeOfDay}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
+    }
+    return tip.trim();
+  } catch (error) {
+    logger.warn(
+      "Erro ao obter dica do coach (usando fallback)",
+      "geminiService",
+      error,
+    );
+    return `Bom ${timeOfDay}! Mantenha-se hidratado e focado no seu objetivo de ${user.objetivo}. Você consegue! 💪`;
+  }
 };
 
 // --- PROGRESS ANALYSIS ---
@@ -586,8 +611,6 @@ const progressAnalysisSchema = {
 };
 
 export const analyzeProgress = async (user: User): Promise<ProgressAnalysis> => {
-    const apiKey = await getApiKey(user.gymId);
-    if (!apiKey) throw new Error("API key is not configured. Please set it up in Settings.");
     const prompt = `
         Analise o histórico de peso do usuário para o objetivo de "${user.objetivo}".
         Histórico (data, peso em kg): ${JSON.stringify(user.weightHistory)}.
@@ -599,29 +622,101 @@ export const analyzeProgress = async (user: User): Promise<ProgressAnalysis> => 
         5. Sugira 2 áreas de melhoria.
         Retorne estritamente no formato JSON.
     `;
-    const ai = await getGeminiClient(user.gymId);
-    const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash", // Modelo estável
-        contents: prompt,
-        config: { responseMimeType: "application/json", responseSchema: progressAnalysisSchema }
+
+    if (!isOnline()) {
+      throw new Error("Conecte-se à internet para obter a análise de progresso.");
+    }
+
+    // Verificar se backend está marcado como indisponível
+    if (isBackendUnavailable()) {
+      throw new Error("Backend de IA temporariamente indisponível. Tente novamente em alguns instantes.");
+    }
+
+    const res = await fetch(`${AI_BACKEND_BASE}/ai/text`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: user.id,
+        gymId: user.gymId ?? null,
+        feature: "progress_analysis",
+        model: "gemini-1.5-flash",
+        prompt,
+      }),
     });
-    return JSON.parse(response.text) as ProgressAnalysis;
+
+    if (!res.ok) {
+      // Se for 503 (Service Unavailable), marcar backend como indisponível
+      if (res.status === 503) {
+        markBackendUnavailable();
+      }
+      const text = await res.text();
+      // Só logar se não for 503 (para evitar spam no console)
+      if (res.status !== 503) {
+        logger.warn(
+          `Falha no backend de IA em analyzeProgress: ${res.status} ${text}`,
+          "geminiService",
+        );
+      }
+      throw new Error("Não foi possível gerar a análise de progresso.");
+    }
+
+    const data = await res.json();
+    const text: string = data.text || "";
+    if (!text.trim()) {
+      throw new Error("Resposta vazia do serviço de IA para análise de progresso.");
+    }
+
+    return JSON.parse(text) as ProgressAnalysis;
 };
 
 // --- EXPLAIN MEAL ---
 export const explainMeal = async (mealName: string, user: User): Promise<string> => {
-    const apiKey = await getApiKey(user.gymId);
-    if (!apiKey) throw new Error("API key is not configured. Please set it up in Settings.");
     const prompt = `
         Explique de forma científica e simples por que a refeição "${mealName}" é uma boa escolha para o usuário, considerando seu objetivo de "${user.objetivo}".
         Fale sobre os macronutrientes principais da refeição e como eles ajudam a atingir o objetivo.
         Seja breve (2-3 frases) e educativo.
     `;
-    const ai = await getGeminiClient(user.gymId);
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" }); // usar modelo estável de texto
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text().trim();
+
+    if (!isOnline()) {
+      throw new Error("Conecte-se à internet para obter a explicação da refeição.");
+    }
+
+    // Verificar se backend está marcado como indisponível
+    if (isBackendUnavailable()) {
+      throw new Error("Backend de IA temporariamente indisponível. Tente novamente em alguns instantes.");
+    }
+
+    const res = await fetch(`${AI_BACKEND_BASE}/ai/text`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: user.id,
+        gymId: user.gymId ?? null,
+        feature: "food_substitution",
+        model: "gemini-1.5-flash",
+        prompt,
+      }),
+    });
+
+    if (!res.ok) {
+      // Se for 503 (Service Unavailable), marcar backend como indisponível
+      if (res.status === 503) {
+        markBackendUnavailable();
+      }
+      const text = await res.text();
+      // Só logar se não for 503 (para evitar spam no console)
+      if (res.status !== 503) {
+        logger.warn(
+          `Falha no backend de IA em explainMeal: ${res.status} ${text}`,
+          "geminiService",
+        );
+      }
+      throw new Error("Não foi possível obter a explicação da refeição.");
+    }
+
+    const data = await res.json();
+    const explanation: string = data.text || "";
+    return explanation.trim();
 };
 
 // --- FOOD SUBSTITUTION ---
@@ -644,18 +739,84 @@ const foodSubstitutionsSchema = {
 };
 
 export const getFoodSubstitutions = async (food: string, user: User): Promise<FoodSubstitution[]> => {
-    const apiKey = await getApiKey(user.gymId);
-    if (!apiKey) throw new Error("API key is not configured. Please set it up in Settings.");
     const prompt = `
         Para o alimento "${food}", sugira 3 substituições mais saudáveis e alinhadas com o objetivo do usuário de "${user.objetivo}".
         Para cada sugestão, forneça uma justificativa clara e concisa.
         Retorne estritamente no formato JSON.
     `;
-    const ai = await getGeminiClient(user.gymId);
-    const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash", // Modelo estável
-        contents: prompt,
-        config: { responseMimeType: "application/json", responseSchema: foodSubstitutionsSchema }
+
+    if (!isOnline()) {
+      throw new Error("Conecte-se à internet para obter as substituições de alimentos.");
+    }
+
+    // Verificar se backend está marcado como indisponível
+    if (isBackendUnavailable()) {
+      throw new Error("Backend de IA temporariamente indisponível. Tente novamente em alguns instantes.");
+    }
+
+    const res = await fetch(`${AI_BACKEND_BASE}/ai/text`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: user.id,
+        gymId: user.gymId ?? null,
+        feature: "food_substitution",
+        model: "gemini-1.5-flash",
+        prompt,
+      }),
     });
-    return (JSON.parse(response.text) as { substituicoes: FoodSubstitution[] }).substituicoes;
+
+    if (!res.ok) {
+      // Se for 503 (Service Unavailable), marcar backend como indisponível
+      if (res.status === 503) {
+        markBackendUnavailable();
+      }
+      const text = await res.text();
+      // Só logar se não for 503 (para evitar spam no console)
+      if (res.status !== 503) {
+        logger.warn(
+          `Falha no backend de IA em getFoodSubstitutions: ${res.status} ${text}`,
+          "geminiService",
+        );
+      }
+      throw new Error("Não foi possível obter substituições de alimentos.");
+    }
+
+    const data = await res.json();
+    const jsonText: string = data.text || "";
+    if (!jsonText.trim()) {
+      throw new Error("Resposta vazia do serviço de IA para substituições de alimentos.");
+    }
+
+    return (JSON.parse(jsonText) as { substituicoes: FoodSubstitution[] })
+      .substituicoes;
 };
+
+// --- UTILITY FUNCTIONS ---
+
+/**
+ * Obtém a API key do Gemini (do backend ou variável de ambiente)
+ */
+async function getApiKey(gymId?: string | null): Promise<string | null> {
+  // Em desenvolvimento, usar variável de ambiente se disponível
+  const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (envKey) {
+    return envKey;
+  }
+
+  // Se tiver gymId, tentar obter do backend (futuro)
+  // Por enquanto, retornar null se não houver chave
+  return null;
+}
+
+/**
+ * Obtém cliente Gemini com API key
+ */
+async function getGeminiClient(gymId?: string | null): Promise<GoogleGenAI> {
+  const apiKey = await getApiKey(gymId);
+  if (!apiKey) {
+    throw new Error("API key for Gemini is not configured. Please set it up in Settings or define VITE_GEMINI_API_KEY.");
+  }
+  
+  return new GoogleGenAI({ apiKey });
+}
