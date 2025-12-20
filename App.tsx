@@ -31,6 +31,7 @@ const AnalysisPage = lazy(() => import('./pages/AnalysisPage'));
 const SmartMealPage = lazy(() => import('./pages/SmartMealPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const ProfessionalDashboardPage = lazy(() => import('./pages/ProfessionalDashboardPage'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 const WelcomeSurveyPage = lazy(() => import('./pages/WelcomeSurveyPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const GymAdminPage = lazy(() => import('./pages/GymAdminPage'));
@@ -125,8 +126,10 @@ const App: React.FC = () => {
     const device = useDeviceContext();
     const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
-    // Verificar se é o primeiro acesso (apresentação ainda não foi vista)
+    // Verificar se é o primeiro acesso (landing, apresentação)
+    const LANDING_SEEN_KEY = 'fitcoach.landing.seen';
     const PRESENTATION_SEEN_KEY = 'fitcoach.presentation.seen';
+    const [hasSeenLanding, setHasSeenLanding] = useState<boolean | null>(null);
     const [hasSeenPresentation, setHasSeenPresentation] = useState<boolean | null>(null);
     const [isInitialized, setIsInitialized] = useState(false);
 
@@ -135,13 +138,22 @@ const App: React.FC = () => {
     const [validatedCouponCode, setValidatedCouponCode] = useState<string | null>(null);
 
     // Rotas públicas (não requerem autenticação)
-    const publicRoutes = ['/premium', '/presentation', '/login'];
+    const publicRoutes = ['/premium', '/presentation', '/login', '/landing'];
     const isPublicRoute = publicRoutes.includes(path);
 
-    // Inicializar verificação de apresentação e login de forma síncrona
+    // Inicializar verificação de landing, apresentação e login de forma síncrona
     useEffect(() => {
+        // Verificar landing de forma síncrona
+        const checkLanding = () => {
+            if (typeof window !== 'undefined') {
+                const seen = localStorage.getItem(LANDING_SEEN_KEY) === 'true';
+                setHasSeenLanding(seen);
+            } else {
+                setHasSeenLanding(false);
+            }
+        };
+
         // Verificar apresentação de forma síncrona
-        // Em mobile, pode pular a apresentação se já foi vista em outro dispositivo
         const checkPresentation = () => {
             if (typeof window !== 'undefined') {
                 // Verificar flag global
@@ -158,21 +170,30 @@ const App: React.FC = () => {
             }
         };
 
+        checkLanding();
         checkPresentation();
 
-        // Listener para mudanças no localStorage (quando apresentação é marcada como vista)
+        // Listener para mudanças no localStorage
         const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === LANDING_SEEN_KEY) {
+                checkLanding();
+            }
             if (e.key === PRESENTATION_SEEN_KEY) {
                 checkPresentation();
             }
         };
 
-        // Listener para evento customizado (quando apresentação é marcada na mesma aba)
+        // Listener para eventos customizados
+        const handleLandingSeen = () => {
+            checkLanding();
+        };
+
         const handlePresentationSeen = () => {
             checkPresentation();
         };
 
         window.addEventListener('storage', handleStorageChange);
+        window.addEventListener('landing-seen', handleLandingSeen);
         window.addEventListener('presentation-seen', handlePresentationSeen);
 
         // Aplicar otimizações específicas do dispositivo
@@ -218,26 +239,30 @@ const App: React.FC = () => {
 
         return () => {
             window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('landing-seen', handleLandingSeen);
             window.removeEventListener('presentation-seen', handlePresentationSeen);
         };
     }, [device]);
 
     // Aguardar inicialização antes de decidir roteamento
-    if (!isInitialized || hasSeenPresentation === null) {
+    if (!isInitialized || hasSeenLanding === null || hasSeenPresentation === null) {
         return <PageLoader />;
     }
 
-    // Se path está vazio (sem hash), decidir baseado na flag de apresentação e login
+    // Se path está vazio (sem hash), decidir baseado no fluxo: Landing → Vídeo → Login
     if (!path || path === '') {
-        if (!hasSeenPresentation) {
-            // Primeiro acesso: redirecionar para apresentação
+        if (!hasSeenLanding) {
+            // Primeiro acesso: mostrar landing (logo)
+            window.location.hash = '#/landing';
+            return <PageLoader />;
+        } else if (!hasSeenPresentation) {
+            // Viu landing mas não viu vídeo: redirecionar para apresentação (vídeo)
             window.location.hash = '#/presentation';
             return <PageLoader />;
         } else if (!isLoggedIn) {
-            // Já viu apresentação mas não está logado: iniciar fluxo de escolha (academia x B2C)
-            if (inviteFlowState === null) {
-                setInviteFlowState('choice');
-            }
+            // Viu landing e vídeo mas não está logado: redirecionar para login
+            window.location.hash = '#/login';
+            return <PageLoader />;
         } else {
             // Logado: redirecionar para home
             window.location.hash = '#/';
@@ -245,10 +270,22 @@ const App: React.FC = () => {
         }
     }
 
-    // Lógica de primeiro acesso: se não viu apresentação, só permitir /presentation e /premium
-    // Se tentar acessar /login ou qualquer outra rota no primeiro acesso, redirecionar para apresentação
-    if (!hasSeenPresentation && path !== '/presentation' && path !== '/premium') {
+    // Lógica de primeiro acesso: garantir fluxo correto
+    // Se não viu landing, só permitir /landing
+    if (!hasSeenLanding && path !== '/landing') {
+        window.location.hash = '#/landing';
+        return <PageLoader />;
+    }
+    
+    // Se viu landing mas não viu apresentação, só permitir /presentation e /landing
+    if (hasSeenLanding && !hasSeenPresentation && path !== '/presentation' && path !== '/landing') {
         window.location.hash = '#/presentation';
+        return <PageLoader />;
+    }
+    
+    // Se viu landing e apresentação mas não está logado, permitir apenas /login, /landing, /presentation
+    if (hasSeenLanding && hasSeenPresentation && !isLoggedIn && path !== '/login' && path !== '/landing' && path !== '/presentation' && path !== '/premium') {
+        window.location.hash = '#/login';
         return <PageLoader />;
     }
 
@@ -307,29 +344,40 @@ const App: React.FC = () => {
         return null;
     }
 
-    // Verificar se usuário precisa responder a enquete
-    // O flag da enquete é específico por usuário (username)
-    // A enquete deve aparecer para alunos (USER_GYM) e usuários B2C (USER_B2C)
-    const SURVEY_STORAGE_FLAG = user.username ? `nutriIA_enquete_v2_done_${user.username}` : 'nutriIA_enquete_v2_done';
-    const hasAnsweredSurvey = typeof window !== 'undefined' ? localStorage.getItem(SURVEY_STORAGE_FLAG) : null;
-    
-    // Verificar tipo de conta
-    const accountType = getAccountType(user);
-    
-    // Usuário precisa da enquete se:
-    // 1. É aluno (USER_GYM) OU usuário B2C (USER_B2C)
-    // 2. Não respondeu a enquete ainda
-    // 3. Não está na página da enquete
-    const isUserNeedingSurvey = (
-        (isStudent || accountType === 'USER_B2C') && 
-        !hasAnsweredSurvey && 
-        path !== '/welcome-survey'
-    );
+    // Verificar se usuário precisa responder a enquete (APENAS APÓS LOGIN)
+    // A enquete só aparece após login bem-sucedido
+    if (isLoggedIn) {
+        // Obter chave de storage com sufixo de domínio (para evitar conflitos)
+        const getSurveyStorageFlag = (username?: string) => {
+            const userSuffix = username ? `_${username}` : '';
+            const domainSuffix = typeof window !== 'undefined' 
+                ? `_${window.location.hostname.replace(/\./g, '_')}` 
+                : '';
+            return `nutriIA_enquete_v2_done${userSuffix}${domainSuffix}`;
+        };
+        
+        const SURVEY_STORAGE_FLAG = getSurveyStorageFlag(user.username);
+        const hasAnsweredSurvey = typeof window !== 'undefined' ? localStorage.getItem(SURVEY_STORAGE_FLAG) : null;
+        
+        // Verificar tipo de conta
+        const accountType = getAccountType(user);
+        
+        // Usuário precisa da enquete se:
+        // 1. Está logado
+        // 2. É aluno (USER_GYM) OU usuário B2C (USER_B2C)
+        // 3. Não respondeu a enquete ainda
+        // 4. Não está na página da enquete
+        const isUserNeedingSurvey = (
+            (isStudent || accountType === 'USER_B2C') && 
+            !hasAnsweredSurvey && 
+            path !== '/welcome-survey'
+        );
 
-    // Se usuário não respondeu a enquete, redirecionar
-    if (isUserNeedingSurvey) {
-        window.location.hash = '#/welcome-survey';
-        return null;
+        // Se usuário não respondeu a enquete, redirecionar
+        if (isUserNeedingSurvey) {
+            window.location.hash = '#/welcome-survey';
+            return null;
+        }
     }
 
     const renderPage = () => {
@@ -371,6 +419,18 @@ const App: React.FC = () => {
     };
 
 
+    // Página de Landing (Logo)
+    if (path === '/landing') {
+        return (
+            <GymBrandingProvider>
+                <Suspense fallback={<PageLoader />}>
+                    <LandingPage />
+                </Suspense>
+            </GymBrandingProvider>
+        );
+    }
+
+    // Página de Apresentação (Vídeo)
     if (path === '/presentation') {
         return (
             <Suspense fallback={<PageLoader />}>
