@@ -104,8 +104,19 @@ const PremiumPage: React.FC = () => {
     };
     
     // Separar planos por categoria
-    // NOTA: Planos B2C e Personal Trainer foram removidos - não existem mais na página de vendas nem na Cakto
-    const b2bPlans = useMemo(() => allPlans.filter(p => p.plan_category === 'b2b'), [allPlans]);
+    // NOTA: Planos B2C (monthly, annual_vip) foram removidos - não devem ser exibidos para testes
+    // NOTA: Planos Personal Trainer foram removidos - não existem mais na página de vendas nem na Cakto
+    const b2bPlans = useMemo(() => {
+        // Filtrar planos B2C (monthly e annual_vip) para não exibi-los
+        return allPlans.filter(p => {
+            // Excluir planos B2C
+            if (p.name === 'monthly' || p.name === 'annual_vip' || p.plan_category === 'b2c') {
+                return false;
+            }
+            // Incluir apenas planos B2B
+            return p.plan_category === 'b2b';
+        });
+    }, [allPlans]);
 
     // Rolar para a oferta específica quando vier de #/premium?product=...
     useEffect(() => {
@@ -424,7 +435,7 @@ const PremiumPage: React.FC = () => {
                 </div>
             ) : (
                 <div className="space-y-8 sm:space-y-12">
-                    {/* NOTA: Planos B2C foram removidos - não existem mais na página de vendas nem na Cakto */}
+                    {/* NOTA: Planos B2C (Plano Mensal e Plano Anual VIP) foram removidos - não devem ser exibidos para testes */}
                     
                     {/* PLANOS B2B - ACADEMIAS */}
                     {b2bPlans.length > 0 && (
@@ -450,7 +461,7 @@ const PremiumPage: React.FC = () => {
                                 icon={<ChartBarIcon className="w-6 h-6 text-primary-500" />}
                             />
                             
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 items-stretch mt-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 items-stretch mt-6">
                                 {b2bPlans.map((plan) => {
                                     const isPopular = plan.name === 'academy_growth';
                                     return (
@@ -503,7 +514,7 @@ const PremiumPage: React.FC = () => {
                                     <li className="flex items-start gap-2">
                                         <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
                                         <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
-                                            +20 Minutos de Voz
+                                            +30 Minutos de Voz
                                         </span>
                                     </li>
                                     <li className="flex items-start gap-2">

@@ -109,6 +109,16 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
       return [
         { name: 'Progresso dos Alunos', href: '#/analysis', icon: TrendingUpIcon },
         { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
+        { name: 'Criar Planos de Treino', href: '#/trainer-workout', icon: HeartIcon, show: permissions.canViewStudents },
+        { name: 'Biblioteca de Exercícios', href: '#/biblioteca', icon: BookOpenIcon },
+      ].filter(item => item.show !== false);
+    }
+    
+    // Trainer de Academia
+    if (isTrainer) {
+      return [
+        { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
+        { name: 'Criar Planos de Treino', href: '#/trainer-workout', icon: HeartIcon, show: permissions.canViewStudents },
         { name: 'Biblioteca de Exercícios', href: '#/biblioteca', icon: BookOpenIcon },
       ].filter(item => item.show !== false);
     }

@@ -40,6 +40,17 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     setIsLoading(false);
     setHasError(true);
+    
+    // Debug: Log do erro em desenvolvimento
+    if (import.meta.env.DEV) {
+      console.error('GifLoader: Erro ao carregar GIF', {
+        src,
+        attemptedPath: src,
+        error: e,
+        target: (e.target as HTMLImageElement)?.src,
+      });
+    }
+    
     if (onError) {
       onError(e);
     }
@@ -85,10 +96,15 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
 
       {/* Mensagem de erro */}
       {hasError && (
-        <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+        <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-col gap-1">
           <p className="text-xs text-slate-500 dark:text-slate-400 text-center px-2">
             GIF não disponível
           </p>
+          {import.meta.env.DEV && (
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center px-2 break-all max-w-full">
+              {src}
+            </p>
+          )}
         </div>
       )}
     </div>

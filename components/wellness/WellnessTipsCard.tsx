@@ -34,15 +34,15 @@ export const WellnessTipsCard: React.FC<WellnessTipsCardProps> = ({ tips }) => {
                     {tipSections.map((section) => (
                         <div
                             key={section.key}
-                            className="p-3 sm:p-4 bg-gradient-to-br from-primary-50 to-emerald-50 dark:from-primary-900/20 dark:to-emerald-900/20 rounded-lg border border-primary-200 dark:border-primary-800"
+                            className="p-3 sm:p-4 bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm"
                         >
                             <div className="flex items-center gap-2 mb-2">
                                 <span className="text-xl sm:text-2xl flex-shrink-0">{section.icon}</span>
-                                <h3 className="font-semibold text-sm sm:text-base text-slate-800 dark:text-slate-200 break-words">
+                                <h3 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-slate-100 break-words">
                                     {section.label}
                                 </h3>
                             </div>
-                            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed break-words">
+                            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed break-words">
                                 {section.value}
                             </p>
                         </div>

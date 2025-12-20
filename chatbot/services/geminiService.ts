@@ -58,6 +58,46 @@ const searchMapsFunctionDeclaration: FunctionDeclaration = {
   },
 };
 
+const logMealFunctionDeclaration: FunctionDeclaration = {
+  name: 'logMeal',
+  parameters: {
+    type: Type.OBJECT,
+    description: 'Registra uma refeição consumida pelo usuário no diário alimentar. Use esta ferramenta quando o usuário mencionar que comeu algo.',
+    properties: {
+      foodName: {
+        type: Type.STRING,
+        description: 'Nome do alimento ou refeição consumida.',
+      },
+      calories: {
+        type: Type.NUMBER,
+        description: 'Calorias estimadas (opcional, estime se não informado).',
+      },
+      protein: {
+        type: Type.NUMBER,
+        description: 'Proteínas em gramas (opcional, estime se não informado).',
+      },
+      carbs: {
+        type: Type.NUMBER,
+        description: 'Carboidratos em gramas (opcional, estime se não informado).',
+      },
+      fats: {
+        type: Type.NUMBER,
+        description: 'Gorduras em gramas (opcional, estime se não informado).',
+      },
+      mealType: {
+        type: Type.STRING,
+        description: 'Tipo de refeição: breakfast, lunch, dinner ou snack.',
+        enum: ['breakfast', 'lunch', 'dinner', 'snack'],
+      },
+      description: {
+        type: Type.STRING,
+        description: 'Descrição adicional da refeição (opcional).',
+      },
+    },
+    required: ['foodName', 'mealType'],
+  },
+};
+
 
 // Personality Options
 export const PERSONALITY_OPTIONS = {
@@ -84,53 +124,32 @@ const IMAGE_EDIT_MODEL = 'gemini-2.5-flash-image';
 const LIVE_AUDIO_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
 
-// Ensure the GoogleGenAI instance is created right before an API call
-// to use the most up-to-date API key.
+// Backend proxy base URL para chamadas de texto (chat); recursos avançados
+// como Live Audio e ferramentas ainda usam GoogleGenAI diretamente e
+// serão migrados em uma etapa posterior.
+const AI_BACKEND_BASE =
+  import.meta.env.VITE_AI_BACKEND_URL || '/api';
+
+// Cliente Gemini direto ainda é usado apenas para Live Audio e processamento de imagem/vídeo.
+// Grounded/Maps/TTS agora usam o backend proxy para segurança e controle de custo.
 function getGeminiClient(): GoogleGenAI {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || undefined;
   if (!apiKey) {
-    throw new Error("API key for Gemini is not configured. Please set VITE_GEMINI_API_KEY in your .env file.");
+    throw new Error(
+      'API key for Gemini is not configured. Please set VITE_GEMINI_API_KEY in your .env file.',
+    );
   }
   return new GoogleGenAI({ apiKey });
 }
 
+// initializeChat deixa de abrir sessão direto com Gemini para texto; o fluxo
+// principal de chat de texto passa a usar o backend /ai/text. Mantemos a
+// assinatura vazia para compatibilidade com chamadas existentes.
 export async function initializeChat(
-  useProModelForThinking: boolean = false,
-  systemInstruction: string = PERSONALITY_OPTIONS[DEFAULT_PERSONALITY_KEY],
+  _useProModelForThinking: boolean = false,
+  _systemInstruction: string = PERSONALITY_OPTIONS[DEFAULT_PERSONALITY_KEY],
 ): Promise<void> {
-  const modelToUse = useProModelForThinking ? PRO_MODEL : FLASH_MODEL;
-
-  // Reinitialize chat session only if model changes or it's not set
-  // When systemInstruction changes, we want to force a new chat session to apply it.
-  interface ChatSessionWithModel {
-    model?: string;
-    config?: {
-      systemInstruction?: string;
-    };
-  }
-  
-  const chatSessionTyped = chatSession as ChatSessionWithModel | undefined;
-  if (!chatSession || chatSessionTyped?.model !== modelToUse || chatSessionTyped?.config?.systemInstruction !== systemInstruction) {
-    const ai = getGeminiClient();
-    
-    interface ChatConfig {
-      systemInstruction: string;
-      thinkingConfig?: {
-        thinkingBudget: number;
-      };
-    }
-    
-    const config: ChatConfig = {
-      systemInstruction: systemInstruction,
-    };
-    if (useProModelForThinking) {
-      config.thinkingConfig = { thinkingBudget: 32768 }; // Max budget for 2.5-pro
-    }
-    chatSession = ai.chats.create({
-      model: modelToUse,
-      config: config,
-    });
-  }
+  // Nada a fazer: o backend recebe apenas o último prompt e decide contexto.
 }
 
 export async function sendMessageToGemini(
@@ -141,55 +160,44 @@ export async function sendMessageToGemini(
   imageFile?: { base64: string; mimeType: string },
   currentSystemInstruction: string = PERSONALITY_OPTIONS[DEFAULT_PERSONALITY_KEY],
 ): Promise<void> {
-  await initializeChat(useProModelForThinking, currentSystemInstruction); // Ensure chat session is initialized with correct model and system instruction
-
-  if (!chatSession) {
-    onError("Chat session could not be initialized.");
-    return;
-  }
-
   try {
-    interface RequestOptions {
-      message?: string;
-      contents?: {
-        parts: Array<{
-          inlineData?: {
-            mimeType: string;
-            data: string;
-          };
-          text?: string;
-        }>;
-      };
-    }
-    
-    let requestOptions: RequestOptions;
+    // Para chat de texto, usar backend /ai/text e simular streaming
+    const modelToUse = useProModelForThinking ? PRO_MODEL : FLASH_MODEL;
 
-    if (imageFile) {
-      requestOptions = {
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: imageFile.mimeType,
-                data: imageFile.base64,
-              },
-            },
-            { text: message },
-          ],
-        },
-      };
-    } else {
-      requestOptions = {
-        message: message, // Simple text message
-      };
+    // Incluir instrução de sistema simples no prompt enviado ao backend
+    const promptWithSystem = `${currentSystemInstruction}\n\nUsuário: ${message}`;
+
+    const res = await fetch(`${AI_BACKEND_BASE}/ai/text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: 'chatbot', // opcional: pode ser substituído por ID real se houver
+        gymId: null,
+        feature: 'chat',
+        model: modelToUse,
+        prompt: promptWithSystem,
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      onError(
+        `Falha ao chamar backend de IA: ${res.status} ${res.statusText} - ${text}`,
+      );
+      return;
     }
 
-    const responseStream = await chatSession.sendMessageStream(requestOptions);
+    const data = await res.json();
+    const fullText: string = data.text || '';
+    if (!fullText.trim()) {
+      onError('Resposta vazia do backend de IA.');
+      return;
+    }
 
-    for await (const chunk of responseStream) {
-      if (chunk.text) {
-        onNewChunk(chunk.text);
-      }
+    // Simular streaming dividindo a resposta em pedaços
+    const chunks = fullText.split(/(\. |\n)/).filter((c) => c && c.trim());
+    for (const chunk of chunks) {
+      onNewChunk(chunk);
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -199,27 +207,28 @@ export async function sendMessageToGemini(
 }
 
 export async function generateGroundedResponse(prompt: string): Promise<{ text: string; webResults: WebSearchResult[] }> {
-  const ai = getGeminiClient();
   try {
-    const response = await ai.models.generateContent({
-      model: FLASH_MODEL,
-      contents: prompt,
-      config: {
-        generationConfig: {
-          maxOutputTokens: 1024,
-        },
-        tools: [{ googleSearch: {} }],
-      },
+    const res = await fetch(`${AI_BACKEND_BASE}/ai/grounded`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: 'chatbot', // TODO: substituir por ID real do usuário quando disponível
+        gymId: null,
+        model: FLASH_MODEL,
+        prompt,
+      }),
     });
 
-    const text = response.text;
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    
-    const webResults = groundingChunks
-      .map(chunk => chunk.web)
-      .filter((web): web is { uri: string; title: string } => !!web && !!web.uri && !!web.title);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Backend error: ${res.status} ${res.statusText} - ${text}`);
+    }
 
-    return { text: text || "No text response found.", webResults };
+    const data = await res.json();
+    return {
+      text: data.text || "No text response found.",
+      webResults: data.webResults || [],
+    };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error("Erro na API de busca web do Gemini", 'chatbot/geminiService', error);
@@ -228,8 +237,7 @@ export async function generateGroundedResponse(prompt: string): Promise<{ text: 
 }
 
 export async function generateMapsGroundedResponse(prompt: string): Promise<{ text: string; mapsResults: MapSearchResult[] }> {
-  const ai = getGeminiClient();
-
+  // Obter localização do navegador
   const location = await new Promise<{latitude: number, longitude: number} | null>((resolve) => {
     if (!navigator.geolocation) {
       resolve(null);
@@ -241,75 +249,35 @@ export async function generateMapsGroundedResponse(prompt: string): Promise<{ te
     );
   });
 
-  interface MapsConfig {
-    tools: Array<{ googleMaps: Record<string, never> }>;
-    toolConfig?: {
-      retrievalConfig: {
-        latLng: { latitude: number; longitude: number };
-      };
-    };
-  }
-  
-  const config: MapsConfig = {
-    tools: [{googleMaps: {}}],
-  };
-
-  if (location) {
-    config.toolConfig = {
-      retrievalConfig: { latLng: location },
-    };
-  }
-
   try {
-    const response = await ai.models.generateContent({
+    const body: any = {
+      userId: 'chatbot', // TODO: substituir por ID real do usuário quando disponível
+      gymId: null,
       model: FLASH_MODEL,
-      contents: prompt,
-      config: {
-        ...config,
-        generationConfig: {
-          maxOutputTokens: 1024,
-        },
-      },
+      prompt,
+    };
+
+    if (location) {
+      body.latitude = location.latitude;
+      body.longitude = location.longitude;
+    }
+
+    const res = await fetch(`${AI_BACKEND_BASE}/ai/maps`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
 
-    const text = response.text;
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-
-    interface MapsChunk {
-      maps?: {
-        uri?: string;
-        title?: string;
-        placeAnswerSources?: {
-          reviewSnippets?: Array<{
-            text?: string;
-            author?: string;
-            rating?: number;
-          }>;
-        };
-      };
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Backend error: ${res.status} ${res.statusText} - ${text}`);
     }
 
-    interface ReviewSnippet {
-      text?: string;
-      author?: string;
-      rating?: number;
-    }
-
-    const mapsResults: MapSearchResult[] = (groundingChunks as MapsChunk[])
-      .map(chunk => chunk.maps)
-      .filter((maps): maps is NonNullable<MapsChunk['maps']> => !!maps)
-      .map(maps => ({
-        uri: maps.uri || '',
-        title: maps.title || '',
-        reviews: maps.placeAnswerSources?.reviewSnippets?.map((review: ReviewSnippet) => ({
-            text: review.text || '',
-            author: review.author || 'N/A',
-            rating: review.rating || 0
-        })) || []
-      }))
-      .filter(result => result.uri && result.title);
-
-    return { text: text || "No text response found.", mapsResults };
+    const data = await res.json();
+    return {
+      text: data.text || "No text response found.",
+      mapsResults: data.mapsResults || [],
+    };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error("Erro na API de Maps do Gemini", 'chatbot/geminiService', error);
@@ -471,7 +439,7 @@ export async function startLiveAudioSession(
   onTranscriptionChunk: (text: string) => void,
   onModelAudioChunk: (audioBuffer: AudioBuffer) => void,
   onModelTranscriptionChunk: (text: string) => void,
-  onTurnComplete: (results: { webResults?: WebSearchResult[], mapsResults?: MapSearchResult[] }) => void,
+  onTurnComplete: (results: { webResults?: WebSearchResult[], mapsResults?: MapSearchResult[], mealLogged?: boolean }) => void,
   onSuccess: () => void,
   onError: (error: string, isApiKeyError: boolean) => void, // Modified onError signature
   onSessionEndedUnexpectedly: () => void,
@@ -481,6 +449,10 @@ export async function startLiveAudioSession(
   onToolCallResult: (toolName: string) => void,
   useWebSearch: boolean,
   useMapsSearch: boolean,
+  useMealLogging: boolean = false,
+  onMealLogged?: (meal: { foodName: string; calories?: number; protein?: number; carbs?: number; fats?: number; mealType: string; description?: string }) => void,
+  onVolumeLevel?: (level: number) => void, // Callback para medidor de volume (0-100)
+  getIsMicMuted?: () => boolean, // Função para obter estado do mute dinamicamente
 ): Promise<void> {
   if (liveAudioSession || sessionPromiseForCleanup) {
     logger.warn("Sessão de áudio ao vivo já ativa ou conectando. Fechando sessão existente para reiniciar com nova configuração.", 'chatbot/geminiService');
@@ -533,6 +505,7 @@ export async function startLiveAudioSession(
     const tools: FunctionDeclaration[] = [];
     if (useWebSearch) tools.push(searchWebFunctionDeclaration);
     if (useMapsSearch) tools.push(searchMapsFunctionDeclaration);
+    if (useMealLogging) tools.push(logMealFunctionDeclaration);
 
     interface LiveConfig {
       responseModalities: Modality[];
@@ -559,7 +532,7 @@ export async function startLiveAudioSession(
         liveConfig.tools = [{ functionDeclarations: tools }];
     }
     
-    let turnToolResults: { webResults?: WebSearchResult[], mapsResults?: MapSearchResult[] } = {};
+    let turnToolResults: { webResults?: WebSearchResult[], mapsResults?: MapSearchResult[], mealLogged?: boolean } = {};
 
     const sessionPromise = ai.live.connect({
       model: LIVE_AUDIO_MODEL,
@@ -627,7 +600,8 @@ export async function startLiveAudioSession(
 
           if (message.toolCall) {
             for (const fc of message.toolCall.functionCalls) {
-              onToolCallStart(fc.name, fc.args.query);
+              const query = fc.args.query || fc.args.foodName || '';
+              onToolCallStart(fc.name, query);
               let results;
               try {
                 if (fc.name === 'searchWeb') {
@@ -640,6 +614,24 @@ export async function startLiveAudioSession(
                   if (results.mapsResults) {
                      turnToolResults.mapsResults = [...(turnToolResults.mapsResults || []), ...results.mapsResults];
                   }
+                } else if (fc.name === 'logMeal') {
+                  // Registrar refeição
+                  const mealData = {
+                    foodName: fc.args.foodName,
+                    calories: fc.args.calories,
+                    protein: fc.args.protein,
+                    carbs: fc.args.carbs,
+                    fats: fc.args.fats,
+                    mealType: fc.args.mealType,
+                    description: fc.args.description,
+                  };
+                  
+                  if (onMealLogged) {
+                    onMealLogged(mealData);
+                  }
+                  
+                  turnToolResults.mealLogged = true;
+                  results = { text: `Refeição "${mealData.foodName}" registrada com sucesso no diário!` };
                 } else {
                   throw new Error(`Unknown function call: ${fc.name}`);
                 }
@@ -697,8 +689,30 @@ export async function startLiveAudioSession(
 
     scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
       const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-      const pcmBlob = createBlob(inputData);
-      sessionPromise.then((session) => session.sendRealtimeInput({ media: pcmBlob }));
+      
+      // Verificar estado do mute dinamicamente
+      const isMuted = getIsMicMuted ? getIsMicMuted() : false;
+      
+      // Calcular nível de volume para medidor visual
+      if (onVolumeLevel) {
+        if (!isMuted) {
+          let sum = 0;
+          for (let i = 0; i < inputData.length; i++) {
+            sum += Math.abs(inputData[i]);
+          }
+          const average = sum / inputData.length;
+          const volumeLevel = Math.min(100, Math.max(0, average * 200)); // Normalizar para 0-100
+          onVolumeLevel(volumeLevel);
+        } else {
+          onVolumeLevel(0);
+        }
+      }
+      
+      // Enviar áudio apenas se microfone não estiver mutado
+      if (!isMuted) {
+        const pcmBlob = createBlob(inputData);
+        sessionPromise.then((session) => session.sendRealtimeInput({ media: pcmBlob }));
+      }
     };
 
     mediaStreamSource.connect(scriptProcessor);
@@ -772,26 +786,28 @@ export async function stopLiveAudioSession(): Promise<void> {
 
 // New TTS Function
 export async function generateSpeechFromText(text: string, voiceName: string): Promise<string> {
-  const ai = getGeminiClient();
   try {
-    const response = await ai.models.generateContent({
-      model: TTS_MODEL,
-      contents: [{ parts: [{ text: text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: voiceName },
-          },
-        },
-      },
+    const res = await fetch(`${AI_BACKEND_BASE}/ai/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: 'chatbot', // TODO: substituir por ID real do usuário quando disponível
+        gymId: null,
+        text,
+        voiceName: voiceName || DEFAULT_VOICE_NAME,
+      }),
     });
 
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) {
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Backend error: ${res.status} ${res.statusText} - ${text}`);
+    }
+
+    const data = await res.json();
+    if (!data.audioBase64) {
       throw new Error("No audio data was returned from the API.");
     }
-    return base64Audio;
+    return data.audioBase64;
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error("Erro na API de TTS do Gemini", 'chatbot/geminiService', error);

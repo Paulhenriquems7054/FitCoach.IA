@@ -31,6 +31,12 @@ interface DashboardStats {
   recentActivity: { name: string; students: number; trainers: number }[];
 }
 
+interface AiDashboardStats {
+  aiCallsMonth: number;
+  aiTokensMonth: number;
+  aiCostUsdMonth: number;
+}
+
 const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
 
 const AdminDashboardPage: React.FC = () => {
@@ -47,6 +53,11 @@ const AdminDashboardPage: React.FC = () => {
     activeStudents: 0,
     studentsByGoal: [],
     recentActivity: [],
+  });
+  const [aiStats, setAiStats] = useState<AiDashboardStats>({
+    aiCallsMonth: 0,
+    aiTokensMonth: 0,
+    aiCostUsdMonth: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -237,6 +248,41 @@ const AdminDashboardPage: React.FC = () => {
     };
 
     loadDashboardData();
+
+    // Carregar uso de IA para o mês atual (apenas admins / dev)
+    const loadAiUsage = async () => {
+      try {
+        const isDeveloper =
+          user.username === 'Desenvolvedor' || user.username === 'dev123';
+        const isDefaultAdmin =
+          user.username === 'Administrador' ||
+          user.username === 'Desenvolvedor' ||
+          user.username === 'dev123' ||
+          user.gymRole === 'admin';
+
+        if (!isDeveloper && !isDefaultAdmin) {
+          return;
+        }
+
+        const gymIdToUse = user.gymId || (isDefaultAdmin ? 'default-gym' : '');
+        if (!gymIdToUse) return;
+
+        const { fetchAiUsageSummary } = await import('../services/aiUsageService');
+        const usage = await fetchAiUsageSummary(gymIdToUse);
+        const tokens =
+          (usage?.totals.tokensIn || 0) + (usage?.totals.tokensOut || 0);
+
+        setAiStats({
+          aiCallsMonth: usage?.totals.calls || 0,
+          aiTokensMonth: tokens,
+          aiCostUsdMonth: usage?.totals.costUsd || 0,
+        });
+      } catch (e) {
+        console.warn('Erro ao carregar uso de IA para dashboard:', e);
+      }
+    };
+
+    loadAiUsage();
     
     // Carregar configurações de API e assinaturas (apenas para desenvolvedor)
     const isDeveloper = user.username === 'Desenvolvedor' || user.username === 'dev123';
@@ -1196,7 +1242,7 @@ const AdminDashboardPage: React.FC = () => {
       </div>
 
       {/* Estatísticas Principais */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${(user.username === 'Desenvolvedor' || user.username === 'dev123') ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3 sm:gap-4`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${(user.username === 'Desenvolvedor' || user.username === 'dev123') ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} gap-3 sm:gap-4`}>
         {/* Card: Total de Academias (apenas para desenvolvedor) */}
         {(user.username === 'Desenvolvedor' || user.username === 'dev123') && (
           <Card>
@@ -1274,6 +1320,44 @@ const AdminDashboardPage: React.FC = () => {
               </div>
               <div className="bg-purple-100 dark:bg-purple-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
                 <UsersIcon className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 dark:text-purple-400" />
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Card: IA - Chamadas (mês) */}
+        <Card>
+          <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">
+                  Chamadas Gemini (período)
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1 sm:mt-2">
+                  {aiStats.aiCallsMonth}
+                </p>
+              </div>
+              <div className="bg-sky-100 dark:bg-sky-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                <ChartBarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-sky-600 dark:text-sky-400" />
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Card: IA - Tokens (mês) */}
+        <Card>
+          <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 truncate">
+                  Tokens Gemini (período)
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1 sm:mt-2">
+                  {aiStats.aiTokensMonth}
+                </p>
+              </div>
+              <div className="bg-indigo-100 dark:bg-indigo-900/50 p-2 sm:p-3 rounded-lg flex-shrink-0 ml-2">
+                <ChartBarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600 dark:text-indigo-400" />
               </div>
             </div>
           </div>

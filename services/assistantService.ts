@@ -111,7 +111,9 @@ interface ImportMeta {
   env?: ImportMetaEnv;
 }
 
-const API_KEY = (import.meta as ImportMeta)?.env?.VITE_GEMINI_API_KEY || (process.env as { API_KEY?: string }).API_KEY;
+const API_KEY = (import.meta as ImportMeta)?.env?.VITE_GEMINI_API_KEY || 
+                (typeof window !== 'undefined' && (window as any).__GEMINI_API_KEY__) || 
+                undefined;
 const CUSTOM_PROMPT_STORAGE_KEY = 'nutria.assistant.customPrompt';
 
 // ---------------------------------------------------------------------------
@@ -140,6 +142,12 @@ let lastInstructionSignature: string | null = null;
 
 function getGeminiClient(): GoogleGenAI {
   if (!API_KEY) {
+    // Em desenvolvimento, logar aviso mas não quebrar a aplicação
+    if (import.meta.env.DEV) {
+      console.warn('[DEV] Gemini API key is missing. Defina VITE_GEMINI_API_KEY nas variáveis de ambiente para usar recursos de IA.');
+      // Retornar um cliente dummy que falhará graciosamente
+      return new GoogleGenAI({ apiKey: 'dummy-key-for-dev' });
+    }
     throw new Error('Gemini API key is missing. Defina VITE_GEMINI_API_KEY nas variáveis de ambiente.');
   }
   return new GoogleGenAI({ apiKey: API_KEY });

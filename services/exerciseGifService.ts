@@ -1381,6 +1381,21 @@ function findSimilarGif(
 }
 
 /**
+ * Codifica um caminho de URL preservando os separadores de caminho (/)
+ * Codifica cada segmento do caminho separadamente para lidar com caracteres especiais
+ * como espaços, parênteses, acentos, etc.
+ */
+function encodeUrlPath(path: string): string {
+  // Dividir o caminho em segmentos (preservando as barras)
+  const segments = path.split('/').filter(segment => segment.length > 0);
+  // Reconstruir o caminho codificando cada segmento
+  // Se o caminho original começava com /, preservar isso
+  const prefix = path.startsWith('/') ? '/' : '';
+  // Codificar cada segmento usando encodeURIComponent que lida com todos os caracteres especiais
+  return prefix + segments.map(segment => encodeURIComponent(segment)).join('/');
+}
+
+/**
  * Busca o GIF mais adequado para um exercício
  * @param exerciseName - Nome do exercício
  * @returns Caminho relativo para o GIF ou null se não encontrado
@@ -1391,7 +1406,12 @@ export function getExerciseGif(exerciseName: string): string | null {
   // Verificar cache primeiro
   const cacheKey = normalizeText(exerciseName);
   if (gifCache.has(cacheKey)) {
-    return gifCache.get(cacheKey) || null;
+    const cached = gifCache.get(cacheKey);
+    // Debug para Prancha
+    if (exerciseName.toLowerCase().includes('prancha')) {
+      console.log('🔍 [CACHE] Prancha encontrado no cache:', cached);
+    }
+    return cached || null;
   }
   
   const normalized = normalizeText(exerciseName);
@@ -1399,17 +1419,54 @@ export function getExerciseGif(exerciseName: string): string | null {
   
   // 1. Buscar por grupo muscular
   const muscleGroup = findMuscleGroup(exerciseName);
+  
+  // Debug para Prancha
+  if (exerciseName.toLowerCase().includes('prancha')) {
+    console.log('🔍 [DEBUG] Buscando GIF para:', {
+      exerciseName,
+      normalized,
+      muscleGroup,
+      availableGifsCount: muscleGroup ? availableGifsByGroup[muscleGroup]?.length : 0,
+    });
+  }
+  
   if (muscleGroup) {
     const availableGifs = availableGifsByGroup[muscleGroup];
     if (availableGifs && availableGifs.length > 0) {
       // 2. PRIMEIRO: Tentar encontrar match exato (ignorando case e acentos)
       const exactMatch = availableGifs.find(gif => {
         const gifNameNormalized = normalizeText(gif.replace('.gif', ''));
-        return gifNameNormalized === normalized;
+        const matches = gifNameNormalized === normalized;
+        
+        // Debug para Prancha
+        if (exerciseName.toLowerCase().includes('prancha')) {
+          console.log('🔍 [MATCH] Comparando:', {
+            gif,
+            gifNameNormalized,
+            normalized,
+            matches,
+          });
+        }
+        
+        return matches;
       });
       
       if (exactMatch) {
-        result = `/GIFS/${muscleGroup}/${exactMatch}`;
+        // Construir caminho - o navegador e servidor devem lidar com caracteres especiais automaticamente
+        // Mas vamos codificar apenas os segmentos do caminho para garantir compatibilidade
+        const rawPath = `/GIFS/${muscleGroup}/${exactMatch}`;
+        result = encodeUrlPath(rawPath);
+        
+        // Debug para Prancha
+        if (exerciseName.toLowerCase().includes('prancha')) {
+          console.log('✅ [SUCCESS] Caminho gerado:', {
+            rawPath,
+            encoded: result,
+            muscleGroup,
+            exactMatch,
+          });
+        }
+        
         gifCache.set(cacheKey, result);
         return result;
       }
@@ -1421,7 +1478,9 @@ export function getExerciseGif(exerciseName: string): string | null {
       });
       
       if (partialMatch) {
-        result = `/GIFS/${muscleGroup}/${partialMatch}`;
+        // Codificar o caminho para lidar com caracteres especiais
+        const rawPath = `/GIFS/${muscleGroup}/${partialMatch}`;
+        result = encodeUrlPath(rawPath);
         gifCache.set(cacheKey, result);
         return result;
       }
@@ -1438,7 +1497,9 @@ export function getExerciseGif(exerciseName: string): string | null {
         });
         
         if (keywordMatch) {
-          result = `/GIFS/${muscleGroup}/${keywordMatch}`;
+          // Codificar o caminho para lidar com caracteres especiais
+          const rawPath = `/GIFS/${muscleGroup}/${keywordMatch}`;
+          result = encodeUrlPath(rawPath);
           gifCache.set(cacheKey, result);
           return result;
         }
@@ -1447,7 +1508,9 @@ export function getExerciseGif(exerciseName: string): string | null {
       // 5. QUARTO: Tentar encontrar GIF similar por similaridade de nome
       const similarGif = findSimilarGif(normalized, muscleGroup, 0.3); // Reduzido threshold para 0.3
       if (similarGif) {
-        result = `/GIFS/${muscleGroup}/${similarGif}`;
+        // Codificar o caminho para lidar com caracteres especiais
+        const rawPath = `/GIFS/${muscleGroup}/${similarGif}`;
+        result = encodeUrlPath(rawPath);
         // Armazenar no cache
         gifCache.set(cacheKey, result);
         return result;
@@ -1455,7 +1518,8 @@ export function getExerciseGif(exerciseName: string): string | null {
       
       // 6. ÚLTIMO: Se não encontrou similar, tentar retornar um GIF genérico do grupo
       // Retornar o primeiro GIF do grupo como fallback genérico
-      result = `/GIFS/${muscleGroup}/${availableGifs[0]}`;
+      const rawPath = `/GIFS/${muscleGroup}/${availableGifs[0]}`;
+      result = encodeUrlPath(rawPath);
       gifCache.set(cacheKey, result);
       return result;
     }
@@ -1485,7 +1549,8 @@ export function getCacheSize(): number {
  * Gera URL completa para o GIF
  */
 export function getGifUrl(folder: string, filename: string): string {
-  return `/GIFS/${folder}/${filename}`;
+  const rawPath = `/GIFS/${folder}/${filename}`;
+  return encodeUrlPath(rawPath);
 }
 
 /**

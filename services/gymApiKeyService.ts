@@ -24,7 +24,7 @@ export async function getAllGymsWithApiConfig(): Promise<GymApiKeyConfig[]> {
   try {
     const { data, error } = await supabase
       .from('gyms')
-      .select('id, name, gemini_api_key, gemini_api_enabled, gemini_api_last_used, gemini_api_usage_count')
+      .select('id, name, gemini_api_enabled, gemini_api_last_used, gemini_api_usage_count')
       .order('name');
     
     if (error) {
@@ -35,7 +35,8 @@ export async function getAllGymsWithApiConfig(): Promise<GymApiKeyConfig[]> {
     return (data || []).map(gym => ({
       gymId: gym.id,
       gymName: gym.name,
-      geminiApiKey: gym.gemini_api_key || null,
+      // Por segurança, a chave NUNCA é retornada para o frontend
+      geminiApiKey: null,
       geminiApiEnabled: gym.gemini_api_enabled ?? true, // Default true se não especificado
       lastUsed: gym.gemini_api_last_used || null,
       usageCount: gym.gemini_api_usage_count || 0,

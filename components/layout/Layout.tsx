@@ -5,6 +5,7 @@ import Sidebar from './Sidebar.tsx';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useI18n } from '../../context/I18nContext';
 import NutriAssistant from '../chatbot/NutriAssistant';
+import { NutriVoiceAssistant } from '../chatbot/NutriVoiceAssistant';
 import { useAutoLogout } from '../../hooks/useAutoLogout';
 import { AccessBlockChecker } from '../AccessBlockChecker';
 import { useUser } from '../../context/UserContext';
@@ -12,6 +13,7 @@ import { getAccountType } from '../../utils/accountType';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [nutriVoiceOpen, setNutriVoiceOpen] = useState(false);
   const isOnline = useOnlineStatus();
   const { t } = useI18n();
   const { user } = useUser();
@@ -53,7 +55,25 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </div>
       )}
       {/* IA de Voz/Chat: desabilitada para PERSONAL (USER_PERSONAL) */}
-      {!isBlocked && accountType !== 'USER_PERSONAL' && <NutriAssistant />}
+      {!isBlocked && accountType !== 'USER_PERSONAL' && (
+        <>
+          <NutriAssistant />
+          <NutriVoiceAssistant isOpen={nutriVoiceOpen} onClose={() => setNutriVoiceOpen(false)} />
+          {/* Botão flutuante para abrir Nutri.ai */}
+          {!nutriVoiceOpen && (
+            <button
+              onClick={() => setNutriVoiceOpen(true)}
+              className="fixed bottom-24 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-sky-500 text-white shadow-xl transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300/60"
+              aria-label="Abrir Nutri.ai - Assistente de Voz"
+              title="Nutri.ai - Conversa por voz"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 };
