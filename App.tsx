@@ -14,6 +14,8 @@ import { InviteCodeEntry } from './components/InviteCodeEntry';
 import { LoginOrRegister } from './components/LoginOrRegister';
 import { authService } from './services/supabaseService';
 import { Logo } from './components/Logo';
+import { Gender } from './types';
+import { getAccountType } from './utils/accountType';
 
 // Lazy load das páginas para reduzir o bundle inicial
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -35,12 +37,14 @@ const GymAdminPage = lazy(() => import('./pages/GymAdminPage'));
 const StudentManagementPage = lazy(() => import('./pages/StudentManagementPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const PermissionsManagementPage = lazy(() => import('./pages/PermissionsManagementPage'));
+const TrainerWorkoutPage = lazy(() => import('./pages/TrainerWorkoutPage'));
 const VideoPresentationPage = lazy(() => import('./pages/VideoPresentationPage'));
 const PremiumPage = lazy(() => import('./pages/PremiumPage'));
 const ActivationScreen = lazy(() => import('./pages/ActivationScreen'));
 const SubscriptionStatusScreen = lazy(() => import('./pages/SubscriptionStatusScreen'));
 const ChangePlanPage = lazy(() => import('./pages/ChangePlanPage'));
 const CreateDefaultUsersPage = lazy(() => import('./pages/CreateDefaultUsersPage'));
+const Onboarding = lazy(() => import('./components/Onboarding'));
 
 // Componente de loading
 const PageLoader = () => (
@@ -303,14 +307,27 @@ const App: React.FC = () => {
         return null;
     }
 
-    // Verificar se aluno precisa responder a enquete
+    // Verificar se usuário precisa responder a enquete
     // O flag da enquete é específico por usuário (username)
+    // A enquete deve aparecer para alunos (USER_GYM) e usuários B2C (USER_B2C)
     const SURVEY_STORAGE_FLAG = user.username ? `nutriIA_enquete_v2_done_${user.username}` : 'nutriIA_enquete_v2_done';
     const hasAnsweredSurvey = typeof window !== 'undefined' ? localStorage.getItem(SURVEY_STORAGE_FLAG) : null;
-    const isStudentNeedingSurvey = isStudent && !hasAnsweredSurvey && path !== '/welcome-survey';
+    
+    // Verificar tipo de conta
+    const accountType = getAccountType(user);
+    
+    // Usuário precisa da enquete se:
+    // 1. É aluno (USER_GYM) OU usuário B2C (USER_B2C)
+    // 2. Não respondeu a enquete ainda
+    // 3. Não está na página da enquete
+    const isUserNeedingSurvey = (
+        (isStudent || accountType === 'USER_B2C') && 
+        !hasAnsweredSurvey && 
+        path !== '/welcome-survey'
+    );
 
-    // Se aluno não respondeu a enquete, redirecionar
-    if (isStudentNeedingSurvey) {
+    // Se usuário não respondeu a enquete, redirecionar
+    if (isUserNeedingSurvey) {
         window.location.hash = '#/welcome-survey';
         return null;
     }
@@ -331,6 +348,7 @@ const App: React.FC = () => {
             case '/professional': return <ProfessionalDashboardPage />;
             case '/gym-admin': return <GymAdminPage />;
             case '/student-management': return <StudentManagementPage />;
+            case '/trainer-workout': return <TrainerWorkoutPage />;
             case '/admin-dashboard': return <AdminDashboardPage />;
             case '/permissions': return <PermissionsManagementPage />;
             case '/premium': return <PremiumPage />;
@@ -510,6 +528,38 @@ const App: React.FC = () => {
         return (
             <Suspense fallback={<PageLoader />}>
                 <WelcomeSurveyPage />
+            </Suspense>
+        );
+    }
+
+    if (path === '/onboarding') {
+        return (
+            <Suspense fallback={<PageLoader />}>
+                <Onboarding 
+                    onComplete={async (profile) => {
+                        // Converter UserProfile para User e salvar
+                        const { saveUser } = await import('./services/databaseService');
+                        const userData = {
+                            nome: profile.name,
+                            idade: profile.age,
+                            genero: profile.gender === Gender.Male ? 'Masculino' : profile.gender === Gender.Female ? 'Feminino' : 'Masculino',
+                            peso: profile.weight,
+                            altura: profile.height,
+                            objetivo: profile.goal,
+                            points: 0,
+                            disciplineScore: 0,
+                            completedChallengeIds: [],
+                            isAnonymized: false,
+                            weightHistory: [],
+                            role: 'user' as const,
+                            subscription: 'free' as const,
+                        };
+                        await saveUser(userData);
+                        setUser(userData as any);
+                        setIsLoggedIn(true);
+                        window.location.hash = '#/';
+                    }}
+                />
             </Suspense>
         );
     }

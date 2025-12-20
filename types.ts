@@ -5,6 +5,46 @@ export enum Goal {
   GANHAR_MASSA = 'ganhar massa muscular',
 }
 
+// Tipos para Onboarding
+export enum Gender {
+  Male = 'Masculino',
+  Female = 'Feminino',
+  Other = 'Outro',
+}
+
+export enum ActivityLevel {
+  Sedentary = 'Sedentário',
+  Light = 'Leve',
+  Moderate = 'Moderado',
+  Active = 'Ativo',
+  VeryActive = 'Muito Ativo',
+}
+
+// Mapeamento de Goal para valores do sistema
+export const GoalMapping = {
+  LoseWeight: Goal.PERDER_PESO,
+  Maintain: Goal.MANTER_PESO,
+  GainMuscle: Goal.GANHAR_MASSA,
+  ImproveHealth: Goal.MANTER_PESO, // Mapear para manter peso como padrão
+};
+
+export interface UserProfile {
+  name: string;
+  age: number;
+  gender: Gender;
+  height: number;
+  weight: number;
+  activityLevel: ActivityLevel;
+  goal: Goal;
+  restrictions?: string;
+  mealsPerDay: number;
+  medicalHistory?: string;
+  routineDescription?: string;
+  foodPreferences?: string;
+  streak?: number;
+  lastActiveDate?: string;
+}
+
 export interface User {
   nome: string;
   username?: string; // Nome de usuário para login

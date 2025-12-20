@@ -944,16 +944,21 @@ const LoginPage: React.FC = () => {
 
                 if (accountType === 'USER_PERSONAL') {
                     redirectPath = '#/analysis';
-                } else if (user.gymRole === 'student') {
-                    // Se aluno não respondeu a enquete, redirecionar para ela (primeiro acesso)
-                    if (!hasAnsweredSurvey) {
+                } else {
+                    // Verificar se usuário não respondeu a enquete (para alunos e usuários B2C)
+                    // A enquete deve aparecer para:
+                    // 1. Alunos (gymRole === 'student')
+                    // 2. Usuários B2C (accountType === 'USER_B2C' e sem gymRole)
+                    const shouldShowSurvey = !hasAnsweredSurvey && (
+                        user.gymRole === 'student' || 
+                        (accountType === 'USER_B2C' && !user.gymRole)
+                    );
+                    
+                    if (shouldShowSurvey) {
                         redirectPath = '#/welcome-survey';
                     } else {
                         redirectPath = '#/';
                     }
-                } else {
-                    // Admin / trainer / B2C: home padrão
-                    redirectPath = '#/';
                 }
                 
                 // Redirecionar após 1 segundo
