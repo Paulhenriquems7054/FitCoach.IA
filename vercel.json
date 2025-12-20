@@ -6,6 +6,11 @@
   "installCommand": "npm install",
   "framework": "vite",
   "rewrites": [
+    // Exemplo de proxy para backend NestJS (descomente e ajuste a URL)
+    // {
+    //   "source": "/api/ai/:path*",
+    //   "destination": "https://your-backend-url.railway.app/ai/:path*"
+    // },
     {
       "source": "/(.*)",
       "destination": "/index.html"
