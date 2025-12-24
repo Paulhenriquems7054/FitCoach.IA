@@ -10,8 +10,7 @@ import { useUser } from './context/UserContext';
 import { useDeviceContext } from './context/DeviceContext';
 import { usePermissions } from './hooks/usePermissions';
 import { getCurrentUsername } from './services/databaseService';
-import { InviteCodeEntry } from './components/InviteCodeEntry';
-import { LoginOrRegister } from './components/LoginOrRegister';
+// Removidos: InviteCodeEntry e LoginOrRegister - LoginPage já tem toda a funcionalidade
 import { authService } from './services/supabaseService';
 import { Logo } from './components/Logo';
 import { Gender } from './types';
@@ -58,6 +57,7 @@ const ActivationScreen = lazy(() => import('./pages/ActivationScreen'));
 const SubscriptionStatusScreen = lazy(() => import('./pages/SubscriptionStatusScreen'));
 const ChangePlanPage = lazy(() => import('./pages/ChangePlanPage'));
 const CreateDefaultUsersPage = lazy(() => import('./pages/CreateDefaultUsersPage'));
+const StudentAiPlansPage = lazy(() => import('./pages/StudentAiPlansPage'));
 const Onboarding = lazy(() => import('./components/Onboarding'));
 
 // Componente de loading
@@ -156,9 +156,7 @@ const App: React.FC = () => {
     const [hasSeenPresentation, setHasSeenPresentation] = useState<boolean | null>(null);
     const [isInitialized, setIsInitialized] = useState(false);
 
-    // Estados para fluxo de acesso inicial (convite / código / cadastro)
-    const [inviteFlowState, setInviteFlowState] = useState<'choice' | 'code' | 'register' | null>(null);
-    const [validatedCouponCode, setValidatedCouponCode] = useState<string | null>(null);
+    // Removido: inviteFlowState - LoginPage já gerencia todo o fluxo de login/cadastro/convite
     
     // Ref para evitar múltiplos redirecionamentos simultâneos
     const redirectingRef = useRef(false);
@@ -268,7 +266,12 @@ const App: React.FC = () => {
                         const supabaseUser = await authService.getCurrentUserProfile();
                         if (supabaseUser) {
                             console.log('[App] Usuário encontrado no Supabase');
-                            setUser(supabaseUser);
+                            
+                            // Atualizar status de trial antes de definir usuário
+                            const { updateTrialStatus } = await import('./services/trialAccessService');
+                            const updatedUser = await updateTrialStatus(supabaseUser);
+                            
+                            setUser(updatedUser);
                             setIsLoggedIn(true);
                             setIsInitialized(true);
                             return;
@@ -300,13 +303,78 @@ const App: React.FC = () => {
             window.removeEventListener('presentation-seen', handlePresentationSeen);
         };
     }, []); // Removido 'device' das dependências para evitar re-execuções
+    
+    // Verificar e atualizar status de trial periodicamente
+    useEffect(() => {
+        if (!isLoggedIn || !user) return;
+        
+        const checkTrialStatus = async () => {
+            try {
+                const { updateTrialStatus } = await import('./services/trialAccessService');
+                const { getAiAccessStatus } = await import('./services/aiAccessService');
+                const updatedUser = await updateTrialStatus(user);
+                
+                // Verificar trial de conta expirado
+                if (updatedUser.subscriptionStatus === 'expired') {
+                    const currentPath = normalizePath(window.location.hash);
+                    const accountType = updatedUser.accountType || 'individual';
+                    const isStudent = updatedUser.tenantRole === 'student' && updatedUser.academyId;
+                    
+                    // Se não é aluno, aplicar bloqueio de trial de conta
+                    if (!isStudent) {
+                        // Rotas permitidas após trial expirado
+                        const allowedRoutes = ['/premium', '/admin-dashboard'];
+                        if (accountType === 'academy') {
+                            allowedRoutes.push('/gym-admin');
+                        }
+                        
+                        // Se não está em rota permitida, redirecionar para premium
+                        if (!allowedRoutes.includes(currentPath) && !currentPath.startsWith('/gym-admin')) {
+                            console.log('[App] Trial expirado, redirecionando para premium...');
+                            window.location.hash = '#/premium';
+                            return;
+                        }
+                    }
+                }
+                
+                // Verificar trial de IA expirado (para alunos)
+                if (updatedUser.tenantRole === 'student' && updatedUser.academyId) {
+                    const aiAccessStatus = await getAiAccessStatus(updatedUser);
+                    if (!aiAccessStatus.hasAccess && aiAccessStatus.reason === 'trial_expired') {
+                        const currentPath = normalizePath(window.location.hash);
+                        const allowedRoutes = ['/student-ai-plans', '/premium'];
+                        
+                        // Se não está em rota permitida, redirecionar para planos de IA
+                        if (!allowedRoutes.includes(currentPath)) {
+                            console.log('[App] Trial de IA expirado para aluno, redirecionando para planos...');
+                            window.location.hash = '#/student-ai-plans';
+                            return;
+                        }
+                    }
+                }
+                
+                // Atualizar usuário com status atualizado
+                if (updatedUser !== user) {
+                    setUser(updatedUser);
+                }
+            } catch (error) {
+                console.warn('[App] Erro ao verificar status de trial:', error);
+            }
+        };
+        
+        checkTrialStatus();
+        
+        // Verificar a cada 5 minutos
+        const interval = setInterval(checkTrialStatus, 5 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, [isLoggedIn, user]);
 
     // Lógica de redirecionamento simplificada - apenas para fluxo inicial
     // IMPORTANTE: useEffect DEVE vir ANTES de qualquer return condicional (regras dos hooks do React)
     // CRÍTICO: Apenas redirecionar no fluxo inicial (landing -> presentation -> login)
     useEffect(() => {
-        // Não redirecionar se ainda está inicializando ou já está redirecionando
-        if (!isInitialized || hasSeenLanding === null || hasSeenPresentation === null || redirectingRef.current) {
+        // Não redirecionar se ainda está inicializando
+        if (!isInitialized || hasSeenLanding === null || hasSeenPresentation === null) {
             return;
         }
 
@@ -322,7 +390,16 @@ const App: React.FC = () => {
         }
         // Apenas fluxo inicial: landing -> presentation -> login
         else if (!isLoggedIn) {
-            if (!hasSeenLanding && currentPath !== '/landing' && currentHash !== '#/landing') {
+            // Se hash está vazio (primeira visita), determinar destino baseado no que já foi visto
+            if (!currentHash || currentHash === '' || currentHash === '#') {
+                if (!hasSeenLanding) {
+                    targetPath = '#/landing';
+                } else if (!hasSeenPresentation) {
+                    targetPath = '#/presentation';
+                } else {
+                    targetPath = '#/login';
+                }
+            } else if (!hasSeenLanding && currentPath !== '/landing' && currentHash !== '#/landing') {
                 targetPath = '#/landing';
             } else if (hasSeenLanding && !hasSeenPresentation && currentPath !== '/presentation' && currentPath !== '/landing' && currentHash !== '#/presentation') {
                 targetPath = '#/presentation';
@@ -332,23 +409,46 @@ const App: React.FC = () => {
             }
         }
 
-        // Só redirecionar se for diferente do hash atual E diferente do último hash que tentamos navegar
-        // E não estiver redirecionando no momento
-        // E se o hash atual não for já o target (evitar loop)
-        if (targetPath && currentHash !== targetPath && lastRedirectHashRef.current !== targetPath && !redirectingRef.current) {
+        // Só redirecionar se:
+        // 1. Há um targetPath definido
+        // 2. É diferente do hash atual
+        // 3. É diferente do último hash que tentamos navegar (evitar loops)
+        // 4. Não estiver redirecionando no momento
+        // 5. O hash atual não é já o target (verificação adicional)
+        if (targetPath && 
+            currentHash !== targetPath && 
+            lastRedirectHashRef.current !== targetPath && 
+            !redirectingRef.current &&
+            normalizePath(targetPath) !== currentPath) {
+            
             console.log('[App] Redirecionando para:', targetPath, 'de', currentHash);
             redirectingRef.current = true;
             lastRedirectHashRef.current = targetPath;
-            window.location.hash = targetPath;
-            // Resetar flag após delay maior para evitar loops
-            setTimeout(() => {
-                redirectingRef.current = false;
-            }, 1000);
-        } else {
-            // Se não há targetPath ou já estamos na rota correta, garantir que não estamos redirecionando
+            
+            // Usar requestAnimationFrame para garantir que o redirecionamento aconteça após o render
+            requestAnimationFrame(() => {
+                window.location.hash = targetPath;
+                // Resetar flag após delay para permitir que o hash mude
+                setTimeout(() => {
+                    redirectingRef.current = false;
+                    // Limpar lastRedirectHashRef após mais tempo para permitir redirecionamentos futuros
+                    setTimeout(() => {
+                        if (normalizePath(window.location.hash) === normalizePath(targetPath)) {
+                            lastRedirectHashRef.current = '';
+                        }
+                    }, 500);
+                }, 500);
+            });
+        } else if (!targetPath) {
+            // Se não há targetPath, significa que estamos na rota correta
+            // Limpar flags de redirecionamento
             redirectingRef.current = false;
+            // Só limpar lastRedirectHashRef se realmente estamos na rota correta
+            if (currentPath === normalizePath(lastRedirectHashRef.current)) {
+                lastRedirectHashRef.current = '';
+            }
         }
-    }, [hasSeenLanding, hasSeenPresentation, isLoggedIn, isInitialized]); // Removido 'user' das dependências
+    }, [hasSeenLanding, hasSeenPresentation, isLoggedIn, isInitialized]); // Não incluir 'path' para evitar loops
 
     // Aguardar inicialização antes de decidir roteamento
     // IMPORTANTE: Este return vem DEPOIS de todos os hooks
@@ -376,19 +476,27 @@ const App: React.FC = () => {
     // Se usuário está logado, não precisa verificar landing/presentation
     // Ir direto para a home ou rota solicitada
     if (!isLoggedIn) {
-        // Usuário não logado: verificar fluxo inicial
-        // Mostrar loader durante redirecionamentos apenas se não estiver logado
-        const isRedirecting = 
-            (!path || path === '') ||
-            (!hasSeenLanding && path !== '/landing') ||
-            (hasSeenLanding && !hasSeenPresentation && path !== '/presentation' && path !== '/landing') ||
-            (hasSeenLanding && hasSeenPresentation && 
-             path !== '/login' && path !== '/landing' && path !== '/presentation' && path !== '/premium');
+        // Usuário não logado: verificar se está na rota correta
+        // Se estiver na rota correta, não bloquear (deixar renderizar)
+        // Quando path está vazio (hash vazio), considerar que precisa redirecionar
+        const isEmptyPath = !path || path === '';
+        const isOnCorrectRoute = 
+            (!hasSeenLanding && path === '/landing') ||
+            (hasSeenLanding && !hasSeenPresentation && (path === '/presentation' || path === '/landing')) ||
+            (hasSeenLanding && hasSeenPresentation && (path === '/login' || path === '/landing' || path === '/presentation' || path === '/premium')) ||
+            (isEmptyPath && !hasSeenLanding) || // Path vazio mas precisa ver landing
+            (isEmptyPath && hasSeenLanding && !hasSeenPresentation) || // Path vazio mas precisa ver presentation
+            (isEmptyPath && hasSeenLanding && hasSeenPresentation); // Path vazio mas precisa ir para login (será redirecionado)
         
-        if (isRedirecting) {
-            console.log('[App] Redirecionando (usuário não logado)...', { path, hasSeenLanding, hasSeenPresentation });
+        // Só mostrar loader se NÃO está na rota correta E está redirecionando
+        // Isso evita loop porque não bloqueia quando já está na rota correta
+        if (!isOnCorrectRoute && redirectingRef.current) {
+            console.log('[App] Redirecionando (usuário não logado)...', { path, hasSeenLanding, hasSeenPresentation, isOnCorrectRoute });
             return <PageLoader />;
         }
+        
+        // Se não está na rota correta e ainda não iniciou redirecionamento, 
+        // o useEffect vai iniciar o redirecionamento, mas não bloqueamos aqui para evitar loop
     } else {
         // Usuário logado: se path está vazio, tratar como '/' (home)
         if (!path || path === '') {
@@ -420,8 +528,78 @@ const App: React.FC = () => {
     // Normalizar path vazio para '/' antes de todas as verificações
     const normalizedPath = !path || path === '' ? '/' : path;
     
+    // IMPORTANTE: Verificar rotas públicas ANTES de qualquer verificação de permissão
+    // Isso evita que rotas como landing, presentation, welcome-survey sejam bloqueadas incorretamente
+    
+    // Página de Landing (Logo) - DEVE SER VERIFICADA PRIMEIRO
+    if (normalizedPath === '/landing') {
+        return (
+            <GymBrandingProvider>
+                <ToastProvider>
+                    <Suspense fallback={<PageLoader />}>
+                        <LandingPage
+                            onGetStarted={() => {
+                                // Marcar landing como vista
+                                try {
+                                    localStorage.setItem('fitcoach.landing.seen', 'true');
+                                    window.dispatchEvent(new Event('landing-seen'));
+                                } catch (error) {
+                                    console.warn('Erro ao salvar flag de landing', error);
+                                }
+                                // Redirecionar para onboarding ou login
+                                if (!isLoggedIn) {
+                                    window.location.hash = '#/login';
+                                } else {
+                                    window.location.hash = '#/';
+                                }
+                            }}
+                            onAnalyze={() => {
+                                // Abrir scanner de foto (se implementado)
+                                window.location.hash = '#/analyzer';
+                            }}
+                            onDevSkip={() => {
+                                // Pular onboarding (dev mode)
+                                if (user) {
+                                    window.location.hash = '#/';
+                                }
+                            }}
+                        />
+                    </Suspense>
+                </ToastProvider>
+            </GymBrandingProvider>
+        );
+    }
+    
+    // Página de Apresentação (Vídeo)
+    if (normalizedPath === '/presentation') {
+        return (
+            <Suspense fallback={<PageLoader />}>
+                <VideoPresentationPage />
+            </Suspense>
+        );
+    }
+    
+    // Welcome Survey
+    if (normalizedPath === '/welcome-survey') {
+        return (
+            <GymBrandingProvider>
+                <ToastProvider>
+                    <Suspense fallback={<PageLoader />}>
+                        <WelcomeSurveyPage />
+                    </Suspense>
+                </ToastProvider>
+            </GymBrandingProvider>
+        );
+    }
+    
     // Verificar se é aluno tentando acessar rotas administrativas ou restritas (apenas se logado)
-    const isStudent = isLoggedIn && user?.gymRole === 'student';
+    // Usar tenantRole (B2B2C) como prioridade, fallback para gymRole (compatibilidade)
+    // IMPORTANTE: Apenas alunos vinculados a academia (com academyId) são considerados alunos reais
+    // Usuários B2C individuais (sem academyId) NÃO são alunos
+    const isStudent = isLoggedIn && user && (
+        (user.tenantRole === 'student' && user.academyId) || // Aluno vinculado a academia (B2B2C)
+        (user.gymRole === 'student' && user.gymId) // Aluno com gymId (compatibilidade)
+    );
     const adminRoutes = ['/gym-admin', '/student-management', '/professional'];
     const restrictedRoutes = ['/privacy', '/configuracoes'];
     const isAccessingAdminRoute = adminRoutes.includes(normalizedPath);
@@ -434,9 +612,9 @@ const App: React.FC = () => {
     }
 
     // Verificar se é admin (apenas se estiver logado)
-    const isDefaultAdmin = isLoggedIn && (user?.username === 'Administrador' || user?.username === 'Desenvolvedor');
-    const isAdmin = isLoggedIn && (user?.gymRole === 'admin' || isDefaultAdmin);
-    const isDeveloper = isLoggedIn && (user?.username === 'Desenvolvedor' || user?.username === 'dev123');
+    const isDefaultAdmin = isLoggedIn && user && (user.username === 'Administrador' || user.username === 'Desenvolvedor');
+    const isAdmin = isLoggedIn && user && (user.gymRole === 'admin' || isDefaultAdmin);
+    const isDeveloper = isLoggedIn && user && (user.username === 'Desenvolvedor' || user.username === 'dev123');
 
     // Se for desenvolvedor, mostrar loader (redirecionamento será feito pelo useEffect)
     // Permitir '/' (home) para desenvolvedores também
@@ -445,57 +623,158 @@ const App: React.FC = () => {
         return <PageLoader />;
     }
 
-    // Rotas permitidas para administradores
-    const adminAllowedRoutes = ['/', '/privacy', '/configuracoes', '/perfil', '/student-management', '/gym-admin', '/permissions', '/premium'];
+    // Rotas permitidas para administradores (incluindo welcome-survey e onboarding)
+    const adminAllowedRoutes = ['/', '/privacy', '/configuracoes', '/perfil', '/student-management', '/gym-admin', '/permissions', '/premium', '/welcome-survey', '/onboarding'];
     const isAdminAccessingStudentRoute = isAdmin && !isDeveloper && !adminAllowedRoutes.includes(normalizedPath) && normalizedPath !== '/admin-dashboard';
 
     // Se admin tentar acessar rota de aluno, mostrar loader (redirecionamento será feito pelo useEffect)
-    if (isAdminAccessingStudentRoute) {
-        console.log('[App] Bloqueado: Admin tentando acessar rota de aluno');
+    // Apenas bloquear se realmente for admin e não desenvolvedor
+    if (isAdminAccessingStudentRoute && isLoggedIn && user) {
+        console.log('[App] Bloqueado: Admin tentando acessar rota de aluno', { normalizedPath, adminAllowedRoutes, isAdmin, isDeveloper });
         return <PageLoader />;
+    }
+
+    // Verificar trial expirado ANTES de qualquer outra verificação
+    // Se trial expirou, bloquear acesso a todas as rotas exceto premium/admin
+    if (isLoggedIn && user) {
+        try {
+            const accountType = user.accountType || 'individual';
+            const isStudent = user.tenantRole === 'student' && user.academyId;
+            let isExpired = user.subscriptionStatus === 'expired';
+            let isAiTrialExpired = false;
+            
+            // Verificar data de expiração do trial de conta de forma segura
+            if (user.trialEndDate) {
+                try {
+                    const trialEndDate = new Date(user.trialEndDate);
+                    const now = new Date();
+                    if (!isNaN(trialEndDate.getTime())) {
+                        isExpired = isExpired || trialEndDate < now;
+                    }
+                } catch (dateError) {
+                    console.warn('[App] Erro ao verificar trialEndDate:', dateError);
+                }
+            }
+            
+            // Verificar trial de IA expirado (para alunos)
+            if (isStudent && user.aiSubscriptionStatus) {
+                if (user.aiSubscriptionStatus === 'expired') {
+                    isAiTrialExpired = true;
+                } else if (user.aiTrialEndAt) {
+                    try {
+                        const aiTrialEndDate = new Date(user.aiTrialEndAt);
+                        const now = new Date();
+                        if (!isNaN(aiTrialEndDate.getTime())) {
+                            isAiTrialExpired = aiTrialEndDate < now;
+                        }
+                    } catch (dateError) {
+                        console.warn('[App] Erro ao verificar aiTrialEndAt:', dateError);
+                    }
+                }
+            }
+            
+            // Se trial de conta expirou
+            if (isExpired && !isStudent) {
+                // Rotas permitidas após trial expirado
+                const allowedRoutes = ['/premium'];
+                if (accountType === 'academy') {
+                    allowedRoutes.push('/admin-dashboard', '/gym-admin');
+                }
+                
+                // Se não está em rota permitida, redirecionar para premium
+                if (!allowedRoutes.includes(normalizedPath) && !normalizedPath.startsWith('/gym-admin')) {
+                    console.log('[App] Trial expirado, bloqueando acesso a:', normalizedPath);
+                    window.location.hash = '#/premium';
+                    return <PageLoader />;
+                }
+            }
+            
+            // Se trial de IA expirou (para alunos)
+            if (isAiTrialExpired && isStudent) {
+                // Rotas permitidas após trial de IA expirado
+                const allowedRoutes = ['/student-ai-plans', '/premium'];
+                
+                // Se não está em rota permitida, redirecionar para planos de IA
+                if (!allowedRoutes.includes(normalizedPath)) {
+                    console.log('[App] Trial de IA expirado para aluno, bloqueando acesso a:', normalizedPath);
+                    window.location.hash = '#/student-ai-plans';
+                    return <PageLoader />;
+                }
+            }
+        } catch (error) {
+            console.error('[App] Erro ao verificar trial expirado:', error);
+            // Em caso de erro, continuar o fluxo normal (não bloquear o app)
+        }
     }
 
     // Verificar se usuário precisa responder a enquete (APENAS APÓS LOGIN)
     // A enquete só aparece após login bem-sucedido
-    if (isLoggedIn) {
-        // Obter chave de storage com sufixo de domínio (para evitar conflitos)
-        const getSurveyStorageFlag = (username?: string) => {
-            const userSuffix = username ? `_${username}` : '';
-            const domainSuffix = typeof window !== 'undefined' 
-                ? `_${window.location.hostname.replace(/\./g, '_')}` 
-                : '';
-            return `nutriIA_enquete_v2_done${userSuffix}${domainSuffix}`;
-        };
-        
-        const SURVEY_STORAGE_FLAG = getSurveyStorageFlag(user.username);
-        const hasAnsweredSurvey = typeof window !== 'undefined' ? localStorage.getItem(SURVEY_STORAGE_FLAG) : null;
-        
-        // Verificar tipo de conta
-        const accountType = getAccountType(user);
-        
-        // Usuário precisa da enquete se:
-        // 1. Está logado
-        // 2. É aluno (USER_GYM) OU usuário B2C (USER_B2C)
-        // 3. Não respondeu a enquete ainda
-        // 4. Não está na página da enquete
-        const isUserNeedingSurvey = (
-            (isStudent || accountType === 'USER_B2C') && 
-            !hasAnsweredSurvey && 
-            normalizedPath !== '/welcome-survey'
-        );
-
-        // Se usuário não respondeu a enquete, mostrar loader (redirecionamento será feito pelo useEffect)
-        if (isUserNeedingSurvey) {
-            console.log('[App] Bloqueado: Usuário precisa responder enquete', { isStudent, accountType, hasAnsweredSurvey, normalizedPath });
-            // Redirecionar para welcome-survey se ainda não estiver lá
-            if (normalizedPath !== '/welcome-survey' && !redirectingRef.current) {
-                window.location.hash = '#/welcome-survey';
-                redirectingRef.current = true;
-                setTimeout(() => {
-                    redirectingRef.current = false;
-                }, 1000);
+    if (isLoggedIn && user) {
+        try {
+            // Obter chave de storage com sufixo de domínio (para evitar conflitos)
+            const getSurveyStorageFlag = (username?: string) => {
+                const userSuffix = username ? `_${username}` : '';
+                const domainSuffix = typeof window !== 'undefined' 
+                    ? `_${window.location.hostname.replace(/\./g, '_')}` 
+                    : '';
+                return `nutriIA_enquete_v2_done${userSuffix}${domainSuffix}`;
+            };
+            
+            const SURVEY_STORAGE_FLAG = getSurveyStorageFlag(user?.username);
+            const hasAnsweredSurvey = typeof window !== 'undefined' ? localStorage.getItem(SURVEY_STORAGE_FLAG) : null;
+            
+            // Verificar tipo de conta (com fallback seguro)
+            let accountType: string = 'individual';
+            try {
+                accountType = getAccountType(user);
+            } catch (error) {
+                console.warn('[App] Erro ao obter accountType, usando fallback:', error);
+                accountType = user?.accountType || 'individual';
             }
-            return <PageLoader />;
+            
+            // Usuário precisa da enquete se:
+            // 1. Está logado
+            // 2. É ALUNO (tenantRole === 'student') - APENAS alunos no modelo B2B2C
+            // 3. NÃO é usuário B2C individual (accountType === 'individual' sem tenantRole)
+            // 4. Não respondeu a enquete ainda
+            // 5. Não está na página da enquete
+            // IMPORTANTE: Enquete é APENAS para alunos vinculados a academia, NÃO para B2C puro
+            const isRealStudent = user?.tenantRole === 'student' && user?.academyId; // Aluno vinculado a academia
+            const isB2CIndividual = accountType === 'individual' && !user?.tenantRole && !user?.academyId; // B2C puro sem vínculo
+            
+            const isUserNeedingSurvey = (
+                isRealStudent && // Apenas alunos reais vinculados a academia
+                !isB2CIndividual && // Não é B2C puro
+                !hasAnsweredSurvey && 
+                normalizedPath !== '/welcome-survey'
+            );
+
+            // Se usuário não respondeu a enquete, mostrar loader (redirecionamento será feito pelo useEffect)
+            // IMPORTANTE: Enquete é APENAS para alunos vinculados a academia (tenantRole === 'student' && academyId)
+            if (isUserNeedingSurvey) {
+                console.log('[App] Aluno precisa responder enquete no primeiro acesso', { 
+                    isRealStudent, 
+                    isB2CIndividual,
+                    tenantRole: user?.tenantRole, 
+                    gymRole: user?.gymRole,
+                    academyId: user?.academyId,
+                    accountType,
+                    hasAnsweredSurvey, 
+                    normalizedPath 
+                });
+                // Redirecionar para welcome-survey se ainda não estiver lá
+                if (normalizedPath !== '/welcome-survey' && !redirectingRef.current) {
+                    window.location.hash = '#/welcome-survey';
+                    redirectingRef.current = true;
+                    setTimeout(() => {
+                        redirectingRef.current = false;
+                    }, 1000);
+                }
+                return <PageLoader />;
+            }
+        } catch (error) {
+            console.error('[App] Erro ao verificar enquete:', error);
+            // Em caso de erro, continuar o fluxo normal (não bloquear o app)
         }
     }
 
@@ -507,7 +786,12 @@ const App: React.FC = () => {
         isAdmin, 
         isDeveloper,
         userRole: user?.gymRole,
-        username: user?.username
+        tenantRole: user?.tenantRole,
+        accountType: user?.accountType,
+        academyId: user?.academyId,
+        username: user?.username,
+        subscriptionStatus: user?.subscriptionStatus,
+        trialEndDate: user?.trialEndDate
     });
 
     const renderPage = () => {
@@ -531,6 +815,7 @@ const App: React.FC = () => {
             case '/admin-dashboard': return <AdminDashboardPage />;
             case '/permissions': return <PermissionsManagementPage />;
             case '/premium': return <PremiumPage />;
+            case '/student-ai-plans': return <StudentAiPlansPage />;
             case '/activation': return <ActivationScreen />;
             case '/subscription-status': return <SubscriptionStatusScreen />;
             case '/change-plan': return <ChangePlanPage />;
@@ -550,160 +835,9 @@ const App: React.FC = () => {
     };
 
 
-    // Página de Landing (Logo)
-    if (normalizedPath === '/landing') {
-        return (
-            <GymBrandingProvider>
-                <Suspense fallback={<PageLoader />}>
-                    <LandingPage />
-                </Suspense>
-            </GymBrandingProvider>
-        );
-    }
 
-    // Página de Apresentação (Vídeo)
-    if (normalizedPath === '/presentation') {
-        return (
-            <Suspense fallback={<PageLoader />}>
-                <VideoPresentationPage />
-            </Suspense>
-        );
-    }
-
-    // Fluxo de acesso inicial (primeiro acesso sem login)
-    if (!isLoggedIn && inviteFlowState !== null && normalizedPath !== '/login' && normalizedPath !== '/presentation') {
-        if (inviteFlowState === 'choice') {
-            // Tela inicial: escolha de fluxo (aluno de academia, professor, B2C individual)
-            return (
-                <GymBrandingProvider>
-                    <ToastProvider>
-                        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 px-4">
-                            <Card className="w-full max-w-xl">
-                                <div className="p-6 sm:p-8 space-y-6">
-                                    {/* Logo do FitCoach.IA */}
-                                    <div className="flex justify-center mb-4">
-                                        <Logo size="lg" />
-                                    </div>
-                                    
-                                    <div className="text-center space-y-2">
-                                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                                            Como você quer usar o FitCoach.IA?
-                                        </h1>
-                                        <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
-                                            Escolha a opção que melhor descreve você para continuarmos.
-                                        </p>
-                                    </div>
-
-                                <div className="grid gap-4">
-                                    {/* Aluno de academia parceira */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setInviteFlowState('code')}
-                                        className="text-left rounded-lg border border-primary-200 dark:border-primary-700 bg-white/90 dark:bg-slate-900/80 p-4 hover:shadow-md hover:border-primary-400 transition-all"
-                                    >
-                                        <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
-                                            Sou aluno de uma academia parceira
-                                        </h2>
-                                        <p className="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                                            Vou usar um código da minha academia para ter acesso Premium incluso no meu plano.
-                                        </p>
-                                    </button>
-
-                                    {/* Professor / personal da academia */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setInviteFlowState('code')}
-                                        className="text-left rounded-lg border border-sky-200 dark:border-sky-700 bg-white/90 dark:bg-slate-900/80 p-4 hover:shadow-md hover:border-sky-400 transition-all"
-                                    >
-                                        <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
-                                            Sou professor ou personal da academia
-                                        </h2>
-                                        <p className="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                                            Vou usar o código da academia para acessar meus alunos e treinos (sem gerenciar cobranças).
-                                        </p>
-                                    </button>
-
-                                    {/* B2C individual */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            // Fluxo B2C: pode ir direto para tela de planos ou login
-                                            window.location.hash = '#/premium';
-                                        }}
-                                        className="text-left rounded-lg border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/80 p-4 hover:shadow-md hover:border-slate-400 transition-all"
-                                    >
-                                        <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
-                                            Quero usar o app individualmente
-                                        </h2>
-                                        <p className="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                                            Vou conhecer os planos para pessoa física e assinar direto pelo app.
-                                        </p>
-                                    </button>
-                                </div>
-
-                                <div className="pt-2 text-center">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            // Acesso direto ao login clássico
-                                            window.location.hash = '#/login';
-                                        }}
-                                        className="text-xs sm:text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
-                                    >
-                                        Já tenho uma conta
-                                    </button>
-                                </div>
-                                </div>
-                            </Card>
-                        </div>
-                    </ToastProvider>
-                </GymBrandingProvider>
-            );
-        }
-
-        if (inviteFlowState === 'code') {
-            return (
-                <ToastProvider>
-                    <InviteCodeEntry
-                        onCodeValidated={(code) => {
-                            setValidatedCouponCode(code);
-                            setInviteFlowState('register');
-                        }}
-                        onSkip={() => {
-                            window.location.hash = '#/login';
-                        }}
-                    />
-                </ToastProvider>
-            );
-        } else if (inviteFlowState === 'register' && validatedCouponCode) {
-            return (
-                <ToastProvider>
-                    <LoginOrRegister
-                        couponCode={validatedCouponCode}
-                        onSuccess={async () => {
-                            // Verificar se usuário tem perfil completo
-                            const userProfile = await authService.getCurrentUserProfile();
-                            if (userProfile) {
-                                setUser(userProfile);
-                                setIsLoggedIn(true);
-                                setInviteFlowState(null);
-                                // Verificar se precisa de onboarding
-                                if (!userProfile.nome || userProfile.nome === 'Usuário Padrão') {
-                                    window.location.hash = '#/welcome-survey';
-                                } else {
-                                    window.location.hash = '#/';
-                                }
-                            }
-                        }}
-                        onBack={() => {
-                            setInviteFlowState('code');
-                            setValidatedCouponCode(null);
-                        }}
-                    />
-                </ToastProvider>
-            );
-        }
-    }
+    // REMOVIDO: Fluxo de escolha duplicado - LoginPage já tem toda a funcionalidade necessária
+    // O LoginPage já permite inserir código de convite, fazer login e cadastro
 
     if (normalizedPath === '/login') {
         return (
@@ -715,13 +849,8 @@ const App: React.FC = () => {
         );
     }
 
-    if (normalizedPath === '/welcome-survey') {
-        return (
-            <Suspense fallback={<PageLoader />}>
-                <WelcomeSurveyPage />
-            </Suspense>
-        );
-    }
+    // welcome-survey já foi verificado acima (antes das verificações de permissão)
+    // Não precisa verificar novamente aqui
 
     if (normalizedPath === '/onboarding') {
         return (
