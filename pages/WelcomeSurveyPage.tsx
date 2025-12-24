@@ -1,12 +1,34 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import WelcomeSurvey from '../components/WelcomeSurvey';
 import { Logo } from '../components/Logo';
+import { useUser } from '../context/UserContext';
+import { useRouter } from '../hooks/useRouter';
 
 const WelcomeSurveyPage: React.FC = () => {
+  const { user } = useUser();
+  const { push } = useRouter();
+
+  // Verificar se é aluno - se não for, redirecionar
+  useEffect(() => {
+    if (user) {
+      const isStudent = user.tenantRole === 'student' || user.gymRole === 'student';
+      if (!isStudent) {
+        // Não é aluno, redirecionar para home
+        push('#/');
+      }
+    }
+  }, [user, push]);
+
   const handleSurveyCompleted = () => {
     // Após completar a enquete, redirecionar para a home
     window.location.hash = '#/';
   };
+
+  // Se não for aluno, não renderizar nada (será redirecionado)
+  const isStudent = user?.tenantRole === 'student' || user?.gymRole === 'student';
+  if (user && !isStudent) {
+    return null; // Será redirecionado pelo useEffect
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-600 via-slate-900 to-slate-900">

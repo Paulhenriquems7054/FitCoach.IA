@@ -460,6 +460,21 @@ export async function analyzeImageWithAssistant(
   onNewChunk: (chunk: string) => void,
   onError: (error: string) => void,
 ): Promise<void> {
+  // Verificar acesso à IA antes de analisar (B2B2C guard)
+  try {
+    const user = await getUserFromStorage();
+    if (user) {
+      const { assertAiAccessOrThrow } = await import('./aiAccessService');
+      await assertAiAccessOrThrow(user, 'vision');
+    }
+  } catch (error: any) {
+    if (error?.code === 'AI_ACCESS_DENIED') {
+      onError('Seu acesso à IA está bloqueado. Assine um plano para continuar usando.');
+      return;
+    }
+    logger.warn('Erro ao verificar acesso à IA', 'assistantService', error);
+  }
+
   // Verificar se API key está disponível e válida
   const hasApiKey = !!API_KEY;
   const online = isOnline();
@@ -528,6 +543,17 @@ export async function analyzeImageWithAssistant(
 
     if (response.text) {
       onNewChunk(response.text);
+      
+      // Trackar uso de IA para métricas B2B2C
+      try {
+        const user = await getUserFromStorage();
+        if (user) {
+          const { trackAiUsage } = await import('./aiMetricsService');
+          await trackAiUsage(user.id as any, 'vision', 1, user.academyId || undefined);
+        }
+      } catch (error) {
+        logger.warn('Erro ao trackar uso de visão', 'assistantService', error);
+      }
     } else {
       onError('Não recebemos uma análise da IA.');
     }

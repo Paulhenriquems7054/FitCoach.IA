@@ -16,6 +16,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { logger } from '../utils/logger';
 import { useUser } from '../context/UserContext';
+import { useRouter } from '../hooks/useRouter';
 import { Goal } from '../types';
 
 type QuestionType = 'text' | 'number' | 'choice' | 'choice-multiple' | 'choice-other' | 'time-list';
@@ -363,15 +364,21 @@ type WelcomeSurveyProps = {
 
 const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = true, onCompleted }) => {
   const { setUser, user } = useUser();
+  const { path } = useRouter();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>(baseAnswers);
   const [showSurvey, setShowSurvey] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
+  
+  // Normalizar path para verificação
+  const normalizedPath = !path || path === '' ? '/' : path;
+  const isOnWelcomeSurveyPage = normalizedPath === '/welcome-survey';
 
-  // Obter chaves de storage específicas do usuário E do domínio
-  const STORAGE_KEY = getStorageKey(user?.username);
-  const STORAGE_FLAG = getStorageFlag(user?.username);
+  // Memoizar chaves de storage para evitar recálculos desnecessários
+  const STORAGE_KEY = useMemo(() => getStorageKey(user?.username), [user?.username]);
+  const STORAGE_FLAG = useMemo(() => getStorageFlag(user?.username), [user?.username]);
 
   useEffect(() => {
     setMounted(true);
@@ -379,26 +386,65 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
   }, []);
 
   useEffect(() => {
-    try {
-      // Limpar versões antigas apenas se não houver username (compatibilidade)
-      if (!user?.username) {
-        LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
-        // Limpar também flags antigas sem sufixo de domínio (migração)
-        const oldFlag = `nutriIA_enquete_${SURVEY_VERSION}_done`;
-        if (localStorage.getItem(oldFlag)) {
-          // Se existe flag antiga, migrar para nova chave com domínio
-          const newFlag = getStorageFlag();
-          localStorage.setItem(newFlag, localStorage.getItem(oldFlag)!);
-          localStorage.removeItem(oldFlag);
+    // Verificar se a enquete já foi respondida
+    const checkSurveyStatus = () => {
+      try {
+        setIsChecking(true);
+        
+        // IMPORTANTE: Só mostrar a enquete se estiver na rota correta
+        // Isso evita que apareça sobre outras páginas (como /login)
+        if (!isOnWelcomeSurveyPage) {
+          logger.debug(`WelcomeSurvey: Não está na rota /welcome-survey, não exibindo (path: ${normalizedPath})`, 'WelcomeSurvey');
+          setShowSurvey(false);
+          setIsChecking(false);
+          return;
         }
+        
+        // IMPORTANTE B2B2C: Enquete é APENAS para alunos (tenantRole === 'student')
+        // Não mostrar para admin academia, personal, developer ou usuários B2C puros
+        const isStudent = user?.tenantRole === 'student' || user?.gymRole === 'student';
+        if (!isStudent) {
+          logger.debug(`WelcomeSurvey: Usuário não é aluno (tenantRole: ${user?.tenantRole}, gymRole: ${user?.gymRole}), não exibindo enquete`, 'WelcomeSurvey');
+          setShowSurvey(false);
+          setIsChecking(false);
+          return;
+        }
+        
+        // Limpar versões antigas apenas se não houver username (compatibilidade)
+        if (!user?.username) {
+          LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+          // Limpar também flags antigas sem sufixo de domínio (migração)
+          const oldFlag = `nutriIA_enquete_${SURVEY_VERSION}_done`;
+          if (localStorage.getItem(oldFlag)) {
+            // Se existe flag antiga, migrar para nova chave com domínio
+            const newFlag = getStorageFlag();
+            localStorage.setItem(newFlag, localStorage.getItem(oldFlag)!);
+            localStorage.removeItem(oldFlag);
+          }
+        }
+        const hasAnswered = localStorage.getItem(STORAGE_FLAG);
+        const shouldShow = !hasAnswered && isOnWelcomeSurveyPage && isStudent;
+        logger.debug(`WelcomeSurvey: Verificando status da enquete (hasAnswered: ${!!hasAnswered}, shouldShow: ${shouldShow}, isStudent: ${isStudent}, path: ${normalizedPath})`, 'WelcomeSurvey');
+        setShowSurvey(shouldShow);
+      } catch (error) {
+        logger.warn('Não foi possível acessar o localStorage', 'WelcomeSurvey', error);
+        // Só mostrar se estiver na rota correta E for aluno
+        const isStudent = user?.tenantRole === 'student' || user?.gymRole === 'student';
+        setShowSurvey(isOnWelcomeSurveyPage && isStudent);
+      } finally {
+        setIsChecking(false);
       }
-      const hasAnswered = localStorage.getItem(STORAGE_FLAG);
-      setShowSurvey(!hasAnswered);
-    } catch (error) {
-      logger.warn('Não foi possível acessar o localStorage', 'WelcomeSurvey', error);
-      setShowSurvey(true);
+    };
+
+    // Aguardar um pouco para garantir que o componente está montado e o DOM está pronto
+    if (mounted && typeof window !== 'undefined' && document.body) {
+      // Pequeno delay para garantir que tudo está pronto
+      const timer = setTimeout(() => {
+        checkSurveyStatus();
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [user?.username, STORAGE_FLAG]);
+  }, [user?.username, user?.tenantRole, user?.gymRole, STORAGE_FLAG, mounted, isOnWelcomeSurveyPage, normalizedPath]);
 
   // Lógica condicional: algumas perguntas só aparecem se outras foram respondidas
   const shouldShowQuestion = (question: Question): boolean => {
@@ -650,7 +696,7 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
       logger.error('Erro ao atualizar perfil do usuário', 'WelcomeSurvey', error);
     }
 
-    logger.info('Respostas da Enquete Nutri.IA', 'WelcomeSurvey', payload);
+    logger.info(`Respostas da Enquete Nutri.IA: ${JSON.stringify(payload)}`, 'WelcomeSurvey');
     setShowSummary(true);
   };
 
@@ -710,7 +756,9 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
     );
   }
 
-  if (!mounted || !showSurvey) {
+  // Não renderizar até que a verificação esteja completa e o componente esteja montado
+  // Também verificar se estamos no cliente e se document.body existe
+  if (!mounted || isChecking || !showSurvey || typeof window === 'undefined' || !document.body) {
     return null;
   }
 
@@ -895,11 +943,24 @@ const WelcomeSurvey: React.FC<WelcomeSurveyProps> = ({ showCompletedMessage = tr
     </div>
   );
 
-  if (typeof window === 'undefined') {
+  // Verificar novamente se estamos no cliente e se document.body existe
+  if (typeof window === 'undefined' || !document.body) {
+    logger.warn('WelcomeSurvey: document.body não está disponível', 'WelcomeSurvey');
     return null;
   }
 
-  return createPortal(surveyContent, document.body);
+  // Usar createPortal apenas se o body estiver disponível
+  try {
+    const portal = createPortal(surveyContent, document.body);
+    logger.debug(`WelcomeSurvey: Portal criado com sucesso (mounted: ${mounted}, isChecking: ${isChecking}, showSurvey: ${showSurvey})`, 'WelcomeSurvey');
+    return portal;
+  } catch (error) {
+    logger.error('Erro ao criar portal para WelcomeSurvey', 'WelcomeSurvey', error);
+    // Em caso de erro, tentar renderizar diretamente (pode causar problemas de layout)
+    // Mas é melhor do que não renderizar nada
+    console.error('WelcomeSurvey: Erro ao criar portal, renderizando diretamente', error);
+    return surveyContent;
+  }
 };
 
 // Componente para perguntas numéricas

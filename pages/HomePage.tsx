@@ -15,6 +15,8 @@ import { getAppSetting, saveAppSetting } from '../services/databaseService';
 import { getAccountType } from '../utils/accountType';
 import { UsersIcon } from '../components/icons/UsersIcon';
 import { ChartBarIcon } from '../components/icons/ChartBarIcon';
+import { TrialCounter } from '../components/TrialCounter';
+import { TrialExpiredBanner } from '../components/TrialExpiredBanner';
 
 const QuickActionCard: React.FC<{ href: string; title: string; description: string; icon: React.ElementType }> = ({ href, title, description, icon: Icon }) => (
     <a href={href} className="block group">
@@ -93,6 +95,12 @@ const HomePage: React.FC = () => {
   if (accountType === 'USER_PERSONAL') {
     return (
       <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 px-2 sm:px-4">
+        {/* Banner de Trial Expirado */}
+        <TrialExpiredBanner />
+        
+        {/* Contador de Trial (só aparece se trial estiver ativo) */}
+        <TrialCounter />
+        
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
             Olá, {user.isAnonymized ? 'Personal Trainer' : user.nome}!
@@ -144,6 +152,12 @@ const HomePage: React.FC = () => {
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{t('home.greeting', { name: user.isAnonymized ? t('anonymous_user') : user.nome })}</h1>
             <p className="mt-2 text-base sm:text-lg text-slate-600 dark:text-slate-400">{t('home.welcome_back')}</p>
         </div>
+        
+        {/* Banner de Trial Expirado */}
+        <TrialExpiredBanner />
+        
+        {/* Contador de Trial (só aparece se trial estiver ativo) */}
+        <TrialCounter />
 
         {showCheckin && (
             <Alert type="info" title={t('home.checkin.title')}>

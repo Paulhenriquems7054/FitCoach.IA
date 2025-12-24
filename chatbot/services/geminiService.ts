@@ -161,6 +161,23 @@ export async function sendMessageToGemini(
   currentSystemInstruction: string = PERSONALITY_OPTIONS[DEFAULT_PERSONALITY_KEY],
 ): Promise<void> {
   try {
+    // Verificar acesso à IA antes de fazer chamada (B2B2C guard)
+    try {
+      const { getUser } = await import('../../services/databaseService');
+      const { assertAiAccessOrThrow } = await import('../../services/aiAccessService');
+      const user = await getUser();
+      if (user) {
+        await assertAiAccessOrThrow(user, 'chat');
+      }
+    } catch (error: any) {
+      if (error?.code === 'AI_ACCESS_DENIED') {
+        logger.warn('Acesso à IA negado para chat', 'chatbot/geminiService', error);
+        onError('Seu acesso à IA está bloqueado. Ative um plano para continuar usando.');
+        return;
+      }
+      logger.warn('Erro ao verificar acesso à IA', 'chatbot/geminiService', error);
+    }
+
     // Para chat de texto, usar backend /ai/text e simular streaming
     const modelToUse = useProModelForThinking ? PRO_MODEL : FLASH_MODEL;
 
@@ -198,6 +215,18 @@ export async function sendMessageToGemini(
     const chunks = fullText.split(/(\. |\n)/).filter((c) => c && c.trim());
     for (const chunk of chunks) {
       onNewChunk(chunk);
+    }
+    
+    // Trackar uso de IA para métricas B2B2C
+    try {
+      const { getUser } = await import('../../services/databaseService');
+      const user = await getUser();
+      if (user) {
+        const { trackAiUsage } = await import('../../services/aiMetricsService');
+        await trackAiUsage(user.id as any, 'chat', 1, user.academyId || undefined);
+      }
+    } catch (error) {
+      logger.warn('Erro ao trackar uso de chat', 'chatbot/geminiService', error);
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -344,6 +373,18 @@ export async function processImageWithGemini(
     } else { // analysis
       if (response.text) {
         onNewChunk(response.text);
+        
+        // Trackar uso de IA para métricas B2B2C
+        try {
+          const { getUser } = await import('../../services/databaseService');
+          const user = await getUser();
+          if (user) {
+            const { trackAiUsage } = await import('../../services/aiMetricsService');
+            await trackAiUsage(user.id as any, 'vision', 1, user.academyId || undefined);
+          }
+        } catch (error) {
+          logger.warn('Erro ao trackar uso de visão', 'chatbot/geminiService', error);
+        }
       } else {
         onError("No text response from image analysis.");
       }
@@ -454,9 +495,42 @@ export async function startLiveAudioSession(
   onVolumeLevel?: (level: number) => void, // Callback para medidor de volume (0-100)
   getIsMicMuted?: () => boolean, // Função para obter estado do mute dinamicamente
 ): Promise<void> {
+  // Verificar acesso à IA antes de iniciar sessão de voz (B2B2C guard)
+  try {
+    const { getUser } = await import('../../services/databaseService');
+    const { assertAiAccessOrThrow } = await import('../../services/aiAccessService');
+    const user = await getUser();
+    if (user) {
+      await assertAiAccessOrThrow(user, 'voice');
+    }
+  } catch (error: any) {
+    if (error?.code === 'AI_ACCESS_DENIED') {
+      logger.warn('Acesso à IA negado para voz', 'chatbot/geminiService', error);
+      onError('Seu acesso à IA está bloqueado. Ative um plano para continuar usando.', false);
+      return;
+    }
+    logger.warn('Erro ao verificar acesso à IA', 'chatbot/geminiService', error);
+  }
   if (liveAudioSession || sessionPromiseForCleanup) {
     logger.warn("Sessão de áudio ao vivo já ativa ou conectando. Fechando sessão existente para reiniciar com nova configuração.", 'chatbot/geminiService');
     await stopLiveAudioSession(); // Ensure existing session is stopped
+  }
+
+  // Verificar acesso à IA antes de iniciar (B2B2C guard)
+  try {
+    const { getUser } = await import('../../services/databaseService');
+    const { assertAiAccessOrThrow } = await import('../../services/aiAccessService');
+    const currentUser = await getUser();
+    
+    if (currentUser) {
+      await assertAiAccessOrThrow(currentUser, 'voice');
+    }
+  } catch (error: any) {
+    if (error?.code === 'AI_ACCESS_DENIED') {
+      onError('Seu acesso à IA está bloqueado. Assine um plano para continuar usando.', false);
+      return;
+    }
+    logger.warn('Erro ao verificar acesso à IA', 'chatbot/geminiService', error);
   }
 
   // Verificar limite de voz antes de iniciar
@@ -677,6 +751,21 @@ export async function startLiveAudioSession(
               consumeVoiceSeconds(elapsed).catch(err => 
                 logger.warn('Erro ao consumir tempo final', 'chatbot/geminiService', err)
               );
+            });
+            
+            // Trackar uso de IA para métricas B2B2C
+            import('../../services/databaseService').then(({ getUser }) => {
+              getUser().then(user => {
+                if (user) {
+                  const minutes = Math.ceil(elapsed / 60);
+                  if (minutes > 0) {
+                    import('../../services/aiMetricsService').then(({ trackAiUsage }) => {
+                      trackAiUsage(user.id as any, 'voice', minutes, user.academyId || undefined)
+                        .catch(err => logger.warn('Erro ao trackar uso de voz', 'chatbot/geminiService', err));
+                    });
+                  }
+                }
+              }).catch(err => logger.warn('Erro ao obter usuário para tracking', 'chatbot/geminiService', err));
             });
           }
           stopLiveAudioSession().then(onSessionEndedUnexpectedly);

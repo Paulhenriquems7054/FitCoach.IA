@@ -257,7 +257,7 @@ export function getSupabaseClient(): SupabaseClient<Database> {
  */
 function userToSupabase(user: User, userId?: string): Database['public']['Tables']['users']['Insert'] {
   return {
-    id: userId || user.id || undefined,
+    id: userId || (user as any).id || undefined,
     nome: user.nome,
     username: user.username || null,
     photo_url: user.photoUrl || null,
@@ -270,8 +270,15 @@ function userToSupabase(user: User, userId?: string): Database['public']['Tables
     discipline_score: user.disciplineScore,
     completed_challenge_ids: user.completedChallengeIds || [],
     is_anonymized: user.isAnonymized || false,
+    // Papel global no SaaS (user/professional/developer)
     role: user.role || 'user',
-    gym_id: user.gymId || null,
+    // ====== Multi-tenant B2B2C ======
+    // Nova coluna: academy_id (academia dona da conta B2B)
+    academy_id: user.academyId || user.gymId || null,
+    // Papel dentro da academia: admin_academy | personal | student
+    tenant_role: user.tenantRole || null,
+    // Campos legados de gym (mantidos para compatibilidade com código antigo / migrações)
+    gym_id: user.gymId || user.academyId || null,
     gym_role: user.gymRole || null,
     is_gym_managed: user.isGymManaged || false,
     matricula: user.matricula || null,
@@ -294,8 +301,12 @@ function userToSupabase(user: User, userId?: string): Database['public']['Tables
     gym_server_url: user.gymServerUrl || null,
     // Novos campos de plano, voz e chat
     plan_type: (user.planType || 'free') as any,
-    subscription_status: (user.subscriptionStatus || 'active') as any,
+    subscription_status: (user.subscriptionStatus || 'trial') as any,
     expiry_date: user.expiryDate || null,
+    // Campos de trial
+    account_type: user.accountType || null,
+    trial_start_date: user.trialStartDate || null,
+    trial_end_date: user.trialEndDate || null,
     voice_daily_limit_seconds: user.voiceDailyLimitSeconds || 900,
     voice_used_today_seconds: user.voiceUsedTodaySeconds || 0,
     voice_balance_upsell: user.voiceBalanceUpsell || 0,
@@ -326,8 +337,13 @@ function supabaseToUser(row: Database['public']['Tables']['users']['Row']): User
     completedChallengeIds: row.completed_challenge_ids || [],
     isAnonymized: row.is_anonymized,
     weightHistory: [], // Será carregado separadamente
-    role: row.role,
+    // Papel global no SaaS
+    role: (row.role as any) || 'user',
     subscription: 'free', // Será determinado pela assinatura ativa
+    // ====== Multi-tenant B2B2C ======
+    academyId: (row as any).academy_id || row.gym_id || undefined,
+    tenantRole: ((row as any).tenant_role as any) || null,
+    // Campos legados de gym (mantidos por compatibilidade)
     gymId: row.gym_id || undefined,
     gymRole: row.gym_role || undefined,
     isGymManaged: row.is_gym_managed,
@@ -344,6 +360,10 @@ function supabaseToUser(row: Database['public']['Tables']['users']['Row']): User
     planType: row.plan_type || undefined,
     subscriptionStatus: row.subscription_status || undefined,
     expiryDate: row.expiry_date || undefined,
+    // Campos de trial
+    accountType: row.account_type || undefined,
+    trialStartDate: row.trial_start_date || undefined,
+    trialEndDate: row.trial_end_date || undefined,
     voiceDailyLimitSeconds: row.voice_daily_limit_seconds || undefined,
     voiceUsedTodaySeconds: row.voice_used_today_seconds || undefined,
     voiceBalanceUpsell: row.voice_balance_upsell || undefined,
@@ -842,7 +862,7 @@ export const authFlowService = {
 
     // 1. Tentar validar como CUPOM (fluxo B2C). Se não for cupom válido, trataremos como código de ativação (B2B / activation_code).
     const couponValidation = await couponService.validateCoupon(couponCode);
-    const isCoupon = !!couponValidation.success;
+    const isCoupon = couponValidation.isValid;
 
     // 2. Criar usuário no Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -890,15 +910,33 @@ export const authFlowService = {
       sessionEstablished = true;
     }
 
-    // 3. Criar registro na tabela users
+    // 3. Determinar tipo de conta e inicializar trial
+    // Se o cupom for de academia (B2B), accountType = 'academy', senão 'individual'
+    const planLinked = couponValidation.coupon?.planLinked || '';
+    const accountType = (planLinked.includes('academy') || planLinked.includes('personal')) 
+                         ? 'academy' : 'individual';
+    
+    const now = new Date();
+    const trialDays = accountType === 'individual' ? 7 : 14;
+    const trialEndDate = new Date(now);
+    trialEndDate.setDate(trialEndDate.getDate() + trialDays);
+    
+    // Se cupom válido e plano pago, usar 'active', senão iniciar com 'trial'
+    const subscriptionStatus = (isCoupon && planLinked && planLinked !== 'free') 
+                                ? 'active' : 'trial';
+    
+    // 4. Criar registro na tabela users
     // Usar o cliente autenticado (com a sessão do signup/login)
     const userSupabase = userToSupabase(
       {
         ...userData,
         username,
         // Se for cupom válido (B2C), já definimos o planType. Caso contrário, deixamos como 'free'
-        planType: (isCoupon ? (couponValidation.planLinked as any) : 'free') || 'free',
-        subscriptionStatus: 'active',
+        planType: (isCoupon ? (planLinked as any) : 'free') || 'free',
+        subscriptionStatus: subscriptionStatus as any,
+        accountType: accountType,
+        trialStartDate: subscriptionStatus === 'trial' ? now.toISOString() : undefined,
+        trialEndDate: subscriptionStatus === 'trial' ? trialEndDate.toISOString() : undefined,
         expiryDate: undefined, // Será definido pelo plano
       },
       userId
@@ -1180,6 +1218,80 @@ export const authFlowService = {
  * Serviço de autenticação
  */
 export const authService = {
+  /**
+   * Cadastra um novo usuário sem código de convite (plano free)
+   */
+  async signUp(email: string, password: string): Promise<User> {
+    const supabase = getSupabaseClient();
+
+    // Criar usuário no Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: password,
+      options: {
+        data: {
+          email: email.trim(),
+        },
+      },
+    });
+
+    if (authError || !authData.user) {
+      logger.error('Erro ao criar usuário no Supabase Auth', 'authService', authError);
+      throw new Error(authError?.message || 'Erro ao criar conta');
+    }
+
+    // Inicializar trial (7 dias para usuário individual)
+    const { initializeTrial } = await import('./trialAccessService');
+    const now = new Date();
+    const trialEndDate = new Date(now);
+    trialEndDate.setDate(trialEndDate.getDate() + 7); // 7 dias de trial
+    
+    // Criar perfil do usuário no Supabase com trial inicializado
+    const userProfile: Database['public']['Tables']['users']['Insert'] = {
+      id: authData.user.id,
+      nome: 'Usuário Padrão',
+      username: email.split('@')[0], // Usar parte antes do @ como username
+      email: email.trim(),
+      idade: 0,
+      genero: 'Masculino',
+      peso: 0,
+      altura: 0,
+      objetivo: 'perder peso',
+      points: 0,
+      discipline_score: 0,
+      completed_challenge_ids: [],
+      is_anonymized: false,
+      role: 'user',
+      plan_type: 'free',
+      subscription_status: 'trial',
+      account_type: 'individual',
+      trial_start_date: now.toISOString(),
+      trial_end_date: trialEndDate.toISOString(),
+      voice_daily_limit_seconds: 900, // 15 minutos
+      chat_daily_limit_messages: 600,
+    };
+
+    // Inserir perfil do usuário
+    const { error: insertError } = await supabase
+      .from('users')
+      .insert(userProfile);
+
+    if (insertError) {
+      logger.error('Erro ao criar perfil do usuário', 'authService', insertError);
+      // Tentar buscar o perfil mesmo assim (pode ter sido criado por trigger)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    // Buscar perfil criado
+    const createdProfile = await getUserFromSupabase(authData.user.id);
+    
+    if (!createdProfile) {
+      throw new Error('Erro ao criar perfil do usuário');
+    }
+
+    return createdProfile;
+  },
+
   /**
    * Obtém o perfil completo do usuário atual
    */

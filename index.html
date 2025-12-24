@@ -86,8 +86,11 @@
           if (isDev) {
             var originalRegister = navigator.serviceWorker.register;
             navigator.serviceWorker.register = function() {
-              // Silently ignore in development - no need to log
-              return Promise.reject(new Error('Service workers disabled in development'));
+              // Silently ignore in development - return a rejected promise that won't be logged
+              return Promise.reject(new Error('Service workers disabled in development')).catch(function() {
+                // Silently swallow the error - this is expected in development
+                return Promise.resolve();
+              });
             };
           }
           

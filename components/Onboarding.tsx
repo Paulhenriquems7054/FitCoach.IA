@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserProfile, Gender, ActivityLevel, Goal, GoalMapping } from '../types';
+import { UserProfile, Gender, ActivityLevel, Goal } from '../types';
 import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
 import { CheckIcon } from './icons/CheckIcon';
 import { ClipboardDocumentListIcon } from './icons/ClipboardDocumentListIcon';

@@ -49,22 +49,32 @@ export async function getAiAccessStatus(user: User): Promise<AiAccessStatus> {
     return { hasAccess: false, reason: 'none' };
   }
 
-  // 1. Assinatura ativa na tabela subscriptions
-  const sub = await getActiveUserAiSubscription(user.id as any);
-  if (sub) {
+  // 1. Verificar assinatura ativa (prioridade: campo simplificado ou tabela subscriptions)
+  const hasActiveSubscription = user.subscriptionActive === true || 
+    (user.aiSubscriptionStatus === 'active') ||
+    await getActiveUserAiSubscription(user.id as any) !== null;
+  
+  if (hasActiveSubscription) {
     return { hasAccess: true, reason: 'subscription' };
   }
 
-  // 2. Trial individual de IA (campos ai* do usuário)
-  const daysRemaining = getDaysRemaining(user.aiTrialEndAt || null);
-  if (user.aiSubscriptionStatus === 'trial' && daysRemaining && daysRemaining > 0) {
-    return { hasAccess: true, reason: 'trial', daysRemaining };
+  // 2. Verificar trial ativo (prioridade: campos simplificados trialActive/trialExpiresAt)
+  const trialExpires = user.trialExpiresAt || user.aiTrialEndAt || null;
+  const isTrialActive = user.trialActive === true || 
+    (user.aiSubscriptionStatus === 'trial' && trialExpires && new Date(trialExpires) > new Date());
+  
+  if (isTrialActive && trialExpires) {
+    const daysRemaining = getDaysRemaining(trialExpires);
+    if (daysRemaining !== undefined && daysRemaining > 0) {
+      return { hasAccess: true, reason: 'trial', daysRemaining };
+    }
   }
 
   // 3. Trial expirado ou nunca iniciou
-  if (user.aiSubscriptionStatus === 'trial' || user.aiSubscriptionStatus === 'expired') {
-    // Registrar evento de trial expirado (métricas)
-    if (user.aiSubscriptionStatus === 'expired' || (user.aiTrialEndAt && new Date(user.aiTrialEndAt) < new Date())) {
+  if (user.aiSubscriptionStatus === 'trial' || user.aiSubscriptionStatus === 'expired' || 
+      (trialExpires && new Date(trialExpires) < new Date())) {
+    // Registrar evento de trial expirado (métricas) apenas uma vez
+    if (user.aiSubscriptionStatus !== 'expired' && user.id) {
       try {
         const { trackTrialExpired } = await import('./aiMetricsService');
         await trackTrialExpired(user.id as any, user.academyId || undefined);

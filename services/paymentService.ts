@@ -374,15 +374,28 @@ async function activateSubscription(
     }
   }
 
+  // Verificar se é plano de IA individual (B2B2C)
+  const isAiPlan = planName === 'ai_monthly' || planName === 'ai_annual_vip';
+  
   // Atualizar usuário
+  const updateData: any = {
+    plan_type: planName as any,
+    subscription_status: 'active',
+    expiry_date: periodEnd.toISOString(),
+    updated_at: now.toISOString(),
+  };
+
+  // Se for plano de IA individual (B2B2C), atualizar campos específicos de IA
+  if (isAiPlan) {
+    updateData.subscription_active = true; // Campo simplificado
+    updateData.ai_subscription_status = 'active'; // Campo legado
+    updateData.trial_active = false; // Desativar trial
+    updateData.trial_expires_at = null; // Limpar expiração do trial
+  }
+
   const { error: userUpdateError } = await supabase
     .from('users')
-    .update({
-      plan_type: planName as any,
-      subscription_status: 'active',
-      expiry_date: periodEnd.toISOString(),
-      updated_at: now.toISOString(),
-    })
+    .update(updateData)
     .eq('id', userId);
 
   if (userUpdateError) {

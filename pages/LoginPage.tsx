@@ -1162,19 +1162,28 @@ const LoginPage: React.FC = () => {
                             <p className="text-xs text-slate-700 dark:text-slate-300 mt-3 mb-2">
                                 Se você recebeu um código da sua academia, comece por aqui para liberar seu acesso premium.
                             </p>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowSignup(true);
-                                    setSignupStep(2); // Ir direto para etapa 2 (cadastro)
-                                    setSignupCouponCode(''); // Garantir que não há cupom
-                                    setCouponValidated(false);
-                                }}
-                                className="w-full mt-2 text-center text-sm font-semibold text-primary-700 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 underline decoration-2 underline-offset-2 py-2.5 px-3 transition-all bg-transparent hover:bg-primary-100/50 dark:hover:bg-primary-900/20 rounded-md cursor-pointer"
-                                style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            >
-                                Não tenho código? Testar Grátis por 3 dias
-                            </button>
+                            {/* Botão "Testar Grátis" apenas para usuários individuais (B2C), não para alunos (B2B2C via convite) */}
+                            {!inviteInfo && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowSignup(true);
+                                        setSignupStep(2); // Ir direto para etapa 2 (cadastro)
+                                        setSignupCouponCode(''); // Garantir que não há cupom
+                                        setCouponValidated(false);
+                                    }}
+                                    className="w-full mt-2 text-center text-sm font-semibold text-primary-700 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 underline decoration-2 underline-offset-2 py-2.5 px-3 transition-all bg-transparent hover:bg-primary-100/50 dark:hover:bg-primary-900/20 rounded-md cursor-pointer"
+                                    style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                >
+                                    Não tenho código? Testar Grátis por 3 dias
+                                </button>
+                            )}
+                            {/* Mensagem informativa para alunos que vêm via convite */}
+                            {inviteInfo && inviteInfo.invitedRole === 'student' && (
+                                <p className="mt-3 text-xs text-slate-600 dark:text-slate-400 text-center">
+                                    Você foi convidado pela sua academia. Use o código de convite acima para criar sua conta.
+                                </p>
+                            )}
                         </div>
 
                         {/* Formulário: Já tenho conta */}

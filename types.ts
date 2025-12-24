@@ -60,13 +60,36 @@ export interface User {
   completedChallengeIds: string[];
   isAnonymized: boolean;
   weightHistory: { date: string; weight: number }[];
-  role: 'user' | 'professional';
+  // Papel global no SaaS (ex: desenvolvedor/owner da plataforma)
+  role: 'user' | 'professional' | 'developer';
   subscription: 'free' | 'premium';
   
   // Controle de Plano
   planType?: 'free' | 'monthly' | 'annual_vip' | 'academy_starter_mini' | 'academy_starter' | 'academy_growth' | 'academy_pro' | 'personal_team_5' | 'personal_team_15';
-  subscriptionStatus?: 'active' | 'inactive' | 'expired';
+  subscriptionStatus?: 'trial' | 'active' | 'inactive' | 'expired';
   expiryDate?: string; // ISO date string
+  
+  // Sistema de Trial
+  accountType?: 'individual' | 'academy'; // Tipo de conta: individual (B2C) ou academy (B2B)
+  trialStartDate?: string; // ISO date string - data de início do trial
+  trialEndDate?: string; // ISO date string - data de fim do trial
+
+  // ====== Modelo B2B2C focado em IA por aluno ======
+  // Tenant (multi-tenant): vínculo com academia
+  academyId?: string | null; // ID da academia (owner B2B) se o usuário pertence a uma
+  // Papel dentro da academia (tenant)
+  tenantRole?: 'admin_academy' | 'personal' | 'student' | null;
+
+  // Controle de Trial de IA (B2B2C) - simplificado
+  trialActive?: boolean; // Se o trial está ativo
+  trialExpiresAt?: string | null; // ISO date string - data de expiração do trial
+
+  // Assinatura de IA individual (B2B2C) – por aluno/usuário
+  aiSubscriptionStatus?: 'none' | 'trial' | 'active' | 'expired' | 'cancelled';
+  aiTrialStartAt?: string | null; // ISO date string (legado - manter compatibilidade)
+  aiTrialEndAt?: string | null;   // ISO date string (legado - manter compatibilidade)
+  aiPlanType?: string | null;     // ex: 'ai_individual_basic', 'ai_individual_plus'
+  subscriptionActive?: boolean; // Se tem assinatura ativa de IA (simplificado)
   
   // Controle de Voz (Gemini Live)
   voiceDailyLimitSeconds?: number; // Padrão: 900 (15 minutos)

@@ -140,6 +140,18 @@ const buildMealPlanPrompt = (user: User, language: 'pt' | 'en' | 'es'): string =
 };
 
 export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' = 'pt'): Promise<GeminiMealPlanResponse | null> => {
+    // Verificar acesso à IA antes de gerar plano (B2B2C guard)
+    try {
+        const { assertAiAccessOrThrow } = await import('./aiAccessService');
+        await assertAiAccessOrThrow(user, 'plan');
+    } catch (error: any) {
+        if (error?.code === 'AI_ACCESS_DENIED') {
+            logger.warn('Acesso à IA negado para geração de plano', 'geminiService', error);
+            throw new Error('Seu acesso à IA está bloqueado. Assine um plano para continuar usando.');
+        }
+        logger.warn('Erro ao verificar acesso à IA', 'geminiService', error);
+    }
+
     // SEMPRE priorizar modo offline/local para app 100% offline
     // Tentar IA Local primeiro (Ollama)
     const prompt = buildMealPlanPrompt(user, language);
@@ -210,6 +222,15 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
         if (typeof window !== 'undefined') {
             sessionStorage.setItem('lastMealPlan', JSON.stringify(localResponse));
         }
+        
+        // Trackar uso de IA para métricas B2B2C
+        try {
+            const { trackAiUsage } = await import('./aiMetricsService');
+            await trackAiUsage(user.id as any, 'plan', 1, user.academyId || undefined);
+        } catch (error) {
+            logger.warn('Erro ao trackar uso de plano', 'geminiService', error);
+        }
+        
         return localResponse;
     }
 
@@ -357,6 +378,242 @@ export const searchRecipes = async (query: string, user: User): Promise<Recipe[]
     
     // Nota: Para receitas personalizadas com IA, pode usar Ollama local se disponível
     // Por enquanto, usamos receitas pré-definidas em cache
+};
+
+// --- FOOD SEARCH AI ---
+
+const foodSearchSchema = {
+    type: Type.OBJECT,
+    properties: {
+        alimentos: {
+            type: Type.ARRAY,
+            description: "Lista de 3 a 5 alimentos que correspondem à busca do usuário.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    nome: { type: Type.STRING, description: "Nome do alimento." },
+                    porcao: { type: Type.STRING, description: "Porção padrão (ex: '100g', '1 unidade')." },
+                    calorias: { type: Type.INTEGER, description: "Calorias por porção." },
+                    proteinas_g: { type: Type.INTEGER, description: "Gramas de proteína por porção." },
+                    carboidratos_g: { type: Type.INTEGER, description: "Gramas de carboidratos por porção." },
+                    gorduras_g: { type: Type.INTEGER, description: "Gramas de gordura por porção." },
+                    descricao: { type: Type.STRING, description: "Breve descrição do alimento." }
+                },
+                required: ["nome", "porcao", "calorias", "proteinas_g", "carboidratos_g", "gorduras_g"]
+            }
+        }
+    },
+    required: ["alimentos"]
+};
+
+/**
+ * Busca alimentos usando IA (Gemini 2.5 Flash)
+ * Retorna 3-5 opções com dados nutricionais
+ */
+export const searchFoodAI = async (query: string, user?: User): Promise<Array<{
+    nome: string;
+    porcao: string;
+    calorias: number;
+    proteinas_g: number;
+    carboidratos_g: number;
+    gorduras_g: number;
+    descricao?: string;
+}>> => {
+    const prompt = `Busque alimentos que correspondam à seguinte descrição: "${query}".
+    
+    Retorne uma lista de 3 a 5 alimentos com suas informações nutricionais por porção padrão.
+    Foque em alimentos comuns e saudáveis, preferencialmente brasileiros quando aplicável.
+    
+    Retorne APENAS JSON válido seguindo o schema fornecido.`;
+
+    const systemPrompt = `Você é um nutricionista especializado. Retorne APENAS JSON válido seguindo o schema fornecido.`;
+
+    try {
+        const response = await generateJSONResponse<{ alimentos: Array<{
+            nome: string;
+            porcao: string;
+            calorias: number;
+            proteinas_g: number;
+            carboidratos_g: number;
+            gorduras_g: number;
+            descricao?: string;
+        }> }>(
+            prompt,
+            systemPrompt,
+            async () => {
+                if (!isOnline()) {
+                    return null;
+                }
+                if (isBackendUnavailable()) {
+                    return null;
+                }
+                try {
+                    const res = await fetch(`${AI_BACKEND_BASE}/ai/text`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            userId: user?.id || 'anonymous',
+                            gymId: user?.gymId ?? null,
+                            feature: "food_search",
+                            model: "gemini-1.5-flash",
+                            prompt,
+                        }),
+                    });
+
+                    if (!res.ok) {
+                        if (res.status === 503) {
+                            markBackendUnavailable();
+                        }
+                        return null;
+                    }
+
+                    const data = await res.json();
+                    const text: string = data.text || "";
+                    if (!text.trim()) {
+                        return null;
+                    }
+                    return JSON.parse(text);
+                } catch (error) {
+                    logger.warn("Erro ao chamar backend de IA em searchFoodAI", "geminiService", error);
+                    return null;
+                }
+            }
+        );
+
+        if (response && response.alimentos) {
+            return response.alimentos;
+        }
+
+        // Fallback: retornar lista básica
+        return [
+            {
+                nome: query,
+                porcao: "100g",
+                calorias: 100,
+                proteinas_g: 5,
+                carboidratos_g: 15,
+                gorduras_g: 2,
+                descricao: "Alimento genérico"
+            }
+        ];
+    } catch (error) {
+        logger.error("Erro em searchFoodAI", "geminiService", error);
+        return [];
+    }
+};
+
+/**
+ * Gera receitas usando IA baseado em ingredientes fornecidos
+ */
+export const generateRecipeAI = async (ingredients: string[], user?: User): Promise<Recipe | null> => {
+    const ingredientsList = ingredients.join(", ");
+    const prompt = `Crie uma receita saudável e saborosa usando os seguintes ingredientes: ${ingredientsList}.
+    
+    A receita deve ser:
+    - Nutritiva e balanceada
+    - Fácil de preparar
+    - Com tempo de preparo realista
+    - Com informações nutricionais completas
+    
+    Retorne APENAS JSON válido seguindo o schema fornecido.`;
+
+    const systemPrompt = `Você é um chef nutricionista especializado. Retorne APENAS JSON válido seguindo o schema fornecido.`;
+
+    try {
+        const response = await generateJSONResponse<Recipe>(
+            prompt,
+            systemPrompt,
+            async () => {
+                if (!isOnline()) {
+                    return null;
+                }
+                if (isBackendUnavailable()) {
+                    return null;
+                }
+                try {
+                    const res = await fetch(`${AI_BACKEND_BASE}/ai/text`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            userId: user?.id || 'anonymous',
+                            gymId: user?.gymId ?? null,
+                            feature: "recipe_generation",
+                            model: "gemini-1.5-flash",
+                            prompt,
+                        }),
+                    });
+
+                    if (!res.ok) {
+                        if (res.status === 503) {
+                            markBackendUnavailable();
+                        }
+                        return null;
+                    }
+
+                    const data = await res.json();
+                    const text: string = data.text || "";
+                    if (!text.trim()) {
+                        return null;
+                    }
+                    return JSON.parse(text) as Recipe;
+                } catch (error) {
+                    logger.warn("Erro ao chamar backend de IA em generateRecipeAI", "geminiService", error);
+                    return null;
+                }
+            }
+        );
+
+        return response;
+    } catch (error) {
+        logger.error("Erro em generateRecipeAI", "geminiService", error);
+        return null;
+    }
+};
+
+/**
+ * Alias para analyzeMealPhoto - análise de foto de comida
+ * Usa Gemini 2.5 Flash com visão
+ */
+export const analyzeFoodImage = async (base64Image: string, mimeType: string): Promise<MealAnalysisResponse> => {
+    return analyzeMealPhoto(base64Image, mimeType);
+};
+
+/**
+ * Alias para sendMessageToChat - chat conversacional com nutricionista
+ * Usa Gemini 2.5 Flash
+ */
+export const chatWithNutritionist = async (
+    message: string,
+    onNewChunk: (chunk: string) => void,
+    onError: (error: string) => void,
+    user?: User
+): Promise<void> => {
+    // Inicializar chat se necessário
+    if (user) {
+        await startChat(user);
+    }
+    
+    try {
+        const result = sendMessageToChat(message);
+        // Simular streaming (sendMessageToChat retorna um stream)
+        // Por enquanto, usar fallback para backend
+        const { sendMessageToGemini } = await import('../chatbot/services/geminiService');
+        await sendMessageToGemini(
+            message,
+            onNewChunk,
+            onError,
+            false,
+            undefined,
+            "Você é um nutricionista especializado. Responda de forma clara, empática e profissional, sempre em português."
+        );
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+        onError(errorMessage);
+    }
 };
 
 // --- CONTENT MODERATION ---

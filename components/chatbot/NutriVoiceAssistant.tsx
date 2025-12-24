@@ -403,7 +403,15 @@ export const NutriVoiceAssistant: React.FC<NutriVoiceAssistantProps> = ({ isOpen
                 <button
                   onClick={() => {
                     setShowUpsell(false);
-                    window.location.hash = '#/premium';
+                    // Se for aluno, redirecionar para página de vendas externa (seção recargas)
+                    const isStudent = user?.tenantRole === 'student' && user?.academyId;
+                    if (isStudent) {
+                      import('../../constants/salesPage').then(({ redirectToSalesPage }) => {
+                        redirectToSalesPage('RECHARGE');
+                      });
+                    } else {
+                      window.location.hash = '#/premium';
+                    }
                   }}
                   className="w-full px-4 py-2 bg-gradient-to-r from-emerald-500 to-sky-500 text-white rounded-lg hover:from-emerald-600 hover:to-sky-600 transition"
                 >

@@ -23,11 +23,27 @@ interface SubscriptionPlan {
     features: string[];
     limits: Record<string, number>;
     plan_category?: string;
+    checkout_url_monthly?: string;
+    checkout_url_yearly?: string;
+    checkout_price_monthly?: number;
+    checkout_price_yearly?: number;
 }
 
 const PremiumPage: React.FC = () => {
     const { user } = useUser();
     const { showError, showSuccess } = useToast();
+    
+    // Se for aluno, redirecionar para página de planos de IA
+    React.useEffect(() => {
+        if (user?.tenantRole === 'student') {
+            window.location.hash = '#/student-ai-plans';
+        }
+    }, [user]);
+    
+    // Não renderizar para alunos
+    if (user?.tenantRole === 'student') {
+        return null;
+    }
     const [allPlans, setAllPlans] = useState<SubscriptionPlan[]>([]);
     const [activeSubscription, setActiveSubscription] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -70,6 +86,10 @@ const PremiumPage: React.FC = () => {
                 features: (p.features as string[]) || [],
                 limits: (p.limits as Record<string, number>) || {},
                 plan_category: (p as any).plan_category || null,
+                checkout_url_monthly: (p as any).checkout_url_monthly || null,
+                checkout_url_yearly: (p as any).checkout_url_yearly || null,
+                checkout_price_monthly: (p as any).checkout_price_monthly || null,
+                checkout_price_yearly: (p as any).checkout_price_yearly || null,
             })));
         } catch (error) {
             logger.error('Erro ao carregar planos', 'PremiumPage', error);
@@ -103,19 +123,24 @@ const PremiumPage: React.FC = () => {
         }
     };
     
+    // Estado para controlar a aba ativa
+    const [activePage, setActivePage] = useState<'b2c' | 'b2b' | 'personal' | 'recharge'>('b2c');
+    
     // Separar planos por categoria
-    // NOTA: Planos B2C (monthly, annual_vip) foram removidos - não devem ser exibidos para testes
-    // NOTA: Planos Personal Trainer foram removidos - não existem mais na página de vendas nem na Cakto
+    const b2cPlans = useMemo(() => {
+        return allPlans.filter(p => p.plan_category === 'b2c_ai');
+    }, [allPlans]);
+    
     const b2bPlans = useMemo(() => {
-        // Filtrar planos B2C (monthly e annual_vip) para não exibi-los
-        return allPlans.filter(p => {
-            // Excluir planos B2C
-            if (p.name === 'monthly' || p.name === 'annual_vip' || p.plan_category === 'b2c') {
-                return false;
-            }
-            // Incluir apenas planos B2B
-            return p.plan_category === 'b2b';
-        });
+        return allPlans.filter(p => p.plan_category === 'b2b_platform');
+    }, [allPlans]);
+    
+    const personalPlans = useMemo(() => {
+        return allPlans.filter(p => p.plan_category === 'personal_platform');
+    }, [allPlans]);
+    
+    const rechargePlans = useMemo(() => {
+        return allPlans.filter(p => p.plan_category === 'recharge');
     }, [allPlans]);
 
     // Rolar para a oferta específica quando vier de #/premium?product=...
@@ -147,6 +172,15 @@ const PremiumPage: React.FC = () => {
     }, [loading, activeSubscription, hasScrolledFromHash]);
     
     const handleSubscribe = (plan: SubscriptionPlan) => {
+        // Se o plano tem checkout_url, redirecionar direto para Cakto
+        const checkoutUrl = (plan as any).checkout_url_monthly || (plan as any).checkout_url_yearly;
+        if (checkoutUrl) {
+            logger.info(`Redirecionando para checkout: ${checkoutUrl}`, 'PremiumPage');
+            window.open(checkoutUrl, '_blank');
+            return;
+        }
+        
+        // Caso contrário, abrir modal de checkout
         setCheckoutModal({
             isOpen: true,
             planId: plan.id,
@@ -435,10 +469,81 @@ const PremiumPage: React.FC = () => {
                 </div>
             ) : (
                 <div className="space-y-8 sm:space-y-12">
-                    {/* NOTA: Planos B2C (Plano Mensal e Plano Anual VIP) foram removidos - não devem ser exibidos para testes */}
-                    
+                    {/* Navegação por Abas */}
+                    <div className="flex flex-wrap justify-center gap-2 sm:gap-4 border-b border-slate-200 dark:border-slate-700 pb-4">
+                        <button
+                            onClick={() => setActivePage('b2c')}
+                            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                                activePage === 'b2c'
+                                    ? 'bg-primary-600 text-white shadow-lg'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                            }`}
+                        >
+                            Planos Individuais (IA)
+                        </button>
+                        <button
+                            onClick={() => setActivePage('b2b')}
+                            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                                activePage === 'b2b'
+                                    ? 'bg-primary-600 text-white shadow-lg'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                            }`}
+                        >
+                            Planos para Academias
+                        </button>
+                        <button
+                            onClick={() => setActivePage('personal')}
+                            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                                activePage === 'personal'
+                                    ? 'bg-primary-600 text-white shadow-lg'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                            }`}
+                        >
+                            Personal Trainers
+                        </button>
+                        <button
+                            onClick={() => setActivePage('recharge')}
+                            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                                activePage === 'recharge'
+                                    ? 'bg-primary-600 text-white shadow-lg'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                            }`}
+                        >
+                            Recargas
+                        </button>
+                    </div>
+
+                    {/* PLANOS B2C - INDIVIDUAIS (USO DA IA) */}
+                    {activePage === 'b2c' && b2cPlans.length > 0 && (
+                        <div>
+                            <div className="text-center mb-6">
+                                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                                    Planos Individuais - Uso da IA
+                                </h2>
+                                <p className="text-slate-600 dark:text-slate-400">
+                                    Escolha o plano ideal para continuar usando todas as funcionalidades de IA
+                                </p>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto">
+                                {b2cPlans.map((plan) => {
+                                    const isPopular = plan.name === 'ai_annual_vip';
+                                    return (
+                                        <PlanCard
+                                            key={plan.id}
+                                            plan={plan}
+                                            badge={isPopular ? 'MAIS VANTAJOSO' : undefined}
+                                            highlight={isPopular}
+                                            showYearlyPrice={plan.name === 'ai_annual_vip'}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* PLANOS B2B - ACADEMIAS */}
-                    {b2bPlans.length > 0 && (
+                    {activePage === 'b2b' && b2bPlans.length > 0 && (
                         <div>
                             <div className="text-center mb-6">
                                 <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
@@ -463,7 +568,7 @@ const PremiumPage: React.FC = () => {
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 items-stretch mt-6">
                                 {b2bPlans.map((plan) => {
-                                    const isPopular = plan.name === 'academy_growth';
+                                    const isPopular = plan.name === 'growth';
                                     return (
                                         <PlanCard
                                             key={plan.id}
@@ -477,10 +582,37 @@ const PremiumPage: React.FC = () => {
                         </div>
                     )}
 
-                    {/* NOTA: Planos Personal Trainer foram removidos - não existem mais na página de vendas nem na Cakto */}
+                    {/* PLANOS PERSONAL TRAINERS */}
+                    {activePage === 'personal' && personalPlans.length > 0 && (
+                        <div>
+                            <div className="text-center mb-6">
+                                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                                    Planos para Personal Trainers
+                                </h2>
+                                <p className="text-slate-600 dark:text-slate-400">
+                                    Gerencie seus alunos e ofereça treinos personalizados
+                                </p>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto">
+                                {personalPlans.map((plan) => {
+                                    const isPopular = plan.name === 'team_15';
+                                    return (
+                                        <PlanCard
+                                            key={plan.id}
+                                            plan={plan}
+                                            badge={isPopular ? 'MAIS VANTAJOSO' : undefined}
+                                            highlight={isPopular}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Seção de Recargas */}
-                    <div className="mt-8 sm:mt-12">
+                    {activePage === 'recharge' && (
+                    <div>
                         <div className="text-center mb-6">
                             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
                                 Recarga Instantânea
@@ -490,164 +622,164 @@ const PremiumPage: React.FC = () => {
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-                            {/* Sessão Turbo */}
-                            <Card ref={turboRef} className="flex flex-col hover:shadow-lg transition-all relative">
-                                <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <BoltIcon className="w-6 h-6 text-yellow-500" />
-                                        <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
-                                            Sessão Turbo
-                                        </h3>
+                        {rechargePlans.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                                {rechargePlans.map((plan) => {
+                                    const isPopular = plan.name === 'minutes_bank';
+                                    return (
+                                        <PlanCard
+                                            key={plan.id}
+                                            plan={plan}
+                                            badge={isPopular ? 'MELHOR ESCOLHA' : plan.name === 'help_quick' ? 'URGÊNCIA' : plan.name === 'unlimited_voice' ? 'VIP' : undefined}
+                                            highlight={isPopular}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            // Fallback: Recargas hardcoded (caso não existam no banco)
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                                {/* Ajuda Rápida */}
+                                <Card ref={turboRef} className="flex flex-col hover:shadow-lg transition-all relative">
+                                    <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <BoltIcon className="w-6 h-6 text-yellow-500" />
+                                            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
+                                                Ajuda Rápida
+                                            </h3>
+                                        </div>
+                                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-3">
+                                            Urgência
+                                        </p>
+                                        <div className="mt-3">
+                                            <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+                                                R$ 5,00
+                                            </span>
+                                            <span className="text-slate-500 dark:text-slate-400 ml-2 text-xs sm:text-sm">Pagamento Único</span>
+                                        </div>
                                     </div>
-                                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-3">
-                                        Urgência
-                                    </p>
-                                    <div className="mt-3">
-                                        <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                                            R$ 5,00
-                                        </span>
-                                        <span className="text-slate-500 dark:text-slate-400 ml-2 text-xs sm:text-sm">Pagamento Único</span>
+                                    <ul className="p-4 sm:p-6 space-y-2 flex-grow">
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
+                                            <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
+                                                +20 Minutos de Voz
+                                            </span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
+                                            <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
+                                                Válido por 24h
+                                            </span>
+                                        </li>
+                                    </ul>
+                                    <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700">
+                                        <Button
+                                            onClick={() => window.open('https://pay.cakto.com.br/ihfy8cz_668443', '_blank', 'noopener,noreferrer')}
+                                            variant="primary"
+                                            className="w-full"
+                                            size="lg"
+                                        >
+                                            Recarregar Agora
+                                        </Button>
                                     </div>
-                                </div>
-                                <ul className="p-4 sm:p-6 space-y-2 flex-grow">
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
-                                        <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
-                                            +30 Minutos de Voz
-                                        </span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
-                                        <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
-                                            Válido por 24h
-                                        </span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
-                                        <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
-                                            Ideal para terminar sua conversa agora
-                                        </span>
-                                    </li>
-                                </ul>
-                                <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700">
-                                    <Button
-                                        onClick={() => window.open('https://pay.cakto.com.br/ihfy8cz_668443', '_blank', 'noopener,noreferrer')}
-                                        variant="primary"
-                                        className="w-full"
-                                        size="lg"
-                                    >
-                                        Recarregar Agora
-                                    </Button>
-                                </div>
-                            </Card>
+                                </Card>
 
-                            {/* Banco de Voz 100 */}
-                            <Card ref={bank100Ref} className="flex flex-col hover:shadow-lg transition-all relative border-2 border-primary-500 bg-gradient-to-br from-primary-50/50 to-blue-50/50 dark:from-primary-900/10 dark:to-blue-900/10">
-                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary-600 to-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
-                                    MELHOR ESCOLHA
-                                </div>
-                                <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 pt-6 sm:pt-8">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <ChartBarIcon className="w-6 h-6 text-blue-500" />
-                                        <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
-                                            Banco de Voz 100
-                                        </h3>
+                                {/* Minutos de Reserva */}
+                                <Card ref={bank100Ref} className="flex flex-col hover:shadow-lg transition-all relative border-2 border-primary-500 bg-gradient-to-br from-primary-50/50 to-blue-50/50 dark:from-primary-900/10 dark:to-blue-900/10">
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary-600 to-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                                        MELHOR ESCOLHA
                                     </div>
-                                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-3">
-                                        Custo-Benefício
-                                    </p>
-                                    <div className="mt-3">
-                                        <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                                            R$ 12,90
-                                        </span>
-                                        <span className="text-slate-500 dark:text-slate-400 ml-2 text-xs sm:text-sm">Pagamento Único</span>
+                                    <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 pt-6 sm:pt-8">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <ChartBarIcon className="w-6 h-6 text-blue-500" />
+                                            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
+                                                Minutos de Reserva
+                                            </h3>
+                                        </div>
+                                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-3">
+                                            Melhor Escolha
+                                        </p>
+                                        <div className="mt-3">
+                                            <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+                                                R$ 12,90
+                                            </span>
+                                            <span className="text-slate-500 dark:text-slate-400 ml-2 text-xs sm:text-sm">Pagamento Único</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <ul className="p-4 sm:p-6 space-y-2 flex-grow">
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircleIcon className="w-5 h-5 text-primary-500 mt-0.5 flex-shrink-0" />
-                                        <span className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
-                                            +100 Minutos de Voz
-                                        </span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircleIcon className="w-5 h-5 text-primary-500 mt-0.5 flex-shrink-0" />
-                                        <span className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
-                                            Não expira
-                                        </span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircleIcon className="w-5 h-5 text-primary-500 mt-0.5 flex-shrink-0" />
-                                        <span className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
-                                            Fica na conta e usa quando o diário acabar
-                                        </span>
-                                    </li>
-                                </ul>
-                                <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 bg-primary-50/50 dark:bg-primary-900/20">
-                                    <Button
-                                        onClick={() => window.open('https://pay.cakto.com.br/hhxugxb_668446', '_blank', 'noopener,noreferrer')}
-                                        variant="primary"
-                                        className="w-full bg-gradient-to-r from-primary-600 to-blue-500 hover:from-primary-700 hover:to-blue-600 text-white"
-                                        size="lg"
-                                    >
-                                        Comprar Banco de Voz
-                                    </Button>
-                                </div>
-                            </Card>
+                                    <ul className="p-4 sm:p-6 space-y-2 flex-grow">
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircleIcon className="w-5 h-5 text-primary-500 mt-0.5 flex-shrink-0" />
+                                            <span className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
+                                                +100 Minutos de Voz
+                                            </span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircleIcon className="w-5 h-5 text-primary-500 mt-0.5 flex-shrink-0" />
+                                            <span className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
+                                                Não expira (banco de minutos)
+                                            </span>
+                                        </li>
+                                    </ul>
+                                    <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 bg-primary-50/50 dark:bg-primary-900/20">
+                                        <Button
+                                            onClick={() => window.open('https://pay.cakto.com.br/hhxugxb_668446', '_blank', 'noopener,noreferrer')}
+                                            variant="primary"
+                                            className="w-full bg-gradient-to-r from-primary-600 to-blue-500 hover:from-primary-700 hover:to-blue-600 text-white"
+                                            size="lg"
+                                        >
+                                            Comprar Banco de Voz
+                                        </Button>
+                                    </div>
+                                </Card>
 
-                            {/* Passe Livre 30 Dias */}
-                            <Card ref={unlimitedRef} className="flex flex-col hover:shadow-lg transition-all relative">
-                                <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <SparklesIcon className="w-6 h-6 text-purple-500" />
-                                        <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
-                                            Passe Livre 30 Dias
-                                        </h3>
+                                {/* Conversa Ilimitada */}
+                                <Card ref={unlimitedRef} className="flex flex-col hover:shadow-lg transition-all relative">
+                                    <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <SparklesIcon className="w-6 h-6 text-purple-500" />
+                                            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
+                                                Conversa Ilimitada
+                                            </h3>
+                                        </div>
+                                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-3">
+                                            VIP
+                                        </p>
+                                        <div className="mt-3">
+                                            <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+                                                R$ 19,90
+                                            </span>
+                                            <span className="text-slate-500 dark:text-slate-400 ml-2 text-xs sm:text-sm">Pagamento Único</span>
+                                        </div>
                                     </div>
-                                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-3">
-                                        Acesso Total
-                                    </p>
-                                    <div className="mt-3">
-                                        <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                                            R$ 19,90
-                                        </span>
-                                        <span className="text-slate-500 dark:text-slate-400 ml-2 text-xs sm:text-sm">Pagamento Único</span>
+                                    <ul className="p-4 sm:p-6 space-y-2 flex-grow">
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
+                                            <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
+                                                Ilimitado por 30 dias
+                                            </span>
+                                        </li>
+                                        <li className="flex items-start gap-2">
+                                            <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
+                                            <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
+                                                Remove o limite de 15 minutos diários
+                                            </span>
+                                        </li>
+                                    </ul>
+                                    <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700">
+                                        <Button
+                                            onClick={() => window.open('https://pay.cakto.com.br/trszqtv_668453', '_blank', 'noopener,noreferrer')}
+                                            variant="primary"
+                                            className="w-full"
+                                            size="lg"
+                                        >
+                                            Liberar Acesso Total
+                                        </Button>
                                     </div>
-                                </div>
-                                <ul className="p-4 sm:p-6 space-y-2 flex-grow">
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
-                                        <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
-                                            Ilimitado por 30 dias
-                                        </span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
-                                        <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
-                                            Remove o limite de 15 minutos diários
-                                        </span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircleIcon className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
-                                        <span className="text-sm sm:text-base text-slate-700 dark:text-slate-300">
-                                            Pelo próximo mês
-                                        </span>
-                                    </li>
-                                </ul>
-                                <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700">
-                                    <Button
-                                        onClick={() => window.open('https://pay.cakto.com.br/trszqtv_668453', '_blank', 'noopener,noreferrer')}
-                                        variant="primary"
-                                        className="w-full"
-                                        size="lg"
-                                    >
-                                        Liberar Acesso Total
-                                    </Button>
-                                </div>
-                            </Card>
-                        </div>
+                                </Card>
+                            </div>
+                        )}
                     </div>
+                    )}
 
                 </div>
             )}

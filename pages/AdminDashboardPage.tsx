@@ -86,6 +86,23 @@ const AdminDashboardPage: React.FC = () => {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [subscriptionHistory, setSubscriptionHistory] = useState<SubscriptionHistoryData[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  
+  // Estados para métricas B2B2C (apenas desenvolvedor)
+  const [trialConversionMetrics, setTrialConversionMetrics] = useState<{
+    totalTrials: number;
+    convertedTrials: number;
+    conversionRate: number;
+    averageTrialDays: number;
+  } | null>(null);
+  const [academyConversionMetrics, setAcademyConversionMetrics] = useState<Array<{
+    academyId: string;
+    academyName: string;
+    totalStudents: number;
+    studentsOnTrial: number;
+    studentsWithActiveSubscription: number;
+    conversionRate: number;
+  }>>([]);
+  const [isLoadingB2B2CMetrics, setIsLoadingB2B2CMetrics] = useState(false);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -124,7 +141,7 @@ const AdminDashboardPage: React.FC = () => {
           
           // Buscar todas as academias
           const { data: gyms, error: gymsError } = await supabase
-            .from('gyms')
+            .from('academies')
             .select('id, name')
             .order('name');
           
@@ -140,7 +157,7 @@ const AdminDashboardPage: React.FC = () => {
           let allUsers: User[] = [];
           
           // Buscar dados de cada academia
-          for (const gym of gyms || []) {
+          for (const gym of (gyms || []) as Array<{ id: string; name: string }>) {
             try {
               const [students, trainers, users] = await Promise.all([
                 getAllStudents(gym.id),
@@ -191,15 +208,16 @@ const AdminDashboardPage: React.FC = () => {
         } else {
           // Para outros admins, buscar dados apenas da academia deles
           // Tentar migrar alunos antigos primeiro (apenas uma vez)
-          try {
-            const { migrateOldStudents } = await import('../services/migrationService');
-            const migrated = await migrateOldStudents(gymIdToUse);
-            if (migrated > 0) {
-              console.log(`Migrados ${migrated} alunos antigos`);
-            }
-          } catch (error) {
-            console.warn('Erro ao migrar alunos antigos:', error);
-          }
+          // Comentado: função migrateOldStudents não existe mais
+          // try {
+          //   const { migrateOldStudents } = await import('../services/migrationService');
+          //   const migrated = await migrateOldStudents(gymIdToUse);
+          //   if (migrated > 0) {
+          //     console.log(`Migrados ${migrated} alunos antigos`);
+          //   }
+          // } catch (error) {
+          //   console.warn('Erro ao migrar alunos antigos:', error);
+          // }
           
           const [students, trainers, allUsers] = await Promise.all([
             getAllStudents(gymIdToUse),
@@ -291,6 +309,7 @@ const AdminDashboardPage: React.FC = () => {
       loadSubscriptions();
       loadSubscriptionStats();
       loadSubscriptionHistory();
+      loadB2B2CMetrics();
     }
   }, [user.gymId, user.username, user.gymRole]);
   
@@ -379,6 +398,29 @@ const AdminDashboardPage: React.FC = () => {
       console.error('Erro ao carregar histórico:', error);
     } finally {
       setIsLoadingHistory(false);
+    }
+  };
+
+  // Função para carregar métricas B2B2C
+  const loadB2B2CMetrics = async () => {
+    setIsLoadingB2B2CMetrics(true);
+    try {
+      const {
+        getTrialConversionMetrics,
+        getAcademyConversionMetrics,
+      } = await import('../services/aiMetricsService');
+      
+      const [trialMetrics, academyMetrics] = await Promise.all([
+        getTrialConversionMetrics(),
+        getAcademyConversionMetrics(),
+      ]);
+      
+      setTrialConversionMetrics(trialMetrics);
+      setAcademyConversionMetrics(academyMetrics);
+    } catch (error) {
+      console.error('Erro ao carregar métricas B2B2C:', error);
+    } finally {
+      setIsLoadingB2B2CMetrics(false);
     }
   };
   
@@ -1220,6 +1262,179 @@ const AdminDashboardPage: React.FC = () => {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Seção: Métricas B2B2C - Conversão Trial → Pago */}
+        <Card>
+          <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  📊 Métricas B2B2C - Conversão de Alunos
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Acompanhe a conversão de trial para assinatura paga
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={loadB2B2CMetrics}
+                disabled={isLoadingB2B2CMetrics}
+              >
+                {isLoadingB2B2CMetrics ? 'Carregando...' : '🔄 Atualizar'}
+              </Button>
+            </div>
+
+            {isLoadingB2B2CMetrics ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Carregando métricas...</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Métricas Gerais de Conversão */}
+                {trialConversionMetrics && (
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Trials Iniciados</p>
+                      <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                        {trialConversionMetrics.totalTrials}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Conversões</p>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {trialConversionMetrics.convertedTrials}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Taxa de Conversão</p>
+                      <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                        {trialConversionMetrics.conversionRate.toFixed(1)}%
+                      </p>
+                    </div>
+                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Dias Médios de Trial</p>
+                      <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                        {trialConversionMetrics.averageTrialDays}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Gráfico de Conversão por Academia */}
+                {academyConversionMetrics.length > 0 && (
+                  <div>
+                    <h3 className="text-md font-semibold text-slate-900 dark:text-white mb-4">
+                      Conversão por Academia (Top 10)
+                    </h3>
+                    <div className="w-full h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={academyConversionMetrics.slice(0, 10)}
+                          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.2)" />
+                          <XAxis
+                            dataKey="academyName"
+                            stroke="rgb(100 116 139)"
+                            tick={{ fontSize: 10 }}
+                            angle={-45}
+                            textAnchor="end"
+                            height={100}
+                          />
+                          <YAxis
+                            stroke="rgb(100 116 139)"
+                            tick={{ fontSize: 12 }}
+                            label={{ value: 'Taxa (%)', angle: -90, position: 'insideLeft' }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                              borderColor: 'rgb(51 65 85)',
+                              color: 'white',
+                            }}
+                            formatter={(value: any) => [`${value}%`, 'Taxa de Conversão']}
+                          />
+                          <Legend />
+                          <Bar
+                            dataKey="conversionRate"
+                            name="Taxa de Conversão"
+                            fill="#10b981"
+                            radius={[8, 8, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tabela de Academias com Maior Conversão */}
+                {academyConversionMetrics.length > 0 && (
+                  <div>
+                    <h3 className="text-md font-semibold text-slate-900 dark:text-white mb-4">
+                      Detalhes por Academia
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 dark:border-slate-700">
+                            <th className="text-left p-2 text-slate-600 dark:text-slate-400">Academia</th>
+                            <th className="text-right p-2 text-slate-600 dark:text-slate-400">Total Alunos</th>
+                            <th className="text-right p-2 text-slate-600 dark:text-slate-400">Em Trial</th>
+                            <th className="text-right p-2 text-slate-600 dark:text-slate-400">Assinantes</th>
+                            <th className="text-right p-2 text-slate-600 dark:text-slate-400">Taxa Conversão</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {academyConversionMetrics.slice(0, 10).map((academy) => (
+                            <tr
+                              key={academy.academyId}
+                              className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                            >
+                              <td className="p-2 font-medium text-slate-900 dark:text-white">
+                                {academy.academyName}
+                              </td>
+                              <td className="p-2 text-right text-slate-600 dark:text-slate-400">
+                                {academy.totalStudents}
+                              </td>
+                              <td className="p-2 text-right text-amber-600 dark:text-amber-400">
+                                {academy.studentsOnTrial}
+                              </td>
+                              <td className="p-2 text-right text-emerald-600 dark:text-emerald-400">
+                                {academy.studentsWithActiveSubscription}
+                              </td>
+                              <td className="p-2 text-right">
+                                <span
+                                  className={`font-semibold ${
+                                    academy.conversionRate >= 30
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : academy.conversionRate >= 15
+                                      ? 'text-blue-600 dark:text-blue-400'
+                                      : 'text-slate-600 dark:text-slate-400'
+                                  }`}
+                                >
+                                  {academy.conversionRate.toFixed(1)}%
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {(!trialConversionMetrics && academyConversionMetrics.length === 0) && (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Nenhuma métrica disponível ainda. As métricas aparecerão aqui quando houver trials e conversões.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

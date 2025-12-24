@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
+    "dev:clean": "powershell -ExecutionPolicy Bypass -File ./start-dev.ps1",
     "build": "npx vite build",
     "preview": "npx vite preview",
     "test": "jest",

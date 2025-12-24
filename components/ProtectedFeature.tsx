@@ -5,7 +5,9 @@
 
 import React from 'react';
 import { useSubscription } from '../hooks/useSubscription';
+import { useUser } from '../context/UserContext';
 import { Button } from './ui/Button';
+import { redirectToSalesPage } from '../constants/salesPage';
 
 interface ProtectedFeatureProps {
   feature: 'photoAnalysis' | 'workoutAnalysis' | 'customWorkouts' | 'textChat' | 'voiceChat';
@@ -21,6 +23,7 @@ export function ProtectedFeature({
   showUpgradePrompt = true,
 }: ProtectedFeatureProps) {
   const { canAccess, isPremium } = useSubscription();
+  const { user } = useUser();
 
   if (canAccess(feature)) {
     return <>{children}</>;
@@ -30,12 +33,23 @@ export function ProtectedFeature({
     return <>{fallback}</>;
   }
 
+  const handleViewPlans = () => {
+    // Se for aluno, redirecionar para página de vendas externa (seção B2C)
+    const isStudent = user?.tenantRole === 'student' && user?.academyId;
+    if (isStudent) {
+      redirectToSalesPage('B2C_PRICING');
+    } else {
+      // Outros usuários: redirecionar para premium interno
+      window.location.hash = '#/premium';
+    }
+  };
+
   return (
     <div className="premium-locked">
       {showUpgradePrompt && (
         <div className="upgrade-prompt">
           <p>Esta funcionalidade requer assinatura Premium</p>
-          <Button onClick={() => { window.location.hash = '#/premium'; }}>
+          <Button onClick={handleViewPlans}>
             Ver Planos
           </Button>
         </div>

@@ -9,6 +9,8 @@ import { NutriVoiceAssistant } from '../chatbot/NutriVoiceAssistant';
 import { useAutoLogout } from '../../hooks/useAutoLogout';
 import { AccessBlockChecker } from '../AccessBlockChecker';
 import { TrialExpiredChecker } from '../TrialExpiredChecker';
+import { TrialExpiredPaywall } from '../TrialExpiredPaywall';
+import { AiTrialCounter } from '../AiTrialCounter';
 import { useUser } from '../../context/UserContext';
 import { getAccountType } from '../../utils/accountType';
 
@@ -26,21 +28,50 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const isBlocked = user.gymRole === 'student' && user.accessBlocked;
   const accountType = getAccountType(user);
   
-  // Verificar se trial expirou
-  const isTrialExpired = (() => {
-    if (user.subscriptionStatus !== 'trial') {
-      return false;
-    }
-    const expiryDate = user.expiryDate || user.trialEndDate;
-    if (!expiryDate) {
-      return false;
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const expiry = new Date(expiryDate);
-    expiry.setHours(0, 0, 0, 0);
-    return today > expiry;
-  })();
+  // Verificar se trial de IA expirou (para alunos) ou trial de plataforma (para outros)
+  const [hasAiAccess, setHasAiAccess] = React.useState(true);
+  
+  React.useEffect(() => {
+    const checkAiAccess = async () => {
+      if (!user || !user.id) {
+        setHasAiAccess(true);
+        return;
+      }
+
+      // Para alunos, verificar acesso à IA usando aiAccessService
+      if (user.tenantRole === 'student') {
+        try {
+          const { getAiAccessStatus } = await import('../../services/aiAccessService');
+          const accessStatus = await getAiAccessStatus(user);
+          setHasAiAccess(accessStatus.hasAccess);
+        } catch (error) {
+          console.error('Erro ao verificar acesso à IA', error);
+          setHasAiAccess(false);
+        }
+      } else {
+        // Para outros usuários, verificar trial de plataforma
+        if (user.subscriptionStatus !== 'trial') {
+          setHasAiAccess(true);
+          return;
+        }
+        const expiryDate = user.expiryDate || user.trialEndDate;
+        if (!expiryDate) {
+          setHasAiAccess(true);
+          return;
+        }
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expiry = new Date(expiryDate);
+        expiry.setHours(0, 0, 0, 0);
+        setHasAiAccess(today <= expiry);
+      }
+    };
+
+    checkAiAccess();
+    // Verificar periodicamente
+    const interval = setInterval(checkAiAccess, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   return (
     <div className="min-h-screen text-slate-800 dark:text-slate-200 transition-colors duration-300">
@@ -59,6 +90,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       )}
       <AccessBlockChecker />
       <TrialExpiredChecker />
+      {/* Paywall obrigatório para alunos quando trial de IA expira */}
+      <TrialExpiredPaywall />
       {!isBlocked && (
         <div className="flex flex-col w-full">
           <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
@@ -66,14 +99,16 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <Header onMenuToggle={() => setSidebarOpen(true)} sidebarOpen={sidebarOpen} />
             <main id="main-content" className="flex-1 relative focus:outline-none" tabIndex={-1}>
               <div className="py-4 px-2 sm:py-6 sm:px-4 md:py-8 md:px-6 lg:px-8 animate-fade-in animate-slide-up max-w-full overflow-x-hidden">
+                  {/* Contador de trial de IA (apenas para alunos) */}
+                  {user.tenantRole === 'student' && <AiTrialCounter />}
                   {children}
               </div>
             </main>
           </div>
         </div>
       )}
-      {/* IA de Voz/Chat: desabilitada para PERSONAL (USER_PERSONAL) e trial expirado */}
-      {!isBlocked && !isTrialExpired && accountType !== 'USER_PERSONAL' && (
+      {/* IA de Voz/Chat: desabilitada para PERSONAL (USER_PERSONAL) e quando não tem acesso à IA */}
+      {!isBlocked && hasAiAccess && accountType !== 'USER_PERSONAL' && (
         <>
           <NutriAssistant />
           <NutriVoiceAssistant isOpen={nutriVoiceOpen} onClose={() => setNutriVoiceOpen(false)} />

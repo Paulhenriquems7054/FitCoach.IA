@@ -46,6 +46,7 @@ cat > .env << EOF
 SUPABASE_URL=https://seu-projeto.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key
 GEMINI_API_KEY=sua_chave_gemini
+GEMINI_DEFAULT_MODEL=gemini-1.5-flash
 PORT=3000
 EOF
 ```
@@ -53,6 +54,7 @@ EOF
 **Onde obter:**
 - **SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY:** https://app.supabase.com/project/seu-projeto/settings/api
 - **GEMINI_API_KEY:** https://aistudio.google.com/apikey
+- **GEMINI_DEFAULT_MODEL:** (Opcional) Modelo padrão do Gemini. Veja `docs/CONFIGURACAO_MODELOS_GEMINI.md` para opções. Padrão: `gemini-1.5-flash`
 
 ### 4️⃣ Testar Backend Localmente (Opcional)
 
@@ -78,24 +80,32 @@ railway login
 cd backend
 railway init
 
-# Adicionar serviço e variáveis (método recomendado - tudo de uma vez)
+# Opção 1: Adicionar serviço e variáveis de uma vez (recomendado)
 railway add --service backend \
   --variables "SUPABASE_URL=https://seu-projeto.supabase.co" \
   --variables "SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key" \
   --variables "GEMINI_API_KEY=sua_chave_gemini" \
+  --variables "GEMINI_DEFAULT_MODEL=gemini-1.5-flash" \
   --variables "PORT=3000"
 
-# OU, se já tiver um serviço criado, adicionar variáveis separadamente:
-# railway variables --set "SUPABASE_URL=https://seu-projeto.supabase.co"
-# railway variables --set "SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key"
-# railway variables --set "GEMINI_API_KEY=sua_chave_gemini"
-# railway variables --set "PORT=3000"
+# Opção 2: Adicionar variáveis a um serviço existente via CLI
+railway variables --set "SUPABASE_URL=https://seu-projeto.supabase.co"
+railway variables --set "SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key"
+railway variables --set "GEMINI_API_KEY=sua_chave_gemini"
+railway variables --set "GEMINI_DEFAULT_MODEL=gemini-1.5-flash"
+railway variables --set "PORT=3000"
+
+# Opção 3: Adicionar variáveis manualmente no painel do Railway (mais fácil)
+# Acesse: https://railway.com/project/SEU_PROJECT_ID/service/SEU_SERVICE_ID/variables
+# E adicione as variáveis através da interface web
 
 # Deploy
 railway up
 ```
 
-Railway gerará uma URL. **Anote essa URL!** Exemplo: `https://backend-production-xxxx.up.railway.app`
+Railway gerará uma URL. **Anote essa URL!** 
+
+**URL atual do backend:** `https://backend-production-c4af.up.railway.app`
 
 #### Opção B: Render
 
@@ -122,9 +132,9 @@ No **Vercel** (ou sua plataforma de deploy):
 2. Settings → Environment Variables
 3. Adicione:
    ```
-   VITE_AI_BACKEND_URL=https://sua-url-do-backend.railway.app
+   VITE_AI_BACKEND_URL=https://backend-production-c4af.up.railway.app
    ```
-   (Use a URL que você anotou no passo 5)
+   **Nota:** Se você tiver uma URL diferente do Railway, use a sua.
 
 ### 7️⃣ Deploy Frontend
 
@@ -143,14 +153,30 @@ Ou via GitHub (automático se configurado).
 
 Acesse: https://app.supabase.com/project/seu-projeto/editor
 
-Verifique se as tabelas foram criadas:
-- ✅ `ai_usage_logs`
-- ✅ `ai_monthly_usage`
+**Opção A - Verificação Rápida:**
+Execute no SQL Editor:
+```sql
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+  AND table_name IN ('ai_usage_logs', 'ai_monthly_usage');
+```
+
+Deve retornar 2 linhas com os nomes das tabelas.
+
+**Opção B - Verificação Completa:**
+Execute o arquivo `supabase/verificar_tabelas.sql` no SQL Editor do Supabase.
+
+**Nota:** Se você vê "Success. No rows returned" ao verificar dados, isso é normal - significa que as tabelas existem mas ainda não há registros. Após testar o backend, os logs aparecerão aqui.
 
 ### Teste 2: Testar Backend
 
+**URL do Backend:** `https://backend-production-c4af.up.railway.app`
+
+Teste o endpoint de texto:
 ```bash
-curl -X POST https://sua-url-backend/ai/text \
+# Linux/Mac
+curl -X POST https://backend-production-c4af.up.railway.app/ai/text \
   -H "Content-Type: application/json" \
   -d '{
     "userId": "test",
@@ -159,23 +185,42 @@ curl -X POST https://sua-url-backend/ai/text \
     "model": "gemini-1.5-flash",
     "prompt": "Olá"
   }'
+
+# Windows PowerShell
+Invoke-WebRequest -Uri https://backend-production-c4af.up.railway.app/ai/text `
+  -Method POST `
+  -Headers @{"Content-Type"="application/json"} `
+  -Body '{"userId":"test","gymId":null,"feature":"chat","model":"gemini-1.5-flash","prompt":"Olá"}'
 ```
 
 Deve retornar JSON com `text`, `tokensIn`, `tokensOut`, `costUsd`.
 
 ### Teste 3: Verificar Logs no Supabase
 
+Após testar o backend, verifique se os logs foram salvos:
+
+**Opção A - Via SQL Editor:**
 Acesse: https://app.supabase.com/project/seu-projeto/sql/new
 
 Execute:
-
 ```sql
 SELECT * FROM ai_usage_logs 
 ORDER BY created_at DESC 
 LIMIT 5;
 ```
 
-Deve mostrar os logs das chamadas de teste.
+Deve mostrar os logs das chamadas de teste com:
+- `user_id`, `gym_id`, `feature`, `model`
+- `tokens_in`, `tokens_out`, `cost_usd`
+- `created_at`
+
+**Opção B - Via Script PowerShell:**
+Execute o arquivo `test_backend.ps1` na raiz do projeto:
+```powershell
+.\test_backend.ps1
+```
+
+Este script testa o backend e mostra instruções para verificar os logs.
 
 ### Teste 4: Testar Frontend
 
@@ -202,6 +247,32 @@ Deve mostrar os logs das chamadas de teste.
 ### Erro: "SUPABASE_URL não configurada"
 
 **Solução:** Verifique variáveis de ambiente no backend (Railway/Render).
+
+### Erro 500 ao testar endpoints de IA
+
+**Solução:**
+1. **Verifique variáveis de ambiente no Railway:**
+   - Acesse: https://railway.com/project/SEU_PROJECT_ID/service/SEU_SERVICE_ID/variables
+   - Confirme: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `PORT`
+
+2. **Verifique logs do Railway:**
+   ```bash
+   cd backend
+   railway logs --tail 100
+   ```
+
+3. **Teste a API key do Gemini:**
+   - Verifique se está válida em: https://aistudio.google.com/apikey
+   - Teste diretamente com curl (veja `docs/TROUBLESHOOTING_BACKEND.md`)
+
+4. **Verifique se as tabelas existem no Supabase:**
+   ```sql
+   SELECT table_name FROM information_schema.tables 
+   WHERE table_schema = 'public' 
+     AND table_name IN ('ai_usage_logs', 'ai_monthly_usage');
+   ```
+
+**Documentação completa:** Veja `docs/TROUBLESHOOTING_BACKEND.md`
 
 ### WebSocket não conecta
 

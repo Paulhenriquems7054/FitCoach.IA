@@ -1,9 +1,9 @@
 
 import React from 'react';
-import WelcomeSurvey from '../components/WelcomeSurvey';
+import Dashboard from '../components/Dashboard';
 
 const ProfessionalDashboardPage: React.FC = () => {
-  return <WelcomeSurvey />;
+  return <Dashboard />;
 };
 
 export default ProfessionalDashboardPage;

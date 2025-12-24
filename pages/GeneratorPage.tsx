@@ -12,6 +12,7 @@ import { MealPlanHistory } from '../components/MealPlanHistory';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
 import { ProtectedFeature } from '../components/ProtectedFeature';
+import { TrialAccessGate } from '../components/TrialAccessGate';
 
 const GeneratorPage: React.FC = () => {
   const { user, addPoints } = useUser();
@@ -73,8 +74,9 @@ const GeneratorPage: React.FC = () => {
   };
 
   return (
-    <ProtectedFeature feature="customWorkouts">
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6">
+    <TrialAccessGate feature="meal_plan" fallbackMessage="Trial expirado. Assine um plano para continuar gerando planos alimentares.">
+      <ProtectedFeature feature="customWorkouts">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 md:mb-8 gap-3 sm:gap-4">
               <div className="text-left flex-1 w-full sm:w-auto">
                   <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Gerador de Plano com IA</h1>
@@ -120,7 +122,8 @@ const GeneratorPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </ProtectedFeature>
+      </ProtectedFeature>
+    </TrialAccessGate>
   );
 };
 

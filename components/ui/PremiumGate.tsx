@@ -3,6 +3,8 @@ import { Card } from './Card';
 import { Button } from './Button';
 import { StarIcon } from '../icons/StarIcon';
 import { usePremiumAccess } from '../../hooks/usePremiumAccess';
+import { useUser } from '../../context/UserContext';
+import { redirectToSalesPage } from '../../constants/salesPage';
 
 interface PremiumGateProps {
   feature: string;
@@ -20,11 +22,23 @@ export const PremiumGate: React.FC<PremiumGateProps> = ({
   showUpgradeButton = true
 }) => {
   const { isPremium, requirePremium } = usePremiumAccess();
+  const { user } = useUser();
   const check = requirePremium(feature);
   
   if (check.allowed) {
     return <>{children}</>;
   }
+  
+  const handleUpgrade = () => {
+    // Se for aluno, redirecionar para página de vendas externa (seção B2C)
+    const isStudent = user?.tenantRole === 'student' && user?.academyId;
+    if (isStudent) {
+      redirectToSalesPage('B2C_PRICING');
+    } else {
+      // Outros usuários: redirecionar para premium interno
+      window.location.hash = '#/premium';
+    }
+  };
   
   return (
     <Card className="border-2 border-amber-400 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20">
@@ -46,7 +60,7 @@ export const PremiumGate: React.FC<PremiumGateProps> = ({
         {showUpgradeButton && (
           <div className="mt-6 sm:mt-8">
             <Button 
-              onClick={() => window.location.hash = '#/premium'}
+              onClick={handleUpgrade}
               className="bg-gradient-to-r from-primary-600 to-amber-500 hover:from-primary-700 hover:to-amber-600 text-white font-bold shadow-lg hover:shadow-xl transition-all duration-300 w-full sm:w-auto"
               size="lg"
             >

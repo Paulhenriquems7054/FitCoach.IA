@@ -89,6 +89,7 @@ export async function validateInvite(code: string): Promise<InviteValidationResu
 
 /**
  * Aceita um convite: vincula usuário à academia e inicia trial de IA se for aluno
+ * MODELO B2B2C: Alunos sempre recebem trial de 7 dias ao aceitar convite
  */
 export async function acceptInvite(code: string, userId: string): Promise<void> {
   const supabase = getSupabaseClient();
@@ -100,20 +101,40 @@ export async function acceptInvite(code: string, userId: string): Promise<void> 
 
   const { academyId, invitedRole } = validation;
 
-  // Atualizar usuário com academy_id e tenant_role
+  // Se for aluno, ativar trial de IA automaticamente (7 dias)
+  const now = new Date();
+  const trialExpiresAt = invitedRole === 'student' 
+    ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
+    : null;
+
+  // Atualizar usuário com academy_id, tenant_role e trial de IA (campos simplificados e legado)
+  const updateData: any = {
+    academy_id: academyId,
+    tenant_role: invitedRole,
+  };
+
+  if (invitedRole === 'student') {
+    // Campos simplificados (novos)
+    updateData.trial_active = true;
+    updateData.trial_expires_at = trialExpiresAt;
+    // Campos legado (manter compatibilidade)
+    updateData.ai_subscription_status = 'trial';
+    updateData.ai_trial_start_at = now.toISOString();
+    updateData.ai_trial_end_at = trialExpiresAt;
+    // Limites de uso: trial tem 5 minutos de voz por dia
+    updateData.voice_daily_limit_seconds = 300; // 5 minutos
+  } else {
+    // Personal trainers não recebem trial de IA
+    updateData.trial_active = false;
+    updateData.trial_expires_at = null;
+    updateData.ai_subscription_status = 'none';
+    updateData.ai_trial_start_at = null;
+    updateData.ai_trial_end_at = null;
+  }
+
   const { error: userError } = await supabase
     .from('users')
-    .update({
-      academy_id: academyId,
-      tenant_role: invitedRole,
-      // Iniciar trial de IA para alunos
-      ai_subscription_status: invitedRole === 'student' ? 'trial' : 'none',
-      ai_trial_start_at: invitedRole === 'student' ? new Date().toISOString() : null,
-      ai_trial_end_at:
-        invitedRole === 'student'
-          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-          : null,
-    })
+    .update(updateData)
     .eq('id', userId);
 
   // Registrar evento de trial iniciado (métricas)

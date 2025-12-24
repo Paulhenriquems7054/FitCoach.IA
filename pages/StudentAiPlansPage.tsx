@@ -134,10 +134,13 @@ export const StudentAiPlansPage: React.FC = () => {
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-slate-900 mb-4">
-            Planos de IA para Alunos
+            Ative sua IA Personalizada
           </h1>
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-            Escolha o plano ideal para continuar usando todas as funcionalidades de IA do FitCoach.IA
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto mb-4">
+            A plataforma é oferecida pela sua academia. A ativação da IA é individual.
+          </p>
+          <p className="text-base text-slate-500 max-w-2xl mx-auto">
+            Escolha o plano ideal para continuar usando todas as funcionalidades de IA
           </p>
         </div>
 

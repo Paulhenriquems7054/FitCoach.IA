@@ -7,6 +7,7 @@ import { getUser } from './databaseService';
 import { getSupabaseClient } from './supabaseService';
 import { logger } from '../utils/logger';
 import type { User } from '../types';
+import { checkAccess, updateTrialStatus } from './trialAccessService';
 
 export interface VoiceUsageStatus {
     canUse: boolean;
@@ -41,6 +42,19 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
                 remainingReserve: 0,
                 totalRemaining: 0,
                 error: 'Usuário não encontrado'
+            };
+        }
+        
+        // Verificar acesso baseado em trial
+        const accessCheck = await checkAccess(user, 'voice');
+        if (!accessCheck.allowed) {
+            return {
+                canUse: false,
+                remainingDaily: 0,
+                remainingBoost: 0,
+                remainingReserve: 0,
+                totalRemaining: 0,
+                error: accessCheck.message || 'Trial expirado. Assine para continuar usando.'
             };
         }
 
@@ -342,9 +356,20 @@ export async function checkTextUsage(): Promise<TextUsageStatus> {
                 error: 'Usuário não encontrado'
             };
         }
-
+        
+        // Atualizar status de trial e verificar acesso
+        const updatedUser = await updateTrialStatus(user);
+        const accessCheck = await checkAccess(updatedUser, 'chat');
+        
         // Resetar contador se necessário
-        await resetDailyCountersIfNeeded(user);
+        await resetDailyCountersIfNeeded(updatedUser);
+        
+        // Se trial expirou: BLOQUEIO TOTAL (sem limite reduzido)
+        let limit = 600; // padrão
+        if (updatedUser.subscriptionStatus === 'expired') {
+            // Trial expirado: bloquear completamente (não permitir uso)
+            limit = 0;
+        }
 
         // Buscar dados atualizados do Supabase
         const supabase = getSupabaseClient();
@@ -354,7 +379,7 @@ export async function checkTextUsage(): Promise<TextUsageStatus> {
             .eq('id', user.id || '')
             .single();
 
-        const limit = 600; // Limite fixo de segurança
+        // limit já foi declarado acima (linha 368)
         let countToday = 0;
 
         if (!error && userData) {
@@ -365,6 +390,17 @@ export async function checkTextUsage(): Promise<TextUsageStatus> {
         }
 
         const remaining = Math.max(0, limit - countToday);
+        
+        // Se trial expirou: BLOQUEIO TOTAL
+        if (updatedUser.subscriptionStatus === 'expired') {
+            return {
+                canSend: false,
+                countToday: countToday,
+                limit: 0,
+                remaining: 0,
+                error: 'Trial expirado. Assine um plano para continuar usando o chat.'
+            };
+        }
 
         return {
             canSend: countToday < limit,

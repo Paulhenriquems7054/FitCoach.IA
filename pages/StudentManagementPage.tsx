@@ -28,6 +28,7 @@ import { Goal } from '../types';
 import { EyeIcon } from '../components/icons/EyeIcon';
 import { EyeSlashIcon } from '../components/icons/EyeSlashIcon';
 import { getCompanyByUserId, getCompanyLicenseStats, type Company } from '../services/companyService';
+import { createInvite } from '../services/inviteService';
 import { logger } from '../utils/logger';
 import { getAccountType } from '../utils/accountType';
 import { getPersonalTrainerClients, getPersonalTrainerActivationCode, getPersonalTrainerStats, type PersonalTrainerClient } from '../services/personalTrainerService';
@@ -41,6 +42,7 @@ const StudentManagementPage: React.FC = () => {
     const [trainers, setTrainers] = useState<User[]>([]);
     const [receptionists, setReceptionists] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingClients, setIsLoadingClients] = useState(false);
     
     // Estados para personal trainers
     const [clients, setClients] = useState<PersonalTrainerClient[]>([]);
@@ -78,6 +80,9 @@ const StudentManagementPage: React.FC = () => {
         maxLicenses: number;
     } | null>(null);
     const [isLoadingStats, setIsLoadingStats] = useState(false);
+    // Convites B2B2C (alunos/personal)
+    const [inviteStudentLink, setInviteStudentLink] = useState<string | null>(null);
+    const [invitePersonalLink, setInvitePersonalLink] = useState<string | null>(null);
 
     const [studentForm, setStudentForm] = useState({
         nome: '',
@@ -1106,7 +1111,79 @@ const StudentManagementPage: React.FC = () => {
                                 {showReceptionistForm ? '❌ Cancelar' : '👤 Criar Recepcionista'}
                             </Button>
                         )}
+                        {/* Convites B2B2C: alunos e personal */}
+                        {currentUser?.gymId && (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    onClick={async () => {
+                                        try {
+                                            const result = await createInvite(currentUser.gymId!, currentUser.id!, 'student');
+                                            const link = `${window.location.origin}/#/login?invite=${result.code}`;
+                                            setInviteStudentLink(link);
+                                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                navigator.clipboard.writeText(link).catch(() => {});
+                                            }
+                                            showSuccess('Convite para aluno gerado! Link copiado para a área de transferência.');
+                                        } catch (error) {
+                                            logger.error('Erro ao gerar convite de aluno', 'StudentManagementPage', error);
+                                            showError('Erro ao gerar convite de aluno.');
+                                        }
+                                    }}
+                                >
+                                    🔗 Gerar Convite Aluno
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={async () => {
+                                        try {
+                                            const result = await createInvite(currentUser.gymId!, currentUser.id!, 'personal');
+                                            const link = `${window.location.origin}/#/login?invite=${result.code}`;
+                                            setInvitePersonalLink(link);
+                                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                navigator.clipboard.writeText(link).catch(() => {});
+                                            }
+                                            showSuccess('Convite para personal gerado! Link copiado para a área de transferência.');
+                                        } catch (error) {
+                                            logger.error('Erro ao gerar convite de personal', 'StudentManagementPage', error);
+                                            showError('Erro ao gerar convite de personal.');
+                                        }
+                                    }}
+                                >
+                                    🧑‍🏫 Gerar Convite Personal
+                                </Button>
+                            </>
+                        )}
                     </div>
+                    {(inviteStudentLink || invitePersonalLink) && (
+                        <Card className="mt-4 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700">
+                            <div className="p-4 space-y-2 text-sm">
+                                {inviteStudentLink && (
+                                    <div>
+                                        <p className="font-semibold text-emerald-900 dark:text-emerald-100">
+                                            Convite para Aluno:
+                                        </p>
+                                        <p className="break-all text-emerald-800 dark:text-emerald-200">
+                                            {inviteStudentLink}
+                                        </p>
+                                    </div>
+                                )}
+                                {invitePersonalLink && (
+                                    <div>
+                                        <p className="font-semibold text-emerald-900 dark:text-emerald-100 mt-2">
+                                            Convite para Personal:
+                                        </p>
+                                        <p className="break-all text-emerald-800 dark:text-emerald-200">
+                                            {invitePersonalLink}
+                                        </p>
+                                    </div>
+                                )}
+                                <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
+                                    Envie estes links por WhatsApp, e-mail ou mostre como QR Code para que alunos e profissionais se cadastrem já vinculados à sua academia.
+                                </p>
+                            </div>
+                        </Card>
+                    )}
                     <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                         <div className="p-4">
                             <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
@@ -1488,6 +1565,7 @@ const StudentManagementPage: React.FC = () => {
                                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Idade</th>
                                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Objetivo</th>
                                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Status</th>
+                                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">IA Status</th>
                                         {(permissions.canEditStudents || permissions.canViewStudents) && (
                                             <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Ações</th>
                                         )}
@@ -1510,6 +1588,36 @@ const StudentManagementPage: React.FC = () => {
                                                         ✓ Ativo
                                                     </span>
                                                 )}
+                                            </td>
+                                            <td className="py-3 px-4 text-sm">
+                                                {(() => {
+                                                    const aiStatus = student.aiSubscriptionStatus || 'none';
+                                                    const trialEndAt = student.aiTrialEndAt;
+                                                    const isTrialExpired = trialEndAt && new Date(trialEndAt) < new Date();
+                                                    
+                                                    if (aiStatus === 'active') {
+                                                        return (
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                                                ✓ Ativo
+                                                            </span>
+                                                        );
+                                                    } else if (aiStatus === 'trial' && !isTrialExpired) {
+                                                        const daysLeft = trialEndAt 
+                                                            ? Math.ceil((new Date(trialEndAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                                                            : 0;
+                                                        return (
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                                                                🧪 Trial ({daysLeft}d)
+                                                            </span>
+                                                        );
+                                                    } else {
+                                                        return (
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300">
+                                                                ⏸️ Inativo
+                                                            </span>
+                                                        );
+                                                    }
+                                                })()}
                                             </td>
                                             {(permissions.canEditStudents || permissions.canViewStudents) && (
                                                 <td className="py-3 px-4 text-sm text-right">

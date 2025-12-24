@@ -11,7 +11,7 @@ import { useRouter } from '../hooks/useRouter';
 import { logger } from '../utils/logger';
 
 interface LoginOrRegisterProps {
-  couponCode: string;
+  couponCode?: string; // Opcional: código de convite
   onSuccess: () => void;
   onBack?: () => void;
 }
@@ -245,27 +245,36 @@ export const LoginOrRegister: React.FC<LoginOrRegisterProps> = ({
     setIsLoading(true);
 
     try {
-      const result = await authFlowService.registerWithInvite(
-        username.trim(),
-        password,
-        {
-          nome: name.trim(),
-          email: email.trim(),
-          idade: 0,
-          genero: 'Masculino',
-          peso: 0,
-          altura: 0,
-          objetivo: 'perder peso' as any,
-          points: 0,
-          disciplineScore: 0,
-          completedChallengeIds: [],
-          isAnonymized: false,
-          weightHistory: [],
-          role: 'user',
-          subscription: 'free',
-        },
-        couponCode
-      );
+      let result;
+      
+      // Se houver código de convite, usar registerWithInvite
+      if (couponCode && couponCode.trim()) {
+        result = await authFlowService.registerWithInvite(
+          username.trim(),
+          password,
+          {
+            nome: name.trim(),
+            email: email.trim(),
+            idade: 0,
+            genero: 'Masculino',
+            peso: 0,
+            altura: 0,
+            objetivo: 'perder peso' as any,
+            points: 0,
+            disciplineScore: 0,
+            completedChallengeIds: [],
+            isAnonymized: false,
+            weightHistory: [],
+            role: 'user',
+            subscription: 'free',
+          },
+          couponCode.trim()
+        );
+      } else {
+        // Cadastro sem cupom (free)
+        const userProfile = await authService.signUp(email.trim(), password);
+        result = { user: userProfile };
+      }
 
       // Validar se o usuário foi retornado corretamente
       if (!result || !result.user) {
