@@ -1145,11 +1145,8 @@ const LoginPage: React.FC = () => {
 
                         {/* Bloco: Primeiro acesso com código de convite */}
                         <div className="mb-6 p-4 rounded-lg border border-dashed border-primary-300/70 bg-primary-50/70 dark:bg-slate-900/40 dark:border-primary-500/60">
-                            <p className="text-sm font-semibold text-primary-800 dark:text-primary-300 mb-1">
+                            <p className="text-sm font-semibold text-primary-800 dark:text-primary-300 mb-3">
                                 Primeiro acesso?
-                            </p>
-                            <p className="text-xs text-slate-700 dark:text-slate-300 mb-3">
-                                Se você recebeu um código da sua academia ou personal, comece por aqui para liberar seu acesso premium.
                             </p>
                             <Button
                                 type="button"
@@ -1162,6 +1159,9 @@ const LoginPage: React.FC = () => {
                             >
                                 Inserir Código de Convite
                             </Button>
+                            <p className="text-xs text-slate-700 dark:text-slate-300 mt-3 mb-2">
+                                Se você recebeu um código da sua academia ou personal, comece por aqui para liberar seu acesso premium.
+                            </p>
                             <button
                                 type="button"
                                 onClick={() => {
@@ -1170,7 +1170,7 @@ const LoginPage: React.FC = () => {
                                     setSignupCouponCode(''); // Garantir que não há cupom
                                     setCouponValidated(false);
                                 }}
-                                className="w-full mt-3 text-center text-sm font-semibold text-primary-700 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 underline decoration-2 underline-offset-2 py-2.5 px-3 transition-all bg-transparent hover:bg-primary-100/50 dark:hover:bg-primary-900/20 rounded-md cursor-pointer"
+                                className="w-full mt-2 text-center text-sm font-semibold text-primary-700 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 underline decoration-2 underline-offset-2 py-2.5 px-3 transition-all bg-transparent hover:bg-primary-100/50 dark:hover:bg-primary-900/20 rounded-md cursor-pointer"
                                 style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                             >
                                 Não tenho código? Testar Grátis por 3 dias
