@@ -24,6 +24,8 @@ import { useToast } from '../../components/ui/Toast';
 import { ProtectedFeature } from '../../components/ProtectedFeature';
 import { useSubscription } from '../../hooks/useSubscription';
 import { VoiceMinutesCounter } from '../../components/VoiceMinutesCounter';
+import { AiAccessGate } from '../../components/AiAccessGate';
+import { useUser } from '../../context/UserContext';
 
 const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> => {
   return new Promise((resolve, reject) => {
@@ -55,6 +57,7 @@ const PLACEHOLDER_TEXT: { [key: string]: string } = {
 
 const ChatbotPopup: React.FC = () => {
   const { showError } = useToast();
+  const { user } = useUser();
   const { canAccess, getRemainingMinutes } = useSubscription();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -111,7 +114,7 @@ const ChatbotPopup: React.FC = () => {
     // Verificar limite de mensagens de texto
     const textStatus = await checkTextUsage();
     if (!textStatus.canSend) {
-      showError('Limite de segurança diário atingido.');
+      showError(textStatus.error || 'Limite de segurança diário atingido.');
       return;
     }
 
@@ -409,7 +412,7 @@ const ChatbotPopup: React.FC = () => {
       logger.error("Erro ao processar vídeo", 'chatbot/ChatbotPopup', error);
       setMessages(prev => [
         ...prev.filter(m => m.content !== processingMessage),
-        { role: 'system', content: `Erro ao carregar o vídeo: ${error.message}`, isError: true },
+        { role: 'system', content: `Erro ao carregar o vídeo: ${errorMessage}`, isError: true },
       ]);
     } finally {
       if (videoInputRef.current) videoInputRef.current.value = '';
@@ -750,7 +753,7 @@ const ChatbotPopup: React.FC = () => {
   }, [isRecording, isTranscribing, isSearchEnabled, isMapsEnabled, handleStartLiveSession, onUserAudioInputToChat]);
 
 
-  return (
+  const content = (
     <>
       <VoiceMinutesCounter 
         isActive={isRecording} 
@@ -966,10 +969,12 @@ const ChatbotPopup: React.FC = () => {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  Seus minutos de voz acabaram
+                  {user.subscriptionStatus === 'trial' ? 'Gostou?' : 'Seus minutos de voz acabaram'}
                 </h2>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  Escolha uma opção abaixo para continuar usando a conversa por voz com o FitCoach.IA.
+                  {user.subscriptionStatus === 'trial' 
+                    ? 'Seu tempo de degustação hoje acabou. Assine o Premium para ter 3x mais tempo todos os dias!'
+                    : 'Escolha uma opção abaixo para continuar usando a conversa por voz com o FitCoach.IA.'}
                 </p>
               </div>
               <button
@@ -984,6 +989,42 @@ const ChatbotPopup: React.FC = () => {
               </button>
             </div>
 
+            {/* Se for trial, mostrar apenas botão de upgrade para Premium, sem opções de recarga */}
+            {user.subscriptionStatus === 'trial' ? (
+              <div className="space-y-4 mt-4">
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-2">
+                    ⭐ Upgrade para Premium e tenha:
+                  </p>
+                  <ul className="text-sm text-amber-800 dark:text-amber-200 space-y-1">
+                    <li>• 3x mais tempo de voz todos os dias (15 minutos)</li>
+                    <li>• Acesso completo a todas as funcionalidades</li>
+                    <li>• Suporte prioritário</li>
+                  </ul>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="flex-1 px-4 py-3 rounded-md border border-slate-300 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    onClick={() => setShowLimitModal(false)}
+                  >
+                    Agora não
+                  </button>
+                  <button
+                    type="button"
+                    className="flex-1 px-4 py-3 rounded-md text-sm font-medium text-white bg-gradient-to-r from-emerald-600 to-sky-600 hover:from-emerald-700 hover:to-sky-700 shadow-lg"
+                    onClick={() => {
+                      setShowLimitModal(false);
+                      if (typeof window !== 'undefined') {
+                        window.open('https://fitcoach.ia/planos', '_blank');
+                      }
+                    }}
+                  >
+                    Assinar Premium
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
               {/* Ajuda Rápida */}
               <button
@@ -1057,8 +1098,10 @@ const ChatbotPopup: React.FC = () => {
                 </ul>
               </button>
             </div>
+            )}
 
-            <div className="flex justify-end gap-3 pt-2">
+            {user.subscriptionStatus !== 'trial' && (
+            <div className="flex justify-end gap-3 pt-2 mt-4">
               <button
                 type="button"
                 className="px-4 py-2 rounded-md border border-slate-300 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -1079,10 +1122,18 @@ const ChatbotPopup: React.FC = () => {
                 Ver todos os planos
               </button>
             </div>
+            )}
           </div>
         </div>
       )}
     </>
+  );
+
+  // Gate de IA: bloqueia apenas alunos sem trial/assinatura
+  return (
+    <AiAccessGate feature="chat">
+      {content}
+    </AiAccessGate>
   );
 };
 

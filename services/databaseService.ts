@@ -666,10 +666,32 @@ export async function registerUser(username: string, password: string, userData:
             weightHistory: userData.weightHistory || [],
             role: userData.role || 'user',
             subscription: userData.subscription || 'free',
+            // Campos de plano e subscription
+            planType: userData.planType,
+            subscriptionStatus: userData.subscriptionStatus,
+            expiryDate: userData.expiryDate,
+            accountType: userData.accountType,
+            trialStartDate: userData.trialStartDate,
+            trialEndDate: userData.trialEndDate,
+            // Campos de IA B2B2C
+            aiSubscriptionStatus: userData.aiSubscriptionStatus,
+            aiTrialStartAt: userData.aiTrialStartAt,
+            aiTrialEndAt: userData.aiTrialEndAt,
+            aiPlanType: userData.aiPlanType,
+            // Controle de Voz
+            voiceDailyLimitSeconds: userData.voiceDailyLimitSeconds,
+            voiceUsedTodaySeconds: userData.voiceUsedTodaySeconds,
+            voiceBalanceUpsell: userData.voiceBalanceUpsell,
+            lastUsageDate: userData.lastUsageDate,
+            // Controle de Chat
+            textMsgCountToday: userData.textMsgCountToday,
+            lastMsgDate: userData.lastMsgDate,
             // Campos de multi-tenancy (academia)
             gymId: userData.gymId,
             gymRole: userData.gymRole,
             isGymManaged: userData.isGymManaged,
+            academyId: userData.academyId,
+            tenantRole: userData.tenantRole,
             // Permissões de dados
             dataPermissions: userData.dataPermissions,
             // Configurações de segurança
@@ -686,6 +708,8 @@ export async function registerUser(username: string, password: string, userData:
             gymServerUrl: userData.gymServerUrl,
             // Foto de perfil
             photoUrl: userData.photoUrl,
+            // Matrícula
+            matricula: userData.matricula,
             updatedAt: new Date().toISOString(),
         };
 

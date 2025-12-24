@@ -18,6 +18,7 @@ import type { LoginCredentials } from '../types';
 import { sanitizeInput, sanitizeEmail } from '../utils/security';
 import { getAccountType } from '../utils/accountType';
 import { logger } from '../utils/logger';
+import { acceptInvite, validateInvite } from '../services/inviteService';
 
 const LoginPage: React.FC = () => {
     const { user, setUser } = useUser();
@@ -54,21 +55,53 @@ const LoginPage: React.FC = () => {
     const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
     const [couponValidated, setCouponValidated] = useState(false);
     const [validatedCouponPlan, setValidatedCouponPlan] = useState<string | null>(null);
+    // Convite B2B2C (academy -> aluno/personal)
+    const [inviteCode, setInviteCode] = useState<string | null>(null);
+    const [inviteError, setInviteError] = useState<string | null>(null);
+    const [inviteInfo, setInviteInfo] = useState<{ academyId: string; invitedRole: 'student' | 'personal' } | null>(null);
 
     // Processar token de acesso do email (quando usuário clica no link do email)
     useEffect(() => {
-        // Ler token tanto da query string quanto do hash (para compatibilidade)
+        // Ler tanto token quanto invite da query string e do hash
         const urlParams = new URLSearchParams(window.location.search);
         let token = urlParams.get('token');
-        
-        // Se não encontrou na query string, tentar no hash
-        if (!token && window.location.hash) {
+        let inviteParam = urlParams.get('invite');
+
+        if (window.location.hash) {
             const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
-            token = hashParams.get('token');
+            if (!token) {
+                token = hashParams.get('token');
+            }
+            if (!inviteParam) {
+                inviteParam = hashParams.get('invite');
+            }
         }
-        
+
         if (token) {
             handleTokenLogin(token);
+        }
+
+        // Se houver código de convite, validar e armazenar
+        if (inviteParam) {
+            const cleaned = inviteParam.trim().toUpperCase();
+            setInviteCode(cleaned);
+            (async () => {
+                try {
+                    const result = await validateInvite(cleaned);
+                    if (!result.valid || !result.academyId || !result.invitedRole) {
+                        setInviteError(result.error || 'Convite inválido ou expirado.');
+                    } else {
+                        setInviteInfo({
+                            academyId: result.academyId,
+                            invitedRole: result.invitedRole,
+                        });
+                        setInviteError(null);
+                    }
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Erro ao validar convite.';
+                    setInviteError(msg);
+                }
+            })();
         }
     }, []);
 
@@ -334,9 +367,17 @@ const LoginPage: React.FC = () => {
         setIsSigningUp(true);
 
         try {
-            // Fluxo de convite: obrigar validação de cupom ou código mestre antes de criar conta
-            if (!couponValidated || !signupCouponCode.trim()) {
-                setSignupError('Valide seu código de convite ou código mestre antes de concluir o cadastro.');
+            // Fluxo de convite acadêmico (B2B2C) via ?invite=CODE
+            // Se há inviteCode válido, não obrigar cupom/código mestre
+            // Se não há cupom nem invite, permitir criar conta com trial de 3 dias
+            const hasCouponOrInvite = inviteInfo || (signupCouponCode.trim() && couponValidated);
+            
+            if (!inviteInfo && !signupCouponCode.trim()) {
+                // Sem cupom e sem invite - permitir trial gratuito de 3 dias
+                // Não precisa validar nada, apenas continuar o fluxo
+            } else if (!inviteInfo && signupCouponCode.trim() && !couponValidated) {
+                // Tem cupom mas não foi validado - precisa validar
+                setSignupError('Por favor, valide seu código de convite antes de concluir o cadastro.');
                 setIsSigningUp(false);
                 return;
             }
@@ -442,6 +483,22 @@ const LoginPage: React.FC = () => {
                 }
             }
 
+            // Determinar tipo de conta e inicializar trial
+            const accountType: 'individual' | 'academy' = (couponPlan && (couponPlan.includes('academy') || couponPlan.includes('personal'))) 
+                ? 'academy' 
+                : 'individual';
+            
+            const now = new Date();
+            
+            // Se não há cupom nem invite (usuário comum sem cupom), criar trial de 3 dias
+            const isTrialWithoutCoupon = !hasCouponOrInvite;
+            const trialDays = isTrialWithoutCoupon ? 3 : (accountType === 'individual' ? 7 : 14);
+            const trialEndDate = new Date(now);
+            trialEndDate.setDate(trialEndDate.getDate() + trialDays);
+            
+            // Se cupom válido e plano pago, usar 'active', senão iniciar com 'trial'
+            const subscriptionStatus = (couponPlan && couponPlan !== 'free') ? 'active' as const : 'trial' as const;
+            
             // Criar registro na tabela users com plano do cupom
             const userData = {
                 nome: sanitizeInput(signupName.trim(), 100),
@@ -460,7 +517,18 @@ const LoginPage: React.FC = () => {
                 subscription: 'free' as const,
                 // Aplicar plano do cupom se houver
                 planType: couponPlan ? couponPlan as any : 'free',
-                subscriptionStatus: couponPlan ? 'active' as const : 'active' as const,
+                subscriptionStatus: subscriptionStatus,
+                accountType: accountType,
+                // Para trial de 3 dias (sem cupom), usar expiryDate em vez de trialEndDate
+                expiryDate: subscriptionStatus === 'trial' ? trialEndDate.toISOString() : undefined,
+                trialStartDate: subscriptionStatus === 'trial' ? now.toISOString() : undefined,
+                trialEndDate: subscriptionStatus === 'trial' ? trialEndDate.toISOString() : undefined,
+                // Limite de voz diário: 300 segundos (5 minutos) para trial sem cupom, 900 (15 minutos) para premium
+                voiceDailyLimitSeconds: isTrialWithoutCoupon ? 300 : 900,
+                // Campos de IA B2B2C: se veio de invite de aluno, trial de IA será setado em acceptInvite
+                aiSubscriptionStatus: inviteInfo && inviteInfo.invitedRole === 'student' ? 'trial' : 'none',
+                aiTrialStartAt: inviteInfo && inviteInfo.invitedRole === 'student' ? now.toISOString() : null,
+                aiTrialEndAt: inviteInfo && inviteInfo.invitedRole === 'student' ? trialEndDate.toISOString() : null,
             };
 
             // Criar usuário no banco local (IndexedDB)
@@ -491,7 +559,11 @@ const LoginPage: React.FC = () => {
                         role: userData.role,
                         plan_type: userData.planType,
                         subscription_status: userData.subscriptionStatus,
-                        voice_daily_limit_seconds: 900,
+                        account_type: userData.accountType,
+                        trial_start_date: userData.trialStartDate || null,
+                        trial_end_date: userData.trialEndDate || null,
+                        expiry_date: userData.expiryDate || null,
+                        voice_daily_limit_seconds: userData.voiceDailyLimitSeconds || (subscriptionStatus === 'trial' && !hasCouponOrInvite ? 300 : 900),
                         voice_used_today_seconds: 0,
                         voice_balance_upsell: 0,
                         text_msg_count_today: 0,
@@ -542,7 +614,7 @@ const LoginPage: React.FC = () => {
                 // Não lançar erro - permitir que o cadastro continue
             }
 
-            // Aplicar cupom ou vincular via código mestre (obrigatório neste fluxo)
+            // Aplicar cupom ou vincular via código mestre (apenas se fornecido)
             if (signupCouponCode.trim()) {
                 // Primeiro, tentar vincular via código mestre
                 const { validateMasterCode, linkUserToCompanyByMasterCode } = await import('../services/masterCodeService');
@@ -564,6 +636,16 @@ const LoginPage: React.FC = () => {
                         logger.warn('Erro ao aplicar cupom', 'LoginPage', { error: applyResult.error });
                         // Não bloquear o cadastro se falhar aplicar o cupom
                     }
+                }
+            }
+
+            // Se veio de invite acadêmico, aceitar convite (vincular academy_id/tenant_role/trial IA)
+            if (inviteCode && inviteInfo) {
+                try {
+                    await acceptInvite(inviteCode, userId);
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Erro ao vincular convite da academia.';
+                    logger.warn(msg, 'LoginPage');
                 }
             }
 
@@ -927,7 +1009,7 @@ const LoginPage: React.FC = () => {
                 const accountType = getAccountType(user);
                 
                 // Debug: verificação de enquete (apenas em DEV)
-                if (import.meta.env.DEV) {
+                if (import.meta.env?.MODE === 'development' || import.meta.env?.DEV) {
                   logger.debug('Verificação de enquete', 'LoginPage', {
                     username: usernameForSurvey,
                     gymRole: user.gymRole,
@@ -1022,7 +1104,7 @@ const LoginPage: React.FC = () => {
                 <Card>
                     <div className="p-6">
                         {/* Logo centralizada e Theme toggle - inside card, top */}
-                        <div className="flex items-center justify-center mb-4 relative">
+                        <div className="flex items-center justify-center mb-6 relative">
                             <img
                                 src="/icons/play_store_512.png"
                                 alt="Logo FitCoach.IA"
@@ -1080,6 +1162,18 @@ const LoginPage: React.FC = () => {
                             >
                                 Inserir Código de Convite
                             </Button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowSignup(true);
+                                    setSignupStep(2); // Ir direto para etapa 2 (cadastro)
+                                    setSignupCouponCode(''); // Garantir que não há cupom
+                                    setCouponValidated(false);
+                                }}
+                                className="w-full mt-2 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium underline"
+                            >
+                                Não tenho código? Testar Grátis por 3 dias
+                            </button>
                         </div>
 
                         {/* Formulário: Já tenho conta */}
@@ -1332,7 +1426,7 @@ const LoginPage: React.FC = () => {
             <Card className="w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-y-auto animate-fade-in-up">
             <div className="p-3 sm:p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
                             <h2 className="text-base sm:text-lg font-bold flex items-center gap-2 truncate pr-2">
-                                ✨ Acesso com Código de Convite ou Código Mestre
+                                ✨ Criar Conta {signupStep === 1 && '(Código opcional)'}
                             </h2>
                             <button
                             type="button"
@@ -1382,46 +1476,69 @@ const LoginPage: React.FC = () => {
                                 </Alert>
                             )}
 
-                            {/* Etapa 1: Inserir Código de Convite */}
+                            {/* Etapa 1: Inserir Código de Convite (Opcional) */}
                             {signupStep === 1 && (
-                                <form onSubmit={(e) => { e.preventDefault(); handleValidateCoupon(); }} className="space-y-4">
+                                <div className="space-y-4">
                                     <p className="text-sm text-slate-600 dark:text-slate-400">
-                                        Primeiro, insira o código de convite ou código mestre fornecido pela sua academia ou personal.
+                                        Se você recebeu um código de convite ou código mestre, insira abaixo. Caso contrário, você pode pular esta etapa e criar uma conta gratuita.
                                     </p>
-                                    <div>
-                                        <label htmlFor="couponCode" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Código de Convite ou Código Mestre *
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                id="couponCode"
-                                                type="text"
-                                                value={signupCouponCode}
-                                                onChange={(e) => {
-                                                    setSignupCouponCode(e.target.value.toUpperCase());
-                                                    setCouponValidated(false);
-                                                    setValidatedCouponPlan(null);
-                                                    setSignupError(null);
-                                                }}
-                                                className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                                placeholder="Ex: ACADEMIA-VIP"
-                                                autoComplete="off"
-                                            />
-                                            <Button
-                                                type="submit"
-                                                variant="primary"
-                                                disabled={!signupCouponCode.trim()}
-                                            >
-                                                Validar
-                                            </Button>
+                                    <form onSubmit={(e) => { e.preventDefault(); if (signupCouponCode.trim()) handleValidateCoupon(); }} className="space-y-4">
+                                        <div>
+                                            <label htmlFor="couponCode" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Código de Convite ou Código Mestre (Opcional)
+                                            </label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    id="couponCode"
+                                                    type="text"
+                                                    value={signupCouponCode}
+                                                    onChange={(e) => {
+                                                        setSignupCouponCode(e.target.value.toUpperCase());
+                                                        setCouponValidated(false);
+                                                        setValidatedCouponPlan(null);
+                                                        setSignupError(null);
+                                                    }}
+                                                    className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                    placeholder="Ex: ACADEMIA-VIP (opcional)"
+                                                    autoComplete="off"
+                                                />
+                                                {signupCouponCode.trim() && (
+                                                    <Button
+                                                        type="submit"
+                                                        variant="primary"
+                                                    >
+                                                        Validar
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            {couponValidated && validatedCouponPlan && (
+                                                <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                                    ✓ Código válido! Plano: {validatedCouponPlan}
+                                                </p>
+                                            )}
                                         </div>
-                                        {couponValidated && validatedCouponPlan && (
-                                            <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
-                                                ✓ Código válido! Plano: {validatedCouponPlan}
-                                            </p>
+                                    </form>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="primary"
+                                            onClick={() => setSignupStep(2)}
+                                            className="flex-1"
+                                        >
+                                            Continuar sem código
+                                        </Button>
+                                        {signupCouponCode.trim() && couponValidated && (
+                                            <Button
+                                                type="button"
+                                                variant="primary"
+                                                onClick={() => setSignupStep(2)}
+                                                className="flex-1"
+                                            >
+                                                Continuar com código
+                                            </Button>
                                         )}
                                     </div>
-                                </form>
+                                </div>
                             )}
 
                             {/* Etapa 2: Criar Conta (E-mail e Senha) */}

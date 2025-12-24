@@ -8,6 +8,7 @@ import NutriAssistant from '../chatbot/NutriAssistant';
 import { NutriVoiceAssistant } from '../chatbot/NutriVoiceAssistant';
 import { useAutoLogout } from '../../hooks/useAutoLogout';
 import { AccessBlockChecker } from '../AccessBlockChecker';
+import { TrialExpiredChecker } from '../TrialExpiredChecker';
 import { useUser } from '../../context/UserContext';
 import { getAccountType } from '../../utils/accountType';
 
@@ -24,6 +25,22 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   // Se o aluno está bloqueado, não renderizar o layout normal
   const isBlocked = user.gymRole === 'student' && user.accessBlocked;
   const accountType = getAccountType(user);
+  
+  // Verificar se trial expirou
+  const isTrialExpired = (() => {
+    if (user.subscriptionStatus !== 'trial') {
+      return false;
+    }
+    const expiryDate = user.expiryDate || user.trialEndDate;
+    if (!expiryDate) {
+      return false;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = new Date(expiryDate);
+    expiry.setHours(0, 0, 0, 0);
+    return today > expiry;
+  })();
 
   return (
     <div className="min-h-screen text-slate-800 dark:text-slate-200 transition-colors duration-300">
@@ -41,6 +58,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </div>
       )}
       <AccessBlockChecker />
+      <TrialExpiredChecker />
       {!isBlocked && (
         <div className="flex flex-col w-full">
           <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
@@ -54,8 +72,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </div>
         </div>
       )}
-      {/* IA de Voz/Chat: desabilitada para PERSONAL (USER_PERSONAL) */}
-      {!isBlocked && accountType !== 'USER_PERSONAL' && (
+      {/* IA de Voz/Chat: desabilitada para PERSONAL (USER_PERSONAL) e trial expirado */}
+      {!isBlocked && !isTrialExpired && accountType !== 'USER_PERSONAL' && (
         <>
           <NutriAssistant />
           <NutriVoiceAssistant isOpen={nutriVoiceOpen} onClose={() => setNutriVoiceOpen(false)} />
