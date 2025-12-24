@@ -1160,7 +1160,7 @@ const LoginPage: React.FC = () => {
                                 Inserir Código de Convite
                             </Button>
                             <p className="text-xs text-slate-700 dark:text-slate-300 mt-3 mb-2">
-                                Se você recebeu um código da sua academia ou personal, comece por aqui para liberar seu acesso premium.
+                                Se você recebeu um código da sua academia, comece por aqui para liberar seu acesso premium.
                             </p>
                             <button
                                 type="button"
