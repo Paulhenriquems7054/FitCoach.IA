@@ -1102,7 +1102,7 @@ const LoginPage: React.FC = () => {
                 </div>
 
                 <Card>
-                    <div className="p-6">
+                    <div className="p-6 pb-8">
                         {/* Logo centralizada e Theme toggle - inside card, top */}
                         <div className="flex items-center justify-center mb-6 relative">
                             <img
@@ -1170,7 +1170,8 @@ const LoginPage: React.FC = () => {
                                     setSignupCouponCode(''); // Garantir que não há cupom
                                     setCouponValidated(false);
                                 }}
-                                className="w-full mt-3 text-center text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium underline py-2 transition-colors"
+                                className="w-full mt-3 text-center text-sm font-semibold text-primary-700 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 underline decoration-2 underline-offset-2 py-2.5 px-3 transition-all bg-transparent hover:bg-primary-100/50 dark:hover:bg-primary-900/20 rounded-md cursor-pointer"
+                                style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                             >
                                 Não tenho código? Testar Grátis por 3 dias
                             </button>
