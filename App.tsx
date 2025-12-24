@@ -268,9 +268,12 @@ const App: React.FC = () => {
 
                 await Promise.race([
                     (async () => {
-                        // Se estiver na página de login, não fazer login automático
-                        if (isOnLoginPage) {
-                            console.log('[App] Usuário está na página de login, não fazer login automático');
+                        // Se estiver na página de login OU hash estiver vazio (raiz), não fazer login automático
+                        // Isso permite que o fluxo de redirecionamento (landing -> presentation -> login) funcione
+                        const isEmptyHash = !currentHash || currentHash === '' || currentHash === '#';
+                        
+                        if (isOnLoginPage || isEmptyHash) {
+                            console.log('[App] Hash vazio ou na página de login, não fazer login automático');
                             setIsLoggedIn(false);
                             setIsInitialized(true);
                             return;
