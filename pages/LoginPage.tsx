@@ -1076,7 +1076,7 @@ const LoginPage: React.FC = () => {
 
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 py-12 px-4 sm:px-6 lg:px-8 relative overflow-y-auto">
             {/* Logo de fundo suave */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                 <img
@@ -1101,7 +1101,7 @@ const LoginPage: React.FC = () => {
                     </p>
                 </div>
 
-                <Card>
+                <Card className="overflow-visible">
                     <div className="p-6 pb-8">
                         {/* Logo centralizada e Theme toggle - inside card, top */}
                         <div className="flex items-center justify-center mb-6 relative">
@@ -1159,7 +1159,7 @@ const LoginPage: React.FC = () => {
                             >
                                 Inserir Código de Convite
                             </Button>
-                            <p className="text-xs text-slate-700 dark:text-slate-300 mt-3 mb-2">
+                            <p className="text-xs text-slate-700 dark:text-slate-300 mt-3 mb-2 leading-relaxed break-words">
                                 Se você recebeu um código da sua academia, comece por aqui para liberar seu acesso premium.
                             </p>
                             {/* Botão "Testar Grátis" apenas para usuários individuais (B2C), não para alunos (B2B2C via convite) */}
