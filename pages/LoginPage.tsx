@@ -83,25 +83,35 @@ const LoginPage: React.FC = () => {
 
         // Se houver código de convite, validar e armazenar
         if (inviteParam) {
+            console.warn('[LoginPage] DEBUG - Encontrado parâmetro invite na URL:', inviteParam);
             const cleaned = inviteParam.trim().toUpperCase();
             setInviteCode(cleaned);
             (async () => {
                 try {
                     const result = await validateInvite(cleaned);
+                    console.warn('[LoginPage] DEBUG - Resultado da validação do invite:', result);
                     if (!result.valid || !result.academyId || !result.invitedRole) {
                         setInviteError(result.error || 'Convite inválido ou expirado.');
+                        console.warn('[LoginPage] DEBUG - Invite inválido, não setando inviteInfo');
                     } else {
                         setInviteInfo({
                             academyId: result.academyId,
                             invitedRole: result.invitedRole,
                         });
                         setInviteError(null);
+                        console.warn('[LoginPage] DEBUG - Invite válido, setando inviteInfo:', {
+                            academyId: result.academyId,
+                            invitedRole: result.invitedRole,
+                        });
                     }
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : 'Erro ao validar convite.';
                     setInviteError(msg);
+                    console.warn('[LoginPage] DEBUG - Erro ao validar invite:', err);
                 }
             })();
+        } else {
+            console.warn('[LoginPage] DEBUG - Nenhum parâmetro invite encontrado na URL, inviteInfo deve permanecer null');
         }
     }, []);
 
@@ -1164,7 +1174,26 @@ const LoginPage: React.FC = () => {
                             </p>
                             {/* Botão "Testar Grátis" apenas para usuários individuais (B2C), não para alunos (B2B2C via convite) */}
                             {/* Mostrar botão sempre que não há inviteInfo válido */}
-                            {!inviteInfo && (
+                            {/* DEBUG: Verificar estado do inviteInfo - usar console.warn pois não é removido em produção */}
+                            {(() => {
+                                const shouldShow = inviteInfo === null || inviteInfo === undefined;
+                                if (typeof window !== 'undefined') {
+                                    console.warn('[LoginPage] DEBUG - Estado do botão Testar Grátis:', {
+                                        shouldShow,
+                                        inviteInfo,
+                                        inviteCode,
+                                        inviteInfoType: typeof inviteInfo,
+                                        inviteInfoIsNull: inviteInfo === null,
+                                        inviteInfoIsUndefined: inviteInfo === undefined,
+                                        hasInviteParam: (() => {
+                                            const urlParams = new URLSearchParams(window.location.search);
+                                            const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+                                            return !!(urlParams.get('invite') || hashParams.get('invite'));
+                                        })()
+                                    });
+                                }
+                                return shouldShow;
+                            })() && (
                                 <button
                                     type="button"
                                     onClick={() => {
