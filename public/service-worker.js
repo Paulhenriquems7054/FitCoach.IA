@@ -44,7 +44,7 @@ if (isDevelopment) {
   // (The code below will never execute in dev mode)
 }
 
-const CACHE_NAME = 'nutri-ia-cache-v2';
+const CACHE_NAME = 'nutri-ia-cache-v3';
 const urlsToCache = [
   '/',
   '/index.html',
