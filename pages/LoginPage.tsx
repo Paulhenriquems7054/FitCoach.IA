@@ -1170,8 +1170,8 @@ const LoginPage: React.FC = () => {
                                 Se você recebeu um código da sua academia, comece por aqui para liberar seu acesso premium.
                             </p>
                             {/* Botão "Testar Grátis" apenas para usuários individuais (B2C), não para alunos (B2B2C via convite) */}
-                            {/* Mostrar botão sempre que não há inviteInfo válido */}
-                            {!inviteInfo && (
+                            {/* Mostrar botão sempre que não há inviteInfo válido - forçar renderização */}
+                            {(inviteInfo === null || inviteInfo === undefined || !inviteInfo) && (
                                 <button
                                     type="button"
                                     onClick={() => {
