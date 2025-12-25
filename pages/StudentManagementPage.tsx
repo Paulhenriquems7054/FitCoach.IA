@@ -28,7 +28,7 @@ import { Goal } from '../types';
 import { EyeIcon } from '../components/icons/EyeIcon';
 import { EyeSlashIcon } from '../components/icons/EyeSlashIcon';
 import { getCompanyByUserId, getCompanyLicenseStats, type Company } from '../services/companyService';
-import { createInvite } from '../services/inviteService';
+import { createInvite, getInviteUsageHistory, type InviteUsageHistory } from '../services/inviteService';
 import { logger } from '../utils/logger';
 import { getAccountType } from '../utils/accountType';
 import { getPersonalTrainerClients, getPersonalTrainerActivationCode, getPersonalTrainerStats, type PersonalTrainerClient } from '../services/personalTrainerService';
@@ -83,6 +83,9 @@ const StudentManagementPage: React.FC = () => {
     // Convites B2B2C (alunos/personal)
     const [inviteStudentLink, setInviteStudentLink] = useState<string | null>(null);
     const [invitePersonalLink, setInvitePersonalLink] = useState<string | null>(null);
+    const [inviteUsageHistory, setInviteUsageHistory] = useState<InviteUsageHistory[]>([]);
+    const [showInviteHistory, setShowInviteHistory] = useState(false);
+    const [isLoadingInviteHistory, setIsLoadingInviteHistory] = useState(false);
 
     const [studentForm, setStudentForm] = useState({
         nome: '',
@@ -1180,6 +1183,90 @@ const StudentManagementPage: React.FC = () => {
                                 )}
                                 <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
                                     Envie estes links por WhatsApp, e-mail ou mostre como QR Code para que alunos e profissionais se cadastrem já vinculados à sua academia.
+                                </p>
+                                {currentUser.gymId && (
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        className="mt-3 w-full"
+                                        onClick={async () => {
+                                            setIsLoadingInviteHistory(true);
+                                            const newShowState = !showInviteHistory;
+                                            setShowInviteHistory(newShowState);
+                                            if (newShowState) {
+                                                try {
+                                                    const history = await getInviteUsageHistory(currentUser.gymId!);
+                                                    setInviteUsageHistory(history);
+                                                } catch (error) {
+                                                    logger.error('Erro ao carregar histórico de convites', 'StudentManagementPage', error);
+                                                    showError('Erro ao carregar histórico de convites.');
+                                                }
+                                            }
+                                            setIsLoadingInviteHistory(false);
+                                        }}
+                                    >
+                                        {isLoadingInviteHistory ? 'Carregando...' : showInviteHistory ? '🔒 Ocultar Histórico' : '📊 Ver Histórico de Uso'}
+                                    </Button>
+                                )}
+                            </div>
+                        </Card>
+                    )}
+                    {/* Histórico de uso de convites */}
+                    {showInviteHistory && inviteUsageHistory.length > 0 && (
+                        <Card className="mt-4 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700">
+                            <div className="p-4">
+                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+                                    📊 Histórico de Uso dos Convites
+                                </h3>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full text-sm">
+                                        <thead className="text-left bg-slate-100 dark:bg-slate-800">
+                                            <tr>
+                                                <th className="p-2 font-semibold text-slate-700 dark:text-slate-300">Usuário</th>
+                                                <th className="p-2 font-semibold text-slate-700 dark:text-slate-300">Role</th>
+                                                <th className="p-2 font-semibold text-slate-700 dark:text-slate-300">Data/Hora</th>
+                                                <th className="p-2 font-semibold text-slate-700 dark:text-slate-300">IP</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {inviteUsageHistory.map((usage, index) => (
+                                                <tr key={index} className="border-t border-slate-200 dark:border-slate-700">
+                                                    <td className="p-2 text-slate-900 dark:text-white">
+                                                        {usage.userName}
+                                                        {usage.userEmail && (
+                                                            <span className="text-xs text-slate-500 dark:text-slate-400 block">
+                                                                {usage.userEmail}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                                            usage.role === 'student' 
+                                                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                                                : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                                        }`}>
+                                                            {usage.role === 'student' ? 'Aluno' : 'Personal'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-2 text-slate-700 dark:text-slate-300">
+                                                        {new Date(usage.usedAt).toLocaleString('pt-BR')}
+                                                    </td>
+                                                    <td className="p-2 text-slate-600 dark:text-slate-400 font-mono text-xs">
+                                                        {usage.ipAddress || 'N/A'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </Card>
+                    )}
+                    {showInviteHistory && inviteUsageHistory.length === 0 && !isLoadingInviteHistory && (
+                        <Card className="mt-4 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700">
+                            <div className="p-4 text-center">
+                                <p className="text-slate-600 dark:text-slate-400">
+                                    Nenhum uso de convite registrado ainda.
                                 </p>
                             </div>
                         </Card>
