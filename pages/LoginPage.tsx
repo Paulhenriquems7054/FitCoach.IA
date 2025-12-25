@@ -1170,22 +1170,25 @@ const LoginPage: React.FC = () => {
                                 Se você recebeu um código da sua academia, comece por aqui para liberar seu acesso premium.
                             </p>
                             {/* Botão "Testar Grátis" apenas para usuários individuais (B2C), não para alunos (B2B2C via convite) */}
-                            {/* Mostrar botão sempre que não há inviteInfo válido - forçar renderização */}
-                            {(inviteInfo === null || inviteInfo === undefined || !inviteInfo) && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowSignup(true);
-                                        setSignupStep(2); // Ir direto para etapa 2 (cadastro)
-                                        setSignupCouponCode(''); // Garantir que não há cupom
-                                        setCouponValidated(false);
-                                    }}
-                                    className="w-full mt-2 text-center text-sm font-semibold text-primary-700 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 underline decoration-2 underline-offset-2 py-2.5 px-3 transition-all bg-transparent hover:bg-primary-100/50 dark:hover:bg-primary-900/20 rounded-md cursor-pointer"
-                                    style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                >
-                                    Não tem código? Testar Grátis por 3 dias
-                                </button>
-                            )}
+                            {/* Sempre renderizar, mas ocultar quando há inviteInfo válido */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowSignup(true);
+                                    setSignupStep(2); // Ir direto para etapa 2 (cadastro)
+                                    setSignupCouponCode(''); // Garantir que não há cupom
+                                    setCouponValidated(false);
+                                }}
+                                className="w-full mt-2 text-center text-sm font-semibold text-primary-700 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 underline decoration-2 underline-offset-2 py-2.5 px-3 transition-all bg-transparent hover:bg-primary-100/50 dark:hover:bg-primary-900/20 rounded-md cursor-pointer"
+                                style={{ 
+                                    minHeight: '44px', 
+                                    display: inviteInfo ? 'none' : 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center' 
+                                }}
+                            >
+                                Não tem código? Testar Grátis por 3 dias
+                            </button>
                             {/* Mensagem informativa para alunos que vêm via convite */}
                             {inviteInfo && inviteInfo.invitedRole === 'student' && (
                                 <p className="mt-3 text-xs text-slate-600 dark:text-slate-400 text-center">
