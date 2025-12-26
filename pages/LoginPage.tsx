@@ -385,8 +385,8 @@ const LoginPage: React.FC = () => {
             } else if (!inviteInfo && signupCouponCode.trim() && !couponValidated) {
                 // Tem cupom mas não foi validado - precisa validar
                 setSignupError('Por favor, valide seu código de convite antes de concluir o cadastro.');
-                setIsSigningUp(false);
-                return;
+                    setIsSigningUp(false);
+                    return;
             }
 
             // Validações básicas
@@ -1187,7 +1187,7 @@ const LoginPage: React.FC = () => {
                                     justifyContent: 'center' 
                                 }}
                             >
-                                Não tem código? Testar Grátis por 3 dias
+                                Não tenho código? Testar Grátis por 3 dias
                             </button>
                             {/* Mensagem informativa para alunos que vêm via convite */}
                             {inviteInfo && inviteInfo.invitedRole === 'student' && (
