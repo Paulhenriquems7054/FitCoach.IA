@@ -601,7 +601,17 @@ const App: React.FC = () => {
     }
     
     // Página de Apresentação (Vídeo)
+    // IMPORTANTE: Se já viu landing e presentation, redirecionar para login
     if (normalizedPath === '/presentation') {
+        // Se já viu presentation, redirecionar para login imediatamente
+        if (hasSeenLanding && hasSeenPresentation && !isLoggedIn) {
+            // Redirecionar imediatamente
+            if (typeof window !== 'undefined') {
+                window.location.hash = '#/login';
+            }
+            return <PageLoader />;
+        }
+        
         return (
             <Suspense fallback={<PageLoader />}>
                 <VideoPresentationPage />
