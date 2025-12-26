@@ -1013,14 +1013,100 @@ const LoginPage: React.FC = () => {
             }
 
             // Se não conseguiu login no Supabase, tentar login local (IndexedDB)
+            // Mas apenas se não tentamos Supabase (ou seja, se emailFromDB não foi encontrado)
+            // Se tentamos Supabase mas falhou, provavelmente é um usuário do Supabase com credenciais erradas
             if (!user) {
-                const credentials: LoginCredentials = { 
-                    username: sanitizedUsername, 
-                    password: sanitizedPassword 
-                };
-                user = await loginUser(credentials);
-                if (user) {
-                    loginMethod = 'local';
+                // Primeiro, tentar buscar o email novamente na tabela users para garantir
+                // que não perdemos nenhuma oportunidade
+                let finalEmailAttempt: string | null = null;
+                if (!emailFromDB) {
+                    try {
+                        const supabase = getSupabaseClient();
+                        // Se input parece email, buscar por email
+                        if (sanitizedUsername.includes('@')) {
+                            const { data: userDataByEmail } = await supabase
+                                .from('users')
+                                .select('email')
+                                .eq('email', sanitizedUsername)
+                                .maybeSingle();
+                            if (userDataByEmail?.email) {
+                                finalEmailAttempt = userDataByEmail.email;
+                            }
+                        }
+                        
+                        // Se não encontrou por email, buscar por username
+                        if (!finalEmailAttempt) {
+                            const { data: userData } = await supabase
+                                .from('users')
+                                .select('email')
+                                .eq('username', sanitizedUsername)
+                                .maybeSingle();
+                            if (userData?.email) {
+                                finalEmailAttempt = userData.email;
+                            }
+                        }
+                        
+                        // Tentar login no Supabase com o email encontrado
+                        if (finalEmailAttempt) {
+                            try {
+                                const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+                                    email: finalEmailAttempt,
+                                    password: sanitizedPassword,
+                                });
+                                
+                                if (authData?.user && !authError) {
+                                    // Buscar dados do usuário
+                                    const { data: userData } = await supabase
+                                        .from('users')
+                                        .select('*')
+                                        .eq('id', authData.user.id)
+                                        .maybeSingle();
+                                    
+                                    if (userData) {
+                                        user = {
+                                            id: userData.id,
+                                            nome: userData.nome || sanitizedUsername,
+                                            username: userData.username || sanitizedUsername,
+                                            email: userData.email || finalEmailAttempt,
+                                            idade: userData.idade || 0,
+                                            genero: userData.genero || 'Masculino',
+                                            peso: userData.peso || 0,
+                                            altura: userData.altura || 0,
+                                            objetivo: (userData.objetivo || 'perder peso') as any,
+                                            points: userData.points || 0,
+                                            disciplineScore: userData.discipline_score || 0,
+                                            completedChallengeIds: userData.completed_challenge_ids || [],
+                                            isAnonymized: userData.is_anonymized || false,
+                                            weightHistory: [],
+                                            role: userData.role || 'user',
+                                            subscription: 'free',
+                                            planType: (userData.plan_type as any) || 'free',
+                                            subscriptionStatus: (userData.subscription_status as any) || 'active',
+                                        };
+                                        loginMethod = 'supabase';
+                                    }
+                                }
+                            } catch (e) {
+                                // Ignorar erro e tentar login local
+                                logger.debug('Tentativa final de login Supabase falhou, tentando login local', 'LoginPage');
+                            }
+                        }
+                    } catch (e) {
+                        // Ignorar erro e tentar login local
+                        logger.debug('Erro ao buscar email final, tentando login local', 'LoginPage');
+                    }
+                }
+                
+                // Se ainda não conseguiu, tentar login local (IndexedDB)
+                if (!user) {
+                    const credentials: LoginCredentials = { 
+                        username: sanitizedUsername, 
+                        password: sanitizedPassword 
+                    };
+                    user = await loginUser(credentials);
+                    if (user) {
+                        loginMethod = 'local';
+                    }
                 }
             }
 
