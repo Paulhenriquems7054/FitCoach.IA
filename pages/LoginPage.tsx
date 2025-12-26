@@ -478,14 +478,38 @@ const LoginPage: React.FC = () => {
             const userId = authData.user.id;
             const username = sanitizeInput(signupName.trim().toLowerCase().replace(/\s+/g, '_'), 50);
 
-            // Verificar se username já existe
-            const exists = await usernameExists(username);
+            // Verificar se username já existe (local E Supabase)
+            // Primeiro verificar no Supabase (fonte de verdade)
+            let usernameToUse = username;
+            const { data: existingUserSupabase } = await supabase
+                .from('users')
+                .select('username')
+                .eq('username', usernameToUse)
+                .maybeSingle();
+            
+            // Se não existe no Supabase, verificar local (pode ter sido criado localmente)
+            let exists = !!existingUserSupabase;
+            if (!exists) {
+                exists = await usernameExists(usernameToUse);
+            }
+            
             if (exists) {
-                // Se já existe, adicionar número
-                let newUsername = username;
+                // Se já existe, adicionar número até encontrar um disponível
                 let counter = 1;
-                while (await usernameExists(newUsername)) {
-                    newUsername = `${username}_${counter}`;
+                while (exists) {
+                    usernameToUse = `${username}_${counter}`;
+                    // Verificar no Supabase primeiro
+                    const { data: existingUser } = await supabase
+                        .from('users')
+                        .select('username')
+                        .eq('username', usernameToUse)
+                        .maybeSingle();
+                    
+                    exists = !!existingUser;
+                    if (!exists) {
+                        // Verificar local também
+                        exists = await usernameExists(usernameToUse);
+                    }
                     counter++;
                 }
             }
@@ -509,7 +533,7 @@ const LoginPage: React.FC = () => {
             // Criar registro na tabela users com plano do cupom
             const userData = {
                 nome: sanitizeInput(signupName.trim(), 100),
-                username: username,
+                username: usernameToUse,
                 idade: 0,
                 genero: 'Masculino' as const,
                 peso: 0,
@@ -539,7 +563,43 @@ const LoginPage: React.FC = () => {
             };
 
             // Criar usuário no banco local (IndexedDB)
-            const newUser = await registerUser(username, signupPassword, userData);
+            // Nota: usernameToUse pode ser diferente de username se houve conflito
+            // IMPORTANTE: Se usernameToUse existe apenas localmente (mas não no Supabase),
+            // podemos sobrescrever usando saveUser em vez de registerUser
+            let newUser: User;
+            try {
+                newUser = await registerUser(usernameToUse, signupPassword, userData);
+            } catch (registerError) {
+                // Se registerUser falhou porque username existe localmente,
+                // mas não existe no Supabase, podemos sobrescrever o registro local
+                const errorMsg = registerError instanceof Error ? registerError.message : '';
+                if (errorMsg.includes('já está em uso')) {
+                    // Verificar novamente no Supabase para ter certeza
+                    const { data: checkUser } = await supabase
+                        .from('users')
+                        .select('username')
+                        .eq('username', usernameToUse)
+                        .maybeSingle();
+                    
+                    if (!checkUser) {
+                        // Não existe no Supabase, mas existe localmente - sobrescrever
+                        logger.warn(`Username ${usernameToUse} existe localmente mas não no Supabase. Sobrescrevendo registro local.`, 'LoginPage');
+                        const existingUser = await getUserByUsername(usernameToUse);
+                        if (existingUser) {
+                            // Atualizar usuário existente com novos dados
+                            await saveUser({ ...userData, username: usernameToUse });
+                            newUser = { ...userData, username: usernameToUse } as User;
+                        } else {
+                            throw registerError;
+                        }
+                    } else {
+                        // Existe no Supabase também - realmente está em uso
+                        throw registerError;
+                    }
+                } else {
+                    throw registerError;
+                }
+            }
 
             // Criar usuário no Supabase usando função RPC segura
             // Primeiro tentar inserir diretamente, se falhar usar função RPC
@@ -550,7 +610,7 @@ const LoginPage: React.FC = () => {
                     .insert({
                         id: userId,
                         nome: userData.nome,
-                        username: userData.username,
+                        username: usernameToUse,
                         email: sanitizedEmail,
                         idade: userData.idade,
                         genero: userData.genero,
@@ -601,7 +661,7 @@ const LoginPage: React.FC = () => {
                     const { error: rpcError } = await supabase.rpc('insert_user_profile_after_signup', {
                         p_user_id: userId,
                         p_nome: userData.nome,
-                        p_username: userData.username,
+                        p_username: usernameToUse,
                         p_plan_type: userData.planType || 'free',
                         p_subscription_status: userData.subscriptionStatus || 'active',
                         p_user_data: userDataJsonb,
