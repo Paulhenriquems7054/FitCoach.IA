@@ -886,9 +886,13 @@ const LoginPage: React.FC = () => {
                             // Verificar tipo de erro específico
                             const errorMsg = authError.message || '';
                             
-                            if (errorMsg.includes('Invalid login credentials') || 
+                            // Erros 400 (Bad Request) são esperados quando usuário não existe no Supabase
+                            // Silenciar esses erros e continuar para login local
+                            if (authError.status === 400 || 
+                                errorMsg.includes('Invalid login credentials') || 
                                 errorMsg.includes('invalid login')) {
-                                // Credenciais inválidas - continuar para próxima tentativa de email
+                                // Credenciais inválidas ou usuário não existe no Supabase
+                                // Continuar para próxima tentativa de email ou fallback local
                                 continue;
                             } else if (errorMsg.includes('Email not confirmed') || 
                                       errorMsg.includes('email not confirmed') ||
@@ -907,11 +911,13 @@ const LoginPage: React.FC = () => {
                         }
                     } catch (supabaseError) {
                         // Continuar para próxima tentativa ou fallback
+                        // Erros 400 são esperados quando usuário não existe - silenciar
                         if (supabaseError instanceof Error && 
                             (supabaseError.message.includes('rate limit') || 
                              supabaseError.message.includes('For security purposes'))) {
                             throw supabaseError;
                         }
+                        // Silenciar outros erros do Supabase e continuar para login local
                         continue;
                     }
                 }
