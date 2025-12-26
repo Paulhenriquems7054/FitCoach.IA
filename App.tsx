@@ -149,11 +149,9 @@ const App: React.FC = () => {
     const device = useDeviceContext();
     const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
-    // Verificar se é o primeiro acesso (landing, apresentação)
+    // Verificar se é o primeiro acesso (landing)
     const LANDING_SEEN_KEY = 'fitcoach.landing.seen';
-    const PRESENTATION_SEEN_KEY = 'fitcoach.presentation.seen';
     const [hasSeenLanding, setHasSeenLanding] = useState<boolean | null>(null);
-    const [hasSeenPresentation, setHasSeenPresentation] = useState<boolean | null>(null);
     const [isInitialized, setIsInitialized] = useState(false);
 
     // Removido: inviteFlowState - LoginPage já gerencia todo o fluxo de login/cadastro/convite
@@ -180,33 +178,12 @@ const App: React.FC = () => {
             }
         };
 
-        // Verificar apresentação de forma síncrona
-        const checkPresentation = () => {
-            if (typeof window !== 'undefined') {
-                // Verificar flag global
-                const seenGlobal = localStorage.getItem(PRESENTATION_SEEN_KEY) === 'true';
-                
-                // Verificar flag específica do dispositivo
-                const deviceKey = `fitcoach.presentation.seen.${device.deviceId}`;
-                const seenDevice = localStorage.getItem(deviceKey) === 'true';
-                
-                // Se foi visto globalmente OU neste dispositivo específico
-                setHasSeenPresentation(seenGlobal || seenDevice);
-            } else {
-                setHasSeenPresentation(false); // Default: não viu (mostrar apresentação)
-            }
-        };
-
         checkLanding();
-        checkPresentation();
 
         // Listener para mudanças no localStorage
         const handleStorageChange = (e: StorageEvent) => {
             if (e.key === LANDING_SEEN_KEY) {
                 checkLanding();
-            }
-            if (e.key === PRESENTATION_SEEN_KEY) {
-                checkPresentation();
             }
         };
 
@@ -215,13 +192,8 @@ const App: React.FC = () => {
             checkLanding();
         };
 
-        const handlePresentationSeen = () => {
-            checkPresentation();
-        };
-
         window.addEventListener('storage', handleStorageChange);
         window.addEventListener('landing-seen', handleLandingSeen);
-        window.addEventListener('presentation-seen', handlePresentationSeen);
 
         // Aplicar otimizações específicas do dispositivo (apenas uma vez)
         if (typeof window !== 'undefined') {
@@ -317,7 +289,6 @@ const App: React.FC = () => {
         return () => {
             window.removeEventListener('storage', handleStorageChange);
             window.removeEventListener('landing-seen', handleLandingSeen);
-            window.removeEventListener('presentation-seen', handlePresentationSeen);
         };
     }, []); // Removido 'device' das dependências para evitar re-execuções
     
@@ -388,10 +359,10 @@ const App: React.FC = () => {
 
     // Lógica de redirecionamento simplificada - apenas para fluxo inicial
     // IMPORTANTE: useEffect DEVE vir ANTES de qualquer return condicional (regras dos hooks do React)
-    // CRÍTICO: Apenas redirecionar no fluxo inicial (landing -> presentation -> login)
+    // CRÍTICO: Apenas redirecionar no fluxo inicial (landing -> login)
     useEffect(() => {
         // Não redirecionar se ainda está inicializando
-        if (!isInitialized || hasSeenLanding === null || hasSeenPresentation === null) {
+        if (!isInitialized || hasSeenLanding === null) {
             return;
         }
 
@@ -405,27 +376,20 @@ const App: React.FC = () => {
         if (isLoggedIn && (!currentPath || currentPath === '') && currentHash !== '#/' && currentHash !== '') {
             targetPath = '#/';
         }
-        // Apenas fluxo inicial: landing -> presentation -> login
+        // Apenas fluxo inicial: landing -> login
         else if (!isLoggedIn) {
             // Se hash está vazio (primeira visita), determinar destino baseado no que já foi visto
             if (!currentHash || currentHash === '' || currentHash === '#') {
                 if (!hasSeenLanding) {
                     targetPath = '#/landing';
-                } else if (!hasSeenPresentation) {
-                    targetPath = '#/presentation';
                 } else {
                     targetPath = '#/login';
                 }
             } else if (!hasSeenLanding && currentPath !== '/landing' && currentHash !== '#/landing') {
                 targetPath = '#/landing';
-            } else if (hasSeenLanding && !hasSeenPresentation && currentPath !== '/presentation' && currentPath !== '/landing' && currentHash !== '#/presentation') {
-                targetPath = '#/presentation';
-            } else if (hasSeenLanding && hasSeenPresentation) {
-                // Se já viu landing e presentation, SEMPRE redirecionar para login
-                // Não permitir voltar para landing ou presentation
-                if (currentPath !== '/login' && currentPath !== '/premium' && currentHash !== '#/login') {
-                    targetPath = '#/login';
-                }
+            } else if (hasSeenLanding && 
+                       currentPath !== '/login' && currentPath !== '/landing' && currentPath !== '/premium' && currentHash !== '#/login') {
+                targetPath = '#/login';
             }
         }
 
@@ -468,12 +432,12 @@ const App: React.FC = () => {
                 lastRedirectHashRef.current = '';
             }
         }
-    }, [hasSeenLanding, hasSeenPresentation, isLoggedIn, isInitialized]); // Não incluir 'path' para evitar loops
+    }, [hasSeenLanding, isLoggedIn, isInitialized]); // Não incluir 'path' para evitar loops
 
     // Aguardar inicialização antes de decidir roteamento
     // IMPORTANTE: Este return vem DEPOIS de todos os hooks
-    if (!isInitialized || hasSeenLanding === null || hasSeenPresentation === null) {
-        console.log('[App] Aguardando inicialização...', { isInitialized, hasSeenLanding, hasSeenPresentation });
+    if (!isInitialized || hasSeenLanding === null) {
+        console.log('[App] Aguardando inicialização...', { isInitialized, hasSeenLanding });
         return <PageLoader />;
     }
 
@@ -484,7 +448,6 @@ const App: React.FC = () => {
             path, 
             isLoggedIn, 
             hasSeenLanding, 
-            hasSeenPresentation, 
             isInitialized,
             redirectingRef: redirectingRef.current,
             userRole: user?.gymRole,
@@ -502,16 +465,14 @@ const App: React.FC = () => {
         const isEmptyPath = !path || path === '';
         const isOnCorrectRoute = 
             (!hasSeenLanding && path === '/landing') ||
-            (hasSeenLanding && !hasSeenPresentation && (path === '/presentation' || path === '/landing')) ||
-            (hasSeenLanding && hasSeenPresentation && (path === '/login' || path === '/premium')) || // Não permitir voltar para landing/presentation depois de visto
+            (hasSeenLanding && (path === '/login' || path === '/landing' || path === '/premium')) ||
             (isEmptyPath && !hasSeenLanding) || // Path vazio mas precisa ver landing
-            (isEmptyPath && hasSeenLanding && !hasSeenPresentation) || // Path vazio mas precisa ver presentation
-            (isEmptyPath && hasSeenLanding && hasSeenPresentation); // Path vazio mas precisa ir para login (será redirecionado)
+            (isEmptyPath && hasSeenLanding); // Path vazio mas precisa ir para login (será redirecionado)
         
         // Só mostrar loader se NÃO está na rota correta E está redirecionando
         // Isso evita loop porque não bloqueia quando já está na rota correta
         if (!isOnCorrectRoute && redirectingRef.current) {
-            console.log('[App] Redirecionando (usuário não logado)...', { path, hasSeenLanding, hasSeenPresentation, isOnCorrectRoute });
+            console.log('[App] Redirecionando (usuário não logado)...', { path, hasSeenLanding, isOnCorrectRoute });
             return <PageLoader />;
         }
         
@@ -552,17 +513,7 @@ const App: React.FC = () => {
     // Isso evita que rotas como landing, presentation, welcome-survey sejam bloqueadas incorretamente
     
     // Página de Landing (Logo) - DEVE SER VERIFICADA PRIMEIRO
-    // IMPORTANTE: Se já viu landing e presentation, redirecionar para login
     if (normalizedPath === '/landing') {
-        // Se já viu landing e presentation, redirecionar para login imediatamente
-        if (hasSeenLanding && hasSeenPresentation && !isLoggedIn) {
-            // Redirecionar imediatamente
-            if (typeof window !== 'undefined') {
-                window.location.hash = '#/login';
-            }
-            return <PageLoader />;
-        }
-        
         return (
             <GymBrandingProvider>
                 <ToastProvider>
@@ -601,17 +552,7 @@ const App: React.FC = () => {
     }
     
     // Página de Apresentação (Vídeo)
-    // IMPORTANTE: Se já viu landing e presentation, redirecionar para login
     if (normalizedPath === '/presentation') {
-        // Se já viu presentation, redirecionar para login imediatamente
-        if (hasSeenLanding && hasSeenPresentation && !isLoggedIn) {
-            // Redirecionar imediatamente
-            if (typeof window !== 'undefined') {
-                window.location.hash = '#/login';
-            }
-            return <PageLoader />;
-        }
-        
         return (
             <Suspense fallback={<PageLoader />}>
                 <VideoPresentationPage />
