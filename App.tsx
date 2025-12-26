@@ -461,10 +461,10 @@ const App: React.FC = () => {
         // Quando path está vazio (hash vazio), considerar que precisa redirecionar
         const isEmptyPath = !path || path === '';
         const isOnCorrectRoute = 
-            (!hasSeenLanding && path === '/landing') ||
-            (hasSeenLanding && (path === '/login' || path === '/landing' || path === '/premium')) ||
-            (isEmptyPath && !hasSeenLanding) || // Path vazio mas precisa ver landing
-            (isEmptyPath && hasSeenLanding); // Path vazio mas precisa ir para login (será redirecionado)
+            path === '/landing' || // Sempre permitir estar na landing
+            path === '/login' || // Sempre permitir estar no login
+            path === '/premium' || // Sempre permitir estar no premium
+            (isEmptyPath); // Path vazio - será redirecionado para landing
         
         // Só mostrar loader se NÃO está na rota correta E está redirecionando
         // Isso evita loop porque não bloqueia quando já está na rota correta
