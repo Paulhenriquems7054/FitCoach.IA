@@ -12,11 +12,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Logo } from '../components/Logo';
 import { ChevronLeftIcon } from '../components/icons/ChevronLeftIcon';
-import { MoonIcon } from '../components/icons/MoonIcon';
-import { SunIcon } from '../components/icons/SunIcon';
 import { validateCoupon } from '../services/couponService';
 import { useToast } from '../components/ui/Toast';
-import { useTheme } from '../context/ThemeContext';
 import { logger } from '../utils/logger';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -46,7 +43,6 @@ interface SubscriptionPlan {
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDevSkip }) => {
-  const { theme, themeSetting, setThemeSetting } = useTheme();
   const [screen, setScreen] = useState<ScreenState>('home');
   const [sliderPosition, setSliderPosition] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -189,47 +185,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
     }
   };
 
-  const handleToggleTheme = () => {
-    if (themeSetting === 'dark') {
-      setThemeSetting('light');
-    } else if (themeSetting === 'light') {
-      setThemeSetting('system');
-    } else {
-      setThemeSetting('dark');
-    }
-  };
-
-  const getThemeIcon = () => {
-    if (themeSetting === 'system') {
-      return (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-          className="w-5 h-5"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z"
-          />
-        </svg>
-      );
-    }
-    return theme === 'dark' ? (
-      <MoonIcon className="w-5 h-5" />
-    ) : (
-      <SunIcon className="w-5 h-5" />
-    );
-  };
-
-  const getThemeLabel = () => {
-    if (themeSetting === 'system') return 'Sistema';
-    return theme === 'dark' ? 'Escuro' : 'Claro';
-  };
-
   // SVG das linhas topográficas (background animado)
   const TopographicLines = () => (
     <svg
@@ -281,7 +236,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
   );
 
   return (
-    <div className="min-h-screen w-full relative overflow-hidden bg-gradient-to-br from-emerald-50 via-slate-50 to-slate-100">
+    <div className="min-h-screen w-full relative overflow-hidden bg-gradient-to-br from-emerald-50 via-slate-50 to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       {/* Background animado (apenas na tela inicial) */}
       {screen === 'home' && <TopographicLines />}
 
@@ -330,18 +285,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
           <div className="w-full max-w-4xl space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
             {/* Hero Section */}
             <div className="text-center space-y-6">
-              <div className="inline-block p-6 sm:p-8 bg-white/20 backdrop-blur-md rounded-[2.5rem] sm:rounded-[3.5rem] shadow-2xl border border-white/30">
-                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif text-[#1A4D2E] mb-4">
+              <div className="inline-block p-6 sm:p-8 bg-white/20 dark:bg-slate-800/20 backdrop-blur-md rounded-[2.5rem] sm:rounded-[3.5rem] shadow-2xl border border-white/30 dark:border-slate-700/30">
+                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif text-[#1A4D2E] dark:text-emerald-400 mb-4">
                   Treinos e Nutrição Consciente
                 </h1>
-                <p className="text-lg sm:text-xl md:text-2xl text-slate-700 max-w-2xl mx-auto">
+                <p className="text-lg sm:text-xl md:text-2xl text-slate-700 dark:text-slate-300 max-w-2xl mx-auto">
                   Planos alimentares personalizados e chefs IA para sua melhor versão
                 </p>
                 <div className="flex items-center justify-center gap-3 mt-6">
-                  <span className="px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold">
+                  <span className="px-4 py-2 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 rounded-full text-sm font-semibold">
                     Saudável
                   </span>
-                  <span className="px-4 py-2 bg-[#F5F1E8] text-[#1A4D2E] rounded-full text-sm font-semibold">
+                  <span className="px-4 py-2 bg-[#F5F1E8] dark:bg-slate-700 text-[#1A4D2E] dark:text-emerald-400 rounded-full text-sm font-semibold">
                     Premium
                   </span>
                 </div>
@@ -384,7 +339,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
                 {/* Knob arrastável */}
                 <div
                   ref={sliderRef}
-                  className="absolute top-2 left-2 w-12 h-12 bg-[#F5F1E8] rounded-full shadow-lg cursor-grab active:cursor-grabbing flex items-center justify-center z-20 transition-transform hover:scale-110"
+                  className="absolute top-2 left-2 w-12 h-12 bg-[#F5F1E8] dark:bg-slate-300 rounded-full shadow-lg cursor-grab active:cursor-grabbing flex items-center justify-center z-20 transition-transform hover:scale-110"
                   style={{
                     transform: `translateX(${sliderPosition}px)`,
                     touchAction: 'none',
@@ -396,7 +351,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
                 >
                   {/* Ícone de Chef Hat */}
                   <svg
-                    className="w-6 h-6 text-[#1A4D2E]"
+                    className="w-6 h-6 text-[#1A4D2E] dark:text-emerald-700"
                     fill="currentColor"
                     viewBox="0 0 24 24"
                   >
@@ -406,31 +361,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
               </div>
             </div>
 
-            {/* Botão "Tenho um convite" - Completamente separado do slider */}
-            <div 
-              className="w-full max-w-md mx-auto mt-2"
-              style={{ position: 'relative', zIndex: 1000 }}
-            >
-              <button
-                onClick={() => {
-                  console.log('[LandingPage] ✅ Botão "Tenho um convite" CLICADO!');
-                  logger.info('Botão "Tenho um convite" clicado', 'LandingPage');
-                  setScreen('coupon');
-                }}
-                className="w-full text-center text-sm font-medium text-slate-600 hover:text-[#1A4D2E] transition-all py-2 underline hover:no-underline cursor-pointer active:scale-95 select-none bg-transparent border-none outline-none"
-                type="button"
-                tabIndex={0}
-                aria-label="Tenho um convite"
-                style={{
-                  pointerEvents: 'auto',
-                  zIndex: 10000,
-                  position: 'relative',
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                Tenho um convite
-              </button>
-            </div>
 
           </div>
         )}
@@ -453,7 +383,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
               {/* Ícone de ticket */}
               <div className="mb-6">
                 <svg
-                  className="w-24 h-24 mx-auto text-[#1A4D2E]"
+                  className="w-24 h-24 mx-auto text-[#1A4D2E] dark:text-emerald-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -472,14 +402,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
                   type="text"
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  className="w-full px-4 py-4 bg-white/50 border border-slate-200 rounded-xl text-center text-2xl font-bold tracking-widest text-[#1A4D2E] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent uppercase"
+                  className="w-full px-4 py-4 bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-600 rounded-xl text-center text-2xl font-bold tracking-widest text-[#1A4D2E] dark:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent uppercase"
                   placeholder="CÓDIGO"
                   maxLength={10}
                 />
                 <button
                   onClick={handleValidateCoupon}
                   disabled={isValidating || !couponCode.trim()}
-                  className="w-full py-3 bg-[#1A4D2E] text-[#F5F1E8] font-semibold rounded-xl hover:bg-[#4F6F52] transition-colors shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  className="w-full py-3 bg-[#1A4D2E] dark:bg-emerald-600 text-[#F5F1E8] dark:text-white font-semibold rounded-xl hover:bg-[#4F6F52] dark:hover:bg-emerald-700 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {isValidating ? 'Validando...' : 'Validar'}
                 </button>
@@ -503,38 +433,38 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
 
               <form onSubmit={(e) => { e.preventDefault(); handleRegister(); }} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Nome</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nome</label>
                   <input
                     type="text"
                     value={registerData.name}
                     onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900 dark:text-slate-100"
                     placeholder="Seu nome"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
                   <input
                     type="email"
                     value={registerData.email}
                     onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900 dark:text-slate-100"
                     placeholder="seu@email.com"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Senha</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Senha</label>
                   <input
                     type="password"
                     value={registerData.password}
                     onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900 dark:text-slate-100"
                     placeholder="••••••••"
                   />
                 </div>
                 <button
                   type="submit"
-                  className="w-full py-3 bg-[#1A4D2E] text-[#F5F1E8] font-semibold rounded-xl hover:bg-[#4F6F52] transition-colors shadow-lg hover:shadow-xl transform hover:scale-105"
+                  className="w-full py-3 bg-[#1A4D2E] dark:bg-emerald-600 text-[#F5F1E8] dark:text-white font-semibold rounded-xl hover:bg-[#4F6F52] dark:hover:bg-emerald-700 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105"
                 >
                   Cadastrar
                 </button>
