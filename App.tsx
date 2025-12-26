@@ -378,19 +378,16 @@ const App: React.FC = () => {
         }
         // Apenas fluxo inicial: landing -> login
         else if (!isLoggedIn) {
-            // Se hash está vazio (primeira visita), determinar destino baseado no que já foi visto
+            // Se hash está vazio (primeira visita), sempre mostrar landing primeiro
             if (!currentHash || currentHash === '' || currentHash === '#') {
-                if (!hasSeenLanding) {
-                    targetPath = '#/landing';
-                } else {
-                    targetPath = '#/login';
-                }
-            } else if (!hasSeenLanding && currentPath !== '/landing' && currentHash !== '#/landing') {
                 targetPath = '#/landing';
-            } else if (hasSeenLanding && 
-                       currentPath !== '/login' && currentPath !== '/landing' && currentPath !== '/premium' && currentHash !== '#/login') {
-                targetPath = '#/login';
+            } 
+            // Se não está na landing e não está no login/premium, ir para landing
+            else if (currentPath !== '/landing' && currentPath !== '/login' && currentPath !== '/premium' && currentHash !== '#/landing' && currentHash !== '#/login') {
+                targetPath = '#/landing';
             }
+            // Se já está na landing e já completou (hasSeenLanding), não redirecionar (deixar landing redirecionar quando completar)
+            // Não forçar redirecionamento automático de landing para login - deixar a LandingPage fazer isso
         }
 
         // Só redirecionar se:
