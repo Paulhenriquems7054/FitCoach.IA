@@ -1262,17 +1262,7 @@ const LoginPage: React.FC = () => {
 
                         {/* Footer */}
                         <div className="mt-6">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowSignup(true);
-                                        setSignupStep(1);
-                                    }}
-                                    className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
-                                >
-                                    Tenho código de convite
-                                </button>
+                            <div className="flex justify-end">
                                 <button
                                     type="button"
                                     onClick={() => setShowForgotPassword(true)}
