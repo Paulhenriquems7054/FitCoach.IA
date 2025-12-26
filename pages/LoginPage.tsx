@@ -1179,7 +1179,7 @@ const LoginPage: React.FC = () => {
                                     setSignupCouponCode(''); // Garantir que não há cupom
                                     setCouponValidated(false);
                                 }}
-                                className="w-full mt-2 text-center text-sm font-semibold text-primary-800 dark:text-primary-400 hover:text-primary-900 dark:hover:text-primary-300 underline decoration-2 underline-offset-2 py-2.5 px-3 transition-all bg-primary-100/50 dark:bg-slate-800/50 hover:bg-primary-200/70 dark:hover:bg-slate-700/70 rounded-md cursor-pointer"
+                                className="w-full mt-2 text-center text-sm font-semibold text-primary-900 dark:text-primary-300 hover:text-primary-950 dark:hover:text-primary-200 underline decoration-2 underline-offset-2 py-2.5 px-3 transition-all bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700 border border-primary-200/50 dark:border-primary-800/50 rounded-md cursor-pointer"
                                 style={{ 
                                     minHeight: '44px', 
                                     display: inviteInfo ? 'none' : 'flex', 
