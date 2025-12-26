@@ -605,8 +605,10 @@ const LoginPage: React.FC = () => {
             // Criar usuário no Supabase usando função RPC segura
             // Primeiro tentar inserir diretamente, se falhar usar função RPC
             let userError = null;
+            let userCreatedInDB = false;
+            
             try {
-                const { error: directInsertError } = await supabase
+                const { data: insertData, error: directInsertError } = await supabase
                     .from('users')
                     .insert({
                         id: userId,
@@ -635,13 +637,24 @@ const LoginPage: React.FC = () => {
                         voice_used_today_seconds: 0,
                         voice_balance_upsell: 0,
                         text_msg_count_today: 0,
-                    });
+                    })
+                    .select(); // Selecionar para verificar se foi criado
 
-                userError = directInsertError;
+                if (directInsertError) {
+                    userError = directInsertError;
+                    logger.warn('Inserção direta falhou, tentando função RPC', 'LoginPage', directInsertError);
+                } else if (insertData && insertData.length > 0) {
+                    userCreatedInDB = true;
+                    logger.info('Usuário criado com sucesso na tabela users (inserção direta)', 'LoginPage');
+                }
             } catch (directError) {
-                // Se inserção direta falhar (RLS), usar função RPC
-                logger.warn('Inserção direta falhou, tentando função RPC', 'LoginPage', directError);
-                
+                // Se inserção direta falhar (RLS ou outro erro), usar função RPC
+                logger.warn('Exceção ao inserir diretamente, tentando função RPC', 'LoginPage', directError);
+                userError = directError as any;
+            }
+
+            // Se inserção direta falhou, tentar função RPC
+            if (!userCreatedInDB && userError) {
                 try {
                     // Preparar dados do usuário em JSONB conforme a função espera
                     const userDataJsonb = {
@@ -659,7 +672,7 @@ const LoginPage: React.FC = () => {
                         role: userData.role,
                     };
 
-                    const { error: rpcError } = await supabase.rpc('insert_user_profile_after_signup', {
+                    const { data: rpcData, error: rpcError } = await supabase.rpc('insert_user_profile_after_signup', {
                         p_user_id: userId,
                         p_nome: userData.nome,
                         p_username: usernameToUse,
@@ -668,18 +681,68 @@ const LoginPage: React.FC = () => {
                         p_user_data: userDataJsonb,
                     });
 
-                    userError = rpcError;
+                    if (rpcError) {
+                        logger.error('Erro ao criar usuário via função RPC', 'LoginPage', rpcError);
+                        userError = rpcError;
+                    } else {
+                        userCreatedInDB = true;
+                        logger.info('Usuário criado com sucesso na tabela users (função RPC)', 'LoginPage');
+                    }
                 } catch (rpcError) {
-                    logger.error('Erro ao criar usuário via função RPC', 'LoginPage', rpcError);
+                    logger.error('Exceção ao criar usuário via função RPC', 'LoginPage', rpcError);
                     userError = rpcError as any;
                 }
             }
 
-            if (userError) {
-                // Log do erro mas não bloquear o cadastro
-                // O usuário pode fazer login depois e o perfil será criado
-                logger.warn('Erro ao criar perfil no Supabase (usuário pode fazer login depois)', 'LoginPage', userError);
-                // Não lançar erro - permitir que o cadastro continue
+            // Se ainda não foi criado, tentar inserir diretamente novamente com campos mínimos
+            if (!userCreatedInDB) {
+                try {
+                    logger.warn('Tentando inserção alternativa com campos mínimos', 'LoginPage');
+                    const { data: altInsertData, error: altInsertError } = await supabase
+                        .from('users')
+                        .insert({
+                            id: userId,
+                            nome: userData.nome,
+                            username: usernameToUse,
+                            email: sanitizedEmail,
+                            idade: userData.idade || 0,
+                            genero: userData.genero || 'Masculino',
+                            peso: 0,
+                            altura: 0,
+                            objetivo: userData.objetivo || 'perder peso',
+                            points: 0,
+                            discipline_score: 0,
+                            completed_challenge_ids: null,
+                            is_anonymized: false,
+                            role: userData.role || 'user',
+                            plan_type: userData.planType || 'free',
+                            subscription_status: userData.subscriptionStatus || 'active',
+                            voice_daily_limit_seconds: userData.voiceDailyLimitSeconds || 300,
+                            voice_used_today_seconds: 0,
+                            voice_balance_upsell: 0,
+                            text_msg_count_today: 0,
+                        })
+                        .select();
+
+                    if (altInsertError) {
+                        logger.error('Erro na inserção alternativa', 'LoginPage', altInsertError);
+                        userError = altInsertError;
+                    } else if (altInsertData && altInsertData.length > 0) {
+                        userCreatedInDB = true;
+                        logger.info('Usuário criado com sucesso na tabela users (inserção alternativa)', 'LoginPage');
+                    }
+                } catch (altError) {
+                    logger.error('Exceção na inserção alternativa', 'LoginPage', altError);
+                    userError = altError as any;
+                }
+            }
+
+            // Se ainda não foi criado, mostrar erro detalhado mas não bloquear completamente
+            if (!userCreatedInDB) {
+                const errorMsg = userError instanceof Error ? userError.message : JSON.stringify(userError);
+                logger.error(`CRÍTICO: Falha ao criar usuário na tabela users. Erro: ${errorMsg}`, 'LoginPage', userError);
+                // Mostrar aviso ao usuário mas permitir que continue (pode criar manualmente depois)
+                showError('Conta criada no sistema, mas houve um problema ao salvar seu perfil. Entre em contato com o suporte se o problema persistir.');
             }
 
             // Aplicar cupom ou vincular via código mestre (apenas se fornecido)
