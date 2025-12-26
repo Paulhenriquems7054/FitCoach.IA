@@ -853,42 +853,33 @@ const LoginPage: React.FC = () => {
             try {
                 const supabase = getSupabaseClient();
                 
-                // Primeiro, tentar buscar o ID do usuário na tabela users pelo username
-                // Nota: A tabela users não tem coluna email, apenas auth.users tem
+                // Primeiro, tentar buscar o usuário na tabela users pelo username para obter o email
+                let emailFromDB: string | null = null;
                 let userIdFromDB: string | null = null;
                 try {
                     const { data: userData } = await supabase
                         .from('users')
-                        .select('id, username')
+                        .select('id, username, email')
                         .eq('username', sanitizedUsername)
                         .maybeSingle();
                     
-                    if (userData && userData.id) {
+                    if (userData) {
                         userIdFromDB = userData.id;
+                        emailFromDB = userData.email || null; // Email salvo na tabela users
                     }
                 } catch (e) {
                     // Ignorar erro ao buscar usuário
                 }
                 
                 // Tentar múltiplas variações de email
-                // Se encontrou o ID do usuário, tentar buscar o email do auth.users
-                let emailFromAuth: string | null = null;
-                if (userIdFromDB) {
-                    try {
-                        // Tentar buscar o email do auth.users usando o ID
-                        // Nota: Isso pode não funcionar sem permissões admin, então vamos tentar variações
-                        emailFromAuth = null; // Não temos acesso direto ao auth.users sem admin API
-                    } catch (e) {
-                        // Ignorar
-                    }
-                }
-                
                 const emailAttempts = [
-                    // Se username parece email, usar diretamente
+                    // PRIORIDADE 1: Email da tabela users (se encontrado)
+                    emailFromDB,
+                    // PRIORIDADE 2: Se username parece email, usar diretamente
                     sanitizedUsername.includes('@') ? sanitizedUsername : null,
-                    // Tentar username@fitcoach.ia (padrão usado no cadastro)
+                    // PRIORIDADE 3: Tentar username@fitcoach.ia (padrão usado no cadastro)
                     `${sanitizedUsername}@fitcoach.ia`,
-                    // Última tentativa: username direto (pode funcionar se email = username)
+                    // PRIORIDADE 4: Username direto (pode funcionar se email = username)
                     sanitizedUsername,
                 ].filter(Boolean) as string[];
 
