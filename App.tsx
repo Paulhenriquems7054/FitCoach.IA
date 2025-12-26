@@ -556,10 +556,10 @@ const App: React.FC = () => {
     if (normalizedPath === '/landing') {
         // Se já viu landing e presentation, redirecionar para login imediatamente
         if (hasSeenLanding && hasSeenPresentation && !isLoggedIn) {
-            // Usar useEffect para evitar render durante redirecionamento
-            React.useEffect(() => {
+            // Redirecionar imediatamente
+            if (typeof window !== 'undefined') {
                 window.location.hash = '#/login';
-            }, []);
+            }
             return <PageLoader />;
         }
         
