@@ -17,7 +17,6 @@ import { useToast } from '../components/ui/Toast';
 import { logger } from '../utils/logger';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import { getSubscriptionPlans } from '../services/supabaseService';
 
 interface LandingPageProps {
@@ -26,7 +25,7 @@ interface LandingPageProps {
   onDevSkip?: () => void;      // Opcional: pula onboarding (dev mode)
 }
 
-type ScreenState = 'home' | 'coupon' | 'register' | 'pricing';
+type ScreenState = 'home' | 'coupon' | 'register';
 
 interface SubscriptionPlan {
   id: string;
@@ -52,8 +51,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
   const [couponCode, setCouponCode] = useState('');
   const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' });
   const [isValidating, setIsValidating] = useState(false);
-  const [allPlans, setAllPlans] = useState<SubscriptionPlan[]>([]);
-  const [loadingPlans, setLoadingPlans] = useState(false);
   
   const sliderRef = useRef<HTMLDivElement>(null);
   const sliderBarRef = useRef<HTMLDivElement>(null);
@@ -68,58 +65,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
     }
   }, [screen]);
 
-  // Carregar planos quando mostrar seção de pricing
-  useEffect(() => {
-    if (screen === 'pricing' && allPlans.length === 0) {
-      loadPlans();
-    }
-  }, [screen]);
-
-  const loadPlans = async () => {
-    setLoadingPlans(true);
-    try {
-      const subscriptionPlans = await getSubscriptionPlans();
-      setAllPlans(subscriptionPlans.map(p => ({
-        id: p.id,
-        name: p.name,
-        display_name: p.display_name,
-        description: p.description,
-        price_monthly: p.price_monthly,
-        price_yearly: p.price_yearly,
-        features: (p.features as string[]) || [],
-        limits: (p.limits as Record<string, number>) || {},
-        plan_category: (p as any).plan_category || null,
-        checkout_url_monthly: (p as any).checkout_url_monthly || null,
-        checkout_url_yearly: (p as any).checkout_url_yearly || null,
-        checkout_price_monthly: (p as any).checkout_price_monthly || null,
-        checkout_price_yearly: (p as any).checkout_price_yearly || null,
-      })));
-    } catch (error) {
-      logger.error('Erro ao carregar planos', 'LandingPage', error);
-    } finally {
-      setLoadingPlans(false);
-    }
-  };
-
-  // Filtrar apenas planos individuais (B2C) - voltados para alunos
-  const b2cPlans = allPlans.filter(p => p.plan_category === 'b2c_ai');
-
-  const handleSelectPlan = (plan: SubscriptionPlan) => {
-    const checkoutUrl = plan.checkout_url_monthly || plan.checkout_url_yearly;
-    if (checkoutUrl) {
-      window.open(checkoutUrl, '_blank');
-    } else {
-      // Se não tem checkout URL, marcar landing como vista e redirecionar para login
-      const LANDING_SEEN_KEY = 'fitcoach.landing.seen';
-      try {
-        localStorage.setItem(LANDING_SEEN_KEY, 'true');
-        window.dispatchEvent(new Event('landing-seen'));
-      } catch (error) {
-        console.warn('Não foi possível salvar flag de landing vista', error);
-      }
-      window.location.hash = '#/login';
-    }
-  };
 
   // Handlers do slider
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -431,109 +376,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
               </button>
             </div>
 
-            {/* Botão "Ver Planos" */}
-            <div className="w-full max-w-md mx-auto mt-6">
-              <button
-                onClick={() => setScreen('pricing')}
-                className="w-full py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                Ver Planos e Preços
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Seção de Planos (Pricing) */}
-        {screen === 'pricing' && (
-          <div className="w-full max-w-7xl mx-auto py-8 space-y-8">
-            {/* Header com botão voltar */}
-            <div className="flex items-center gap-4 mb-6">
-              <button
-                onClick={() => setScreen('home')}
-                className="p-2 hover:bg-white/20 rounded-full transition-colors"
-              >
-                <ChevronLeftIcon size={24} className="text-[#1A4D2E]" />
-              </button>
-              <h2 className="text-3xl font-serif text-[#1A4D2E]">Planos e Preços</h2>
-            </div>
-
-            {/* Título da seção - apenas planos individuais */}
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-[#1A4D2E] mb-2">
-                Planos Individuais - Uso da IA
-              </h3>
-              <p className="text-slate-600">
-                Escolha o plano ideal para continuar usando todas as funcionalidades de IA
-              </p>
-            </div>
-
-            {/* Conteúdo dos Planos - Apenas Planos Individuais (B2C) */}
-            {loadingPlans ? (
-              <div className="text-center py-12">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-                <p className="mt-4 text-slate-600">Carregando planos...</p>
-              </div>
-            ) : b2cPlans.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                {b2cPlans.map((plan) => {
-                  const isPopular = plan.name === 'ai_annual_vip';
-                  return (
-                    <Card key={plan.id} className={`relative ${isPopular ? 'ring-2 ring-emerald-500' : ''}`}>
-                      {isPopular && (
-                        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                          <span className="bg-emerald-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                            Mais Vantajoso
-                          </span>
-                        </div>
-                      )}
-                      <div className="p-6">
-                        <h4 className="text-xl font-bold text-[#1A4D2E] mb-2">{plan.display_name}</h4>
-                        <p className="text-sm text-slate-600 mb-4">{plan.description}</p>
-                        <div className="mb-4">
-                          {plan.price_yearly ? (
-                            <>
-                              <span className="text-4xl font-bold text-emerald-600">
-                                R$ {plan.price_yearly.toFixed(2).replace('.', ',')}
-                              </span>
-                              <span className="text-slate-600 ml-2">/ano</span>
-                              <p className="text-sm text-slate-500 mt-1">
-                                ou 12x de R$ {plan.price_monthly.toFixed(2).replace('.', ',')}
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-4xl font-bold text-emerald-600">
-                                R$ {plan.price_monthly.toFixed(2).replace('.', ',')}
-                              </span>
-                              <span className="text-slate-600 ml-2">/mês</span>
-                            </>
-                          )}
-                        </div>
-                        <ul className="space-y-2 mb-6">
-                          {plan.features.slice(0, 5).map((feature, idx) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <CheckCircleIcon className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                              <span className="text-sm text-slate-700">{feature}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        <Button
-                          onClick={() => handleSelectPlan(plan)}
-                          className="w-full"
-                          variant="primary"
-                        >
-                          Assinar Agora
-                        </Button>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-slate-600">Nenhum plano disponível no momento.</p>
-              </div>
-            )}
           </div>
         )}
 

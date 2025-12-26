@@ -133,13 +133,10 @@ export const StudentAiPlansPage: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-slate-50 to-slate-100 py-12 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-slate-900 mb-4">
-            Ative sua IA Personalizada
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            Planos Individuais - Uso da IA
           </h1>
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto mb-4">
-            A plataforma é oferecida pela sua academia. A ativação da IA é individual.
-          </p>
-          <p className="text-base text-slate-500 max-w-2xl mx-auto">
+          <p className="text-base text-slate-600 max-w-2xl mx-auto">
             Escolha o plano ideal para continuar usando todas as funcionalidades de IA
           </p>
         </div>
@@ -161,7 +158,7 @@ export const StudentAiPlansPage: React.FC = () => {
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                   <span className="bg-emerald-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                    Mais Popular
+                    Mais Vantajoso
                   </span>
                 </div>
               )}
@@ -185,11 +182,11 @@ export const StudentAiPlansPage: React.FC = () => {
                             <span className="text-sm text-green-600 font-semibold">
                               Economia de R$ {plan.savings.toFixed(2).replace('.', ',')}
                             </span>
-                            {plan.installments && (
-                              <p className="text-xs text-slate-500 mt-1">
-                                ou {plan.installments.count}x de R$ {plan.installments.value.toFixed(2).replace('.', ',')}
-                              </p>
-                            )}
+                        {plan.installments && (
+                          <p className="text-sm text-slate-500 mt-1">
+                            ou {plan.installments.count}x de R$ {plan.installments.value.toFixed(2).replace('.', ',')}
+                          </p>
+                        )}
                           </div>
                         )}
                       </>
@@ -212,41 +209,38 @@ export const StudentAiPlansPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="space-y-3 mb-6">
+                <div className="space-y-2 mb-6">
                   <div className="flex items-center gap-2">
-                    <PhotoIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                    <span className="text-slate-700 text-sm">
-                      Análise de fotos e treinos com IA
-                    </span>
+                    <CheckCircleIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                    <span className="text-slate-700 text-sm">chat_ilimitado</span>
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <SparklesIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                    <span className="text-slate-700 text-sm">
-                      Treinos personalizados sob demanda
-                    </span>
+                    <CheckCircleIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                    <span className="text-slate-700 text-sm">voz_15min_dia</span>
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <ChatBubbleLeftRightIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                    <span className="text-slate-700 text-sm">
-                      Chat de texto ilimitado
-                    </span>
+                    <CheckCircleIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                    <span className="text-slate-700 text-sm">analise_fotos_ilimitada</span>
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <MicrophoneIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                    <span className="text-slate-700 text-sm">
-                      15 min/dia de consultoria de voz (Live)
-                    </span>
+                    <CheckCircleIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                    <span className="text-slate-700 text-sm">treinos_personalizados</span>
                   </div>
                   
                   {plan.period === 'annual' && (
-                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200">
-                      <CheckCircleIcon className="w-5 h-5 text-green-600 flex-shrink-0" />
-                      <span className="text-slate-700 text-sm font-semibold">
-                        Garantia de satisfação
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <CheckCircleIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                      <span className="text-slate-700 text-sm">garantia_satisfacao</span>
+                    </div>
+                  )}
+                  
+                  {plan.period === 'monthly' && (
+                    <div className="flex items-center gap-2">
+                      <CheckCircleIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                      <span className="text-slate-700 text-sm">cancelamento_qualquer_momento</span>
                     </div>
                   )}
                 </div>
@@ -260,7 +254,7 @@ export const StudentAiPlansPage: React.FC = () => {
                 >
                   {isProcessing && selectedPlan === plan.id
                     ? 'Processando...'
-                    : plan.period === 'annual' ? 'Assinar Anual VIP' : 'Assinar Mensal'}
+                    : 'Assinar Agora'}
                 </Button>
               </div>
             </Card>
