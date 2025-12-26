@@ -1187,7 +1187,7 @@ const LoginPage: React.FC = () => {
                                     justifyContent: 'center' 
                                 }}
                             >
-                                Não tenho código? Testar Grátis por 3 dias
+                                Não tem código? Testar Grátis por 3 dias
                             </button>
                             {/* Mensagem informativa para alunos que vêm via convite */}
                             {inviteInfo && inviteInfo.invitedRole === 'student' && (
