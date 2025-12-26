@@ -420,9 +420,12 @@ const App: React.FC = () => {
                 targetPath = '#/landing';
             } else if (hasSeenLanding && !hasSeenPresentation && currentPath !== '/presentation' && currentPath !== '/landing' && currentHash !== '#/presentation') {
                 targetPath = '#/presentation';
-            } else if (hasSeenLanding && hasSeenPresentation && 
-                       currentPath !== '/login' && currentPath !== '/landing' && currentPath !== '/presentation' && currentPath !== '/premium' && currentHash !== '#/login') {
-                targetPath = '#/login';
+            } else if (hasSeenLanding && hasSeenPresentation) {
+                // Se já viu landing e presentation, SEMPRE redirecionar para login
+                // Não permitir voltar para landing ou presentation
+                if (currentPath !== '/login' && currentPath !== '/premium' && currentHash !== '#/login') {
+                    targetPath = '#/login';
+                }
             }
         }
 
@@ -500,7 +503,7 @@ const App: React.FC = () => {
         const isOnCorrectRoute = 
             (!hasSeenLanding && path === '/landing') ||
             (hasSeenLanding && !hasSeenPresentation && (path === '/presentation' || path === '/landing')) ||
-            (hasSeenLanding && hasSeenPresentation && (path === '/login' || path === '/landing' || path === '/presentation' || path === '/premium')) ||
+            (hasSeenLanding && hasSeenPresentation && (path === '/login' || path === '/premium')) || // Não permitir voltar para landing/presentation depois de visto
             (isEmptyPath && !hasSeenLanding) || // Path vazio mas precisa ver landing
             (isEmptyPath && hasSeenLanding && !hasSeenPresentation) || // Path vazio mas precisa ver presentation
             (isEmptyPath && hasSeenLanding && hasSeenPresentation); // Path vazio mas precisa ir para login (será redirecionado)
@@ -549,7 +552,17 @@ const App: React.FC = () => {
     // Isso evita que rotas como landing, presentation, welcome-survey sejam bloqueadas incorretamente
     
     // Página de Landing (Logo) - DEVE SER VERIFICADA PRIMEIRO
+    // IMPORTANTE: Se já viu landing e presentation, redirecionar para login
     if (normalizedPath === '/landing') {
+        // Se já viu landing e presentation, redirecionar para login imediatamente
+        if (hasSeenLanding && hasSeenPresentation && !isLoggedIn) {
+            // Usar useEffect para evitar render durante redirecionamento
+            React.useEffect(() => {
+                window.location.hash = '#/login';
+            }, []);
+            return <PageLoader />;
+        }
+        
         return (
             <GymBrandingProvider>
                 <ToastProvider>
