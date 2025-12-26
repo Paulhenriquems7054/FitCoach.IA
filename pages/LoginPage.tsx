@@ -853,34 +853,52 @@ const LoginPage: React.FC = () => {
             try {
                 const supabase = getSupabaseClient();
                 
-                // Primeiro, tentar buscar o usuário na tabela users pelo username para obter o email
+                // Primeiro, tentar buscar o usuário na tabela users pelo username OU email para obter o email
                 let emailFromDB: string | null = null;
                 let userIdFromDB: string | null = null;
                 try {
-                    const { data: userData } = await supabase
-                        .from('users')
-                        .select('id, username, email')
-                        .eq('username', sanitizedUsername)
-                        .maybeSingle();
+                    // Se o input parece email, buscar por email primeiro
+                    if (sanitizedUsername.includes('@')) {
+                        const { data: userDataByEmail } = await supabase
+                            .from('users')
+                            .select('id, username, email')
+                            .eq('email', sanitizedUsername)
+                            .maybeSingle();
+                        
+                        if (userDataByEmail) {
+                            userIdFromDB = userDataByEmail.id;
+                            emailFromDB = userDataByEmail.email || sanitizedUsername;
+                        }
+                    }
                     
-                    if (userData) {
-                        userIdFromDB = userData.id;
-                        emailFromDB = userData.email || null; // Email salvo na tabela users
+                    // Se não encontrou por email, buscar por username
+                    if (!emailFromDB) {
+                        const { data: userData } = await supabase
+                            .from('users')
+                            .select('id, username, email')
+                            .eq('username', sanitizedUsername)
+                            .maybeSingle();
+                        
+                        if (userData) {
+                            userIdFromDB = userData.id;
+                            emailFromDB = userData.email || null; // Email salvo na tabela users
+                        }
                     }
                 } catch (e) {
                     // Ignorar erro ao buscar usuário
+                    logger.debug('Erro ao buscar usuário na tabela users', 'LoginPage', e);
                 }
                 
                 // Tentar múltiplas variações de email
                 const emailAttempts = [
-                    // PRIORIDADE 1: Email da tabela users (se encontrado)
-                    emailFromDB,
-                    // PRIORIDADE 2: Se username parece email, usar diretamente
-                    sanitizedUsername.includes('@') ? sanitizedUsername : null,
-                    // PRIORIDADE 3: Tentar username@fitcoach.ia (padrão usado no cadastro)
-                    `${sanitizedUsername}@fitcoach.ia`,
-                    // PRIORIDADE 4: Username direto (pode funcionar se email = username)
-                    sanitizedUsername,
+                    // PRIORIDADE 1: Email da tabela users (se encontrado) ou input se parece email
+                    emailFromDB || (sanitizedUsername.includes('@') ? sanitizedUsername : null),
+                    // PRIORIDADE 2: Se username parece email, usar diretamente (já incluído acima se emailFromDB não existe)
+                    sanitizedUsername.includes('@') && !emailFromDB ? sanitizedUsername : null,
+                    // PRIORIDADE 3: Tentar username@fitcoach.ia (padrão usado no cadastro) - apenas se não parece email
+                    !sanitizedUsername.includes('@') ? `${sanitizedUsername}@fitcoach.ia` : null,
+                    // PRIORIDADE 4: Username direto (pode funcionar se email = username) - apenas se não parece email
+                    !sanitizedUsername.includes('@') ? sanitizedUsername : null,
                 ].filter(Boolean) as string[];
 
                 for (const email of emailAttempts) {
@@ -938,26 +956,35 @@ const LoginPage: React.FC = () => {
                             // Verificar tipo de erro específico
                             const errorMsg = authError.message || '';
                             
-                            // Erros 400 (Bad Request) são esperados quando usuário não existe no Supabase
+                            // Log detalhado para debugging (apenas em modo debug)
+                            logger.debug(`Supabase login attempt failed for ${email}: ${errorMsg}`, 'LoginPage');
+                            
+                            // Erros 400 (Bad Request) são esperados quando usuário não existe no Supabase ou credenciais inválidas
                             // Silenciar esses erros e continuar para login local
                             if (authError.status === 400 || 
                                 errorMsg.includes('Invalid login credentials') || 
-                                errorMsg.includes('invalid login')) {
+                                errorMsg.includes('invalid login') ||
+                                errorMsg.includes('Invalid credentials')) {
                                 // Credenciais inválidas ou usuário não existe no Supabase
                                 // Continuar para próxima tentativa de email ou fallback local
                                 continue;
                             } else if (errorMsg.includes('Email not confirmed') || 
                                       errorMsg.includes('email not confirmed') ||
-                                      errorMsg.includes('email_not_confirmed')) {
-                                // Email não confirmado
-                                throw new Error('Seu email ainda não foi confirmado. Verifique sua caixa de entrada e clique no link de confirmação antes de fazer login.');
+                                      errorMsg.includes('email_not_confirmed') ||
+                                      errorMsg.includes('Email address not confirmed')) {
+                                // Email não confirmado - mas permitir login local como fallback
+                                // Não bloquear o login, permitir que tente outras variações ou login local
+                                logger.debug(`Email not confirmed for ${email}, allowing fallback to local login`, 'LoginPage');
+                                continue; // Continue para tentar outras variações ou fallback local
                             } else if (errorMsg.includes('rate limit') || 
                                       errorMsg.includes('For security purposes') ||
                                       errorMsg.includes('Too Many Requests')) {
-                                // Rate limit - propagar erro
-                                throw authError;
+                                // Rate limit - propagar erro com mensagem amigável
+                                const match = errorMsg.match(/(\d+)\s*seconds?/i);
+                                const seconds = match ? match[1] : 'alguns';
+                                throw new Error(`Muitas tentativas de login. Por segurança, aguarde ${seconds} segundos antes de tentar novamente.`);
                             } else {
-                                // Outro erro - continuar para próxima tentativa
+                                // Outros erros - tentar próxima variação ou fallback local
                                 continue;
                             }
                         }
