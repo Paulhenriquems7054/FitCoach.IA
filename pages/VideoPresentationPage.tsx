@@ -103,7 +103,7 @@ const VideoPresentationPage: React.FC = () => {
     }
 
     // Redirecionar para login
-    window.location.hash = '/login';
+    window.location.hash = '#/login';
   };
 
   return (

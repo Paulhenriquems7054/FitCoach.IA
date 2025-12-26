@@ -114,8 +114,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
     if (checkoutUrl) {
       window.open(checkoutUrl, '_blank');
     } else {
-      // Se não tem checkout URL, redirecionar para login
-      window.location.hash = '#/login';
+      // Se não tem checkout URL, marcar landing como vista e redirecionar para presentation
+      const LANDING_SEEN_KEY = 'fitcoach.landing.seen';
+      try {
+        localStorage.setItem(LANDING_SEEN_KEY, 'true');
+        window.dispatchEvent(new Event('landing-seen'));
+      } catch (error) {
+        console.warn('Não foi possível salvar flag de landing vista', error);
+      }
+      window.location.hash = '#/presentation';
     }
   };
 
@@ -172,9 +179,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
       navigator.vibrate(50);
     }
     
-    // Redirecionar direto para LoginPage completa
+    // Marcar landing como vista
+    const LANDING_SEEN_KEY = 'fitcoach.landing.seen';
+    try {
+      localStorage.setItem(LANDING_SEEN_KEY, 'true');
+      // Disparar evento customizado para notificar App.tsx
+      window.dispatchEvent(new Event('landing-seen'));
+    } catch (error) {
+      console.warn('Não foi possível salvar flag de landing vista', error);
+    }
+    
+    // Redirecionar para Presentation (fluxo correto: Landing -> Presentation -> Login)
     setTimeout(() => {
-      window.location.hash = '#/login';
+      window.location.hash = '#/presentation';
       setSliderPosition(0);
       setTextOpacity(1);
     }, 200);
@@ -214,9 +231,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
     }
 
     try {
-      // Redirecionar para página de login com dados pré-preenchidos
-      // O usuário pode fazer cadastro direto na página de login
-      window.location.hash = '#/login';
+      // Marcar landing como vista e redirecionar para presentation (fluxo correto)
+      const LANDING_SEEN_KEY = 'fitcoach.landing.seen';
+      try {
+        localStorage.setItem(LANDING_SEEN_KEY, 'true');
+        window.dispatchEvent(new Event('landing-seen'));
+      } catch (error) {
+        console.warn('Não foi possível salvar flag de landing vista', error);
+      }
+      window.location.hash = '#/presentation';
     } catch (error) {
       logger.error('Erro ao cadastrar', 'LandingPage', error);
       showError('Erro ao cadastrar. Tente novamente.');
@@ -285,7 +308,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
         <div className="flex-1 flex justify-end">
           {screen === 'home' && (
             <button
-              onClick={() => window.location.hash = '#/login'}
+              onClick={() => {
+                // Marcar landing como vista antes de redirecionar
+                const LANDING_SEEN_KEY = 'fitcoach.landing.seen';
+                try {
+                  localStorage.setItem(LANDING_SEEN_KEY, 'true');
+                  window.dispatchEvent(new Event('landing-seen'));
+                } catch (error) {
+                  console.warn('Não foi possível salvar flag de landing vista', error);
+                }
+                // Redirecionar para presentation (fluxo correto)
+                window.location.hash = '#/presentation';
+              }}
               className="px-4 py-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
             >
               Entrar
