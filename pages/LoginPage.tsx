@@ -977,13 +977,10 @@ const LoginPage: React.FC = () => {
                             
                             // Buscar perfil do usuário
                             const { authService } = await import('../services/supabaseService');
-                            const userProfile = await authService.getCurrentUserProfile();
+                            let userProfile = await authService.getCurrentUserProfile();
                             
-                            if (userProfile) {
-                                user = userProfile;
-                                break;
-                            } else {
-                                // Se não encontrou perfil, tentar buscar da tabela users
+                            // Se não encontrou perfil, tentar buscar da tabela users diretamente
+                            if (!userProfile) {
                                 const { data: userData } = await supabase
                                     .from('users')
                                     .select('*')
@@ -992,7 +989,7 @@ const LoginPage: React.FC = () => {
                                 
                                 if (userData) {
                                     // Converter dados do Supabase para formato User manualmente
-                                    user = {
+                                    userProfile = {
                                         id: userData.id,
                                         nome: userData.nome || sanitizedUsername,
                                         username: userData.username || sanitizedUsername,
@@ -1012,8 +1009,86 @@ const LoginPage: React.FC = () => {
                                         planType: (userData.plan_type as any) || 'free',
                                         subscriptionStatus: (userData.subscription_status as any) || 'active',
                                     };
-                                    break;
                                 }
+                            }
+                            
+                            // Se ainda não encontrou perfil, criar automaticamente
+                            if (!userProfile) {
+                                logger.warn(`Perfil não encontrado para usuário ${authData.user.id}, criando perfil automaticamente`, 'LoginPage');
+                                
+                                try {
+                                    // Obter metadata do usuário do auth (pode ter nome e username)
+                                    const authUserMetadata = authData.user.user_metadata || {};
+                                    const nomeFromMetadata = authUserMetadata.nome || sanitizedUsername || 'Usuário';
+                                    const usernameFromMetadata = authUserMetadata.username || sanitizedUsername;
+                                    
+                                    // Criar perfil básico na tabela users
+                                    const { data: newUserData, error: createError } = await supabase
+                                        .from('users')
+                                        .insert({
+                                            id: authData.user.id,
+                                            nome: nomeFromMetadata,
+                                            username: usernameFromMetadata,
+                                            email: email,
+                                            idade: 0,
+                                            genero: 'Masculino',
+                                            peso: 0,
+                                            altura: 0,
+                                            objetivo: 'perder peso',
+                                            points: 0,
+                                            discipline_score: 0,
+                                            completed_challenge_ids: null,
+                                            is_anonymized: false,
+                                            role: 'user',
+                                            plan_type: 'free',
+                                            subscription_status: 'trial',
+                                            voice_daily_limit_seconds: 300,
+                                            voice_used_today_seconds: 0,
+                                            voice_balance_upsell: 0,
+                                            text_msg_count_today: 0,
+                                            trial_start_date: new Date().toISOString(),
+                                            trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 dias
+                                            expiry_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+                                        })
+                                        .select()
+                                        .single();
+                                    
+                                    if (createError) {
+                                        logger.error('Erro ao criar perfil automaticamente', 'LoginPage', createError);
+                                        // Continuar - não bloquear login
+                                    } else if (newUserData) {
+                                        logger.info('Perfil criado automaticamente com sucesso', 'LoginPage');
+                                        // Converter para formato User
+                                        userProfile = {
+                                            id: newUserData.id,
+                                            nome: newUserData.nome || nomeFromMetadata,
+                                            username: newUserData.username || usernameFromMetadata,
+                                            email: newUserData.email || email,
+                                            idade: newUserData.idade || 0,
+                                            genero: newUserData.genero || 'Masculino',
+                                            peso: newUserData.peso || 0,
+                                            altura: newUserData.altura || 0,
+                                            objetivo: (newUserData.objetivo || 'perder peso') as any,
+                                            points: newUserData.points || 0,
+                                            disciplineScore: newUserData.discipline_score || 0,
+                                            completedChallengeIds: newUserData.completed_challenge_ids || [],
+                                            isAnonymized: newUserData.is_anonymized || false,
+                                            weightHistory: [],
+                                            role: newUserData.role || 'user',
+                                            subscription: 'free',
+                                            planType: (newUserData.plan_type as any) || 'free',
+                                            subscriptionStatus: (newUserData.subscription_status as any) || 'trial',
+                                        };
+                                    }
+                                } catch (createProfileError) {
+                                    logger.error('Exceção ao criar perfil automaticamente', 'LoginPage', createProfileError);
+                                    // Continuar - não bloquear login
+                                }
+                            }
+                            
+                            if (userProfile) {
+                                user = userProfile;
+                                break;
                             }
                         } else if (authError) {
                             // Verificar tipo de erro específico
