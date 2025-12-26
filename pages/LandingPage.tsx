@@ -12,12 +12,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Logo } from '../components/Logo';
 import { ChevronLeftIcon } from '../components/icons/ChevronLeftIcon';
+import { MoonIcon } from '../components/icons/MoonIcon';
+import { SunIcon } from '../components/icons/SunIcon';
 import { validateCoupon } from '../services/couponService';
 import { useToast } from '../components/ui/Toast';
+import { useTheme } from '../context/ThemeContext';
 import { logger } from '../utils/logger';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { getSubscriptionPlans } from '../services/supabaseService';
 
 interface LandingPageProps {
   onGetStarted: () => void;    // Chamado ao fazer login → inicia onboarding
@@ -242,10 +244,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
       {screen === 'home' && <TopographicLines />}
 
       {/* Header fixo */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 sm:px-6 py-4 bg-white/80 backdrop-blur-md border-b border-emerald-100">
+      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 sm:px-6 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-emerald-100 dark:border-emerald-900">
         <div className="flex-1"></div>
         <Logo size="md" />
-        <div className="flex-1 flex justify-end">
+        <div className="flex-1 flex justify-end items-center gap-3">
+          {/* Botão de tema */}
+          <button
+            onClick={handleToggleTheme}
+            className="p-2 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+            aria-label={`Alternar tema (${getThemeLabel()})`}
+            title={`Tema: ${getThemeLabel()}`}
+          >
+            {getThemeIcon()}
+            <span className="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-slate-900 dark:bg-slate-700 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+              {getThemeLabel()}
+            </span>
+          </button>
           {screen === 'home' && (
             <button
               onClick={() => {
@@ -260,7 +274,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
                 // Redirecionar para login (fluxo: Landing -> Login)
                 window.location.hash = '#/login';
               }}
-              className="px-4 py-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
+              className="px-4 py-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
             >
               Entrar
             </button>
