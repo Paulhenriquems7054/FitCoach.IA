@@ -850,11 +850,11 @@ const LoginPage: React.FC = () => {
             let loginMethod = '';
 
             // Tentar login no Supabase primeiro (usuários criados com cupom)
+            let emailFromDB: string | null = null; // Declarar fora do try para uso posterior
             try {
                 const supabase = getSupabaseClient();
                 
                 // Primeiro, tentar buscar o usuário na tabela users pelo username OU email para obter o email
-                let emailFromDB: string | null = null;
                 let userIdFromDB: string | null = null;
                 try {
                     // Se o input parece email, buscar por email primeiro
