@@ -12,7 +12,7 @@ import { SparklesIcon } from './icons/SparklesIcon';
 import { logger } from '../utils/logger';
 
 export const TrialExpiredPaywall: React.FC = () => {
-    const { user } = useUser();
+  const { user } = useUser();
     const [showPaywall, setShowPaywall] = useState(false);
     const [isChecking, setIsChecking] = useState(true);
 
@@ -35,7 +35,7 @@ export const TrialExpiredPaywall: React.FC = () => {
                 // Mostrar paywall se trial expirou ou não tem acesso
                 if (!accessStatus.hasAccess && (accessStatus.reason === 'trial_expired' || accessStatus.reason === 'none')) {
                     setShowPaywall(true);
-                } else {
+    } else {
                     setShowPaywall(false);
                 }
             } catch (error) {
@@ -59,7 +59,7 @@ export const TrialExpiredPaywall: React.FC = () => {
     }
 
     // Renderizar paywall modal obrigatório
-    return (
+  return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" aria-modal="true">
             <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up">
                 <div className="p-6 sm:p-8">
@@ -67,15 +67,15 @@ export const TrialExpiredPaywall: React.FC = () => {
                     <div className="text-center mb-6">
                         <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 mb-4">
                             <SparklesIcon className="h-8 w-8 text-white" />
-                        </div>
+            </div>
                         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
                             Seu período de teste da IA acabou
-                        </h2>
+            </h2>
                         <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">
                             A plataforma é oferecida pela sua academia. A ativação da IA é individual.
-                        </p>
-                    </div>
-
+            </p>
+          </div>
+          
                     {/* Benefícios da IA */}
                     <div className="mb-6 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
                         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
@@ -99,27 +99,27 @@ export const TrialExpiredPaywall: React.FC = () => {
                                 <span>Conversa por voz com assistente nutricional</span>
                             </li>
                         </ul>
-                    </div>
-
+            </div>
+          
                     {/* Call to Action */}
                     <div className="flex flex-col gap-3">
-                        <Button
+            <Button
                             onClick={() => {
                                 // Redirecionar para página de planos de IA (aluno)
                                 window.location.hash = '#/student-ai-plans';
                             }}
                             variant="primary"
                             className="w-full text-base sm:text-lg py-3"
-                            size="lg"
-                        >
+              size="lg"
+            >
                             Ver Planos de IA
-                        </Button>
+            </Button>
                         <p className="text-xs text-center text-slate-500 dark:text-slate-400">
                             Você continuará tendo acesso à plataforma básica da sua academia
-                        </p>
-                    </div>
-                </div>
-            </Card>
+            </p>
+          </div>
         </div>
-    );
+      </Card>
+    </div>
+  );
 };
