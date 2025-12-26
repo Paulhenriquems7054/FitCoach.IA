@@ -244,19 +244,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 sm:px-6 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-emerald-100 dark:border-emerald-900">
         <div className="flex-1"></div>
         <Logo size="md" />
-        <div className="flex-1 flex justify-end items-center gap-3">
-          {/* Botão de tema */}
-          <button
-            onClick={handleToggleTheme}
-            className="p-2 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
-            aria-label={`Alternar tema (${getThemeLabel()})`}
-            title={`Tema: ${getThemeLabel()}`}
-          >
-            {getThemeIcon()}
-            <span className="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-slate-900 dark:bg-slate-700 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-              {getThemeLabel()}
-            </span>
-          </button>
+        <div className="flex-1 flex justify-end">
           {screen === 'home' && (
             <button
               onClick={() => {
@@ -307,7 +295,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
             <div className="w-full max-w-md mx-auto mb-4">
               <div
                 ref={sliderBarRef}
-                className="relative w-full h-16 bg-[#1A4D2E] rounded-full shadow-lg overflow-hidden"
+                className="relative w-full h-16 bg-[#1A4D2E] dark:bg-emerald-700 rounded-full shadow-lg overflow-hidden"
                 style={{
                   position: 'relative',
                 }}
@@ -331,7 +319,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
                   className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
                   style={{ opacity: textOpacity }}
                 >
-                  <span className="text-[#F5F1E8] font-semibold text-sm sm:text-base tracking-wider">
+                  <span className="text-[#F5F1E8] dark:text-slate-200 font-semibold text-sm sm:text-base tracking-wider">
                     DESLIZE PARA ENTRAR
                   </span>
                 </div>
