@@ -1460,7 +1460,7 @@ const LoginPage: React.FC = () => {
                         )}
 
                         {/* Bloco: Primeiro acesso com código de convite */}
-                        <div className="mb-6 p-4 rounded-lg border border-dashed border-primary-300/70 bg-primary-50/70 dark:bg-slate-900/40 dark:border-primary-500/60">
+                        <div className="mb-6 p-4 rounded-lg border border-dashed border-slate-300/70 dark:border-slate-600/70 bg-slate-100/50 dark:bg-slate-800/60">
                             <p className="text-sm font-semibold text-primary-800 dark:text-primary-300 mb-3">
                                 Primeiro acesso?
                             </p>
