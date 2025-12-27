@@ -12,8 +12,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Logo } from '../components/Logo';
 import { ChevronLeftIcon } from '../components/icons/ChevronLeftIcon';
+import { MoonIcon } from '../components/icons/MoonIcon';
+import { SunIcon } from '../components/icons/SunIcon';
 import { validateCoupon } from '../services/couponService';
 import { useToast } from '../components/ui/Toast';
+import { useTheme } from '../context/ThemeContext';
 import { logger } from '../utils/logger';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -43,6 +46,7 @@ interface SubscriptionPlan {
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDevSkip }) => {
+  const { theme, themeSetting, setThemeSetting } = useTheme();
   const [screen, setScreen] = useState<ScreenState>('home');
   const [sliderPosition, setSliderPosition] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -63,6 +67,48 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
       maxSliderWidthRef.current = sliderBarRef.current.offsetWidth - 56; // 56px = largura do knob
     }
   }, [screen]);
+
+  // Funções para controle do tema
+  const handleToggleTheme = () => {
+    if (themeSetting === 'dark') {
+      setThemeSetting('light');
+    } else if (themeSetting === 'light') {
+      setThemeSetting('system');
+    } else {
+      setThemeSetting('dark');
+    }
+  };
+
+  const getThemeIcon = () => {
+    if (themeSetting === 'system') {
+      return (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+          stroke="currentColor"
+          className="w-5 h-5"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z"
+          />
+        </svg>
+      );
+    }
+    return theme === 'dark' ? (
+      <MoonIcon className="w-5 h-5" />
+    ) : (
+      <SunIcon className="w-5 h-5" />
+    );
+  };
+
+  const getThemeLabel = () => {
+    if (themeSetting === 'system') return 'Sistema';
+    return theme === 'dark' ? 'Escuro' : 'Claro';
+  };
 
 
   // Handlers do slider
@@ -273,7 +319,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
           <div className="w-full max-w-4xl space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
             {/* Hero Section */}
             <div className="text-center space-y-6">
-              <div className="inline-block p-6 sm:p-8 bg-white/20 dark:bg-slate-800/20 backdrop-blur-md rounded-[2.5rem] sm:rounded-[3.5rem] shadow-2xl border border-white/30 dark:border-slate-700/30">
+              <div className="relative inline-block p-6 sm:p-8 bg-white/20 dark:bg-slate-800/20 backdrop-blur-md rounded-[2.5rem] sm:rounded-[3.5rem] shadow-2xl border border-white/30 dark:border-slate-700/30">
+                {/* Botão de modo escuro */}
+                <button
+                  onClick={handleToggleTheme}
+                  className="absolute top-4 right-4 p-2 rounded-md text-slate-600 dark:text-slate-400 hover:bg-white/30 dark:hover:bg-slate-700/50 transition-colors group"
+                  aria-label={`Alternar tema (${getThemeLabel()})`}
+                  title={`Tema: ${getThemeLabel()}`}
+                >
+                  {getThemeIcon()}
+                  <span className="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-slate-900 dark:bg-slate-700 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                    {getThemeLabel()}
+                  </span>
+                </button>
                 <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif text-[#1A4D2E] dark:text-emerald-400 mb-4">
                   Treinos e Nutrição Consciente
                 </h1>
