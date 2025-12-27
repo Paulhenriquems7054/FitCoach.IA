@@ -452,6 +452,22 @@ const LoginPage: React.FC = () => {
             }
 
             const userId = authData.user.id;
+
+            // IMPORTANTE: Fazer login após signup para garantir sessão ativa
+            // Isso permite que as políticas RLS funcionem corretamente (auth.uid() será válido)
+            logger.info('Fazendo login após signup para garantir sessão ativa', 'LoginPage');
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                email: sanitizedEmail,
+                password: signupPassword,
+            });
+
+            if (signInError) {
+                logger.warn('Erro ao fazer login após signup, continuando mesmo assim...', 'LoginPage', signInError);
+                // Continuar mesmo assim - em alguns casos a sessão já pode estar ativa após signUp
+                // Ou podemos tentar criar o perfil mesmo sem sessão (vai usar função RPC como fallback)
+            } else if (signInData?.user) {
+                logger.info('Login após signup bem-sucedido, sessão ativa', 'LoginPage');
+            }
             const username = sanitizeInput(signupName.trim().toLowerCase().replace(/\s+/g, '_'), 50);
 
             // Verificar se username já existe (local E Supabase)
