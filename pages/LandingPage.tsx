@@ -9,7 +9,7 @@
  * - Glassmorphism e animações
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Logo } from '../components/Logo';
 import { ChevronLeftIcon } from '../components/icons/ChevronLeftIcon';
 import { MoonIcon } from '../components/icons/MoonIcon';
@@ -48,11 +48,25 @@ interface SubscriptionPlan {
 const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDevSkip }) => {
   const { theme, themeSetting, setThemeSetting } = useTheme();
   const [screen, setScreen] = useState<ScreenState>('home');
+  const [sliderPosition, setSliderPosition] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [textOpacity, setTextOpacity] = useState(1);
   const [couponCode, setCouponCode] = useState('');
   const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' });
   const [isValidating, setIsValidating] = useState(false);
   
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const sliderBarRef = useRef<HTMLDivElement>(null);
+  const startXRef = useRef(0);
+  const maxSliderWidthRef = useRef(0);
   const { showSuccess, showError } = useToast();
+
+  // Atualizar largura máxima do slider quando o componente montar ou a tela mudar
+  useEffect(() => {
+    if (sliderBarRef.current) {
+      maxSliderWidthRef.current = sliderBarRef.current.offsetWidth - 56; // 56px = largura do knob
+    }
+  }, [screen]);
 
   // Funções para controle do tema
   const handleToggleTheme = () => {
@@ -72,8 +86,59 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
   };
 
 
-  // Handler para clicar na logo e redirecionar para login
-  const handleLogoClick = () => {
+  // Handlers do slider
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (screen !== 'home') return;
+    setIsDragging(true);
+    startXRef.current = e.clientX - sliderPosition;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging || screen !== 'home') return;
+    
+    const maxWidth = maxSliderWidthRef.current;
+    const newPosition = Math.max(0, Math.min(maxWidth, e.clientX - startXRef.current));
+    setSliderPosition(newPosition);
+    
+    // Calcular opacidade do texto (desaparece gradualmente)
+    const progress = maxWidth > 0 ? newPosition / maxWidth : 0;
+    setTextOpacity(Math.max(0, 1 - progress * 1.5));
+    
+    // Se chegou a 85%, completar automaticamente
+    if (progress >= 0.85) {
+      handleSliderComplete();
+    }
+  };
+
+  const handlePointerUp = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    
+    // Se chegou a 85%, completar
+    const maxWidth = maxSliderWidthRef.current;
+    const progress = maxWidth > 0 ? sliderPosition / maxWidth : 0;
+    if (progress >= 0.85) {
+      handleSliderComplete();
+    } else {
+      // Voltar à posição inicial
+      setSliderPosition(0);
+      setTextOpacity(1);
+    }
+  };
+
+  const handlePointerLeave = () => {
+    if (isDragging) {
+      handlePointerUp();
+    }
+  };
+
+  const handleSliderComplete = () => {
+    // Vibração (se suportado)
+    if ('vibrate' in navigator) {
+      navigator.vibrate(50);
+    }
+    
     // Marcar landing como vista
     const LANDING_SEEN_KEY = 'fitcoach.landing.seen';
     try {
@@ -85,7 +150,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
     }
     
     // Redirecionar para Login (fluxo: Landing -> Login)
-    window.location.hash = '#/login';
+    setTimeout(() => {
+      window.location.hash = '#/login';
+      setSliderPosition(0);
+      setTextOpacity(1);
+    }, 200);
   };
 
   // Handler de validação de cupom
@@ -253,16 +322,56 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
               </div>
             </div>
 
-            {/* Logo FitCoach */}
-            <div className="w-full max-w-md mx-auto mb-4 flex justify-center">
-              <button
-                onClick={handleLogoClick}
-                className="p-4 rounded-full hover:scale-110 transition-transform cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-                aria-label="Ir para página de login"
-                title="Clique para continuar"
+            {/* Slider Interativo */}
+            <div className="w-full max-w-md mx-auto mb-4">
+              <div
+                ref={sliderBarRef}
+                className="relative w-full h-16 bg-[#1A4D2E] dark:bg-emerald-700 rounded-full shadow-lg overflow-hidden"
+                style={{
+                  position: 'relative',
+                }}
               >
-                <Logo size="xl" className="w-32 h-32 sm:w-40 sm:h-40" />
-              </button>
+                {/* Shimmer effect */}
+                <div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  style={{
+                    animation: 'shimmer 2s infinite',
+                  }}
+                />
+                <style>{`
+                  @keyframes shimmer {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(100%); }
+                  }
+                `}</style>
+
+                {/* Texto "DESLIZE PARA ENTRAR" */}
+                <div
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+                  style={{ opacity: textOpacity }}
+                >
+                  <span className="text-[#F5F1E8] dark:text-slate-200 font-semibold text-sm sm:text-base tracking-wider">
+                    DESLIZE PARA ENTRAR
+                  </span>
+                </div>
+
+                {/* Knob arrastável com Logo */}
+                <div
+                  ref={sliderRef}
+                  className="absolute top-2 left-2 w-12 h-12 bg-[#F5F1E8] dark:bg-slate-300 rounded-full shadow-lg cursor-grab active:cursor-grabbing flex items-center justify-center z-20 transition-transform hover:scale-110 overflow-hidden"
+                  style={{
+                    transform: `translateX(${sliderPosition}px)`,
+                    touchAction: 'none',
+                  }}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerLeave={handlePointerLeave}
+                >
+                  {/* Logo FitCoach */}
+                  <Logo size="sm" className="w-8 h-8" />
+                </div>
+              </div>
             </div>
 
 
