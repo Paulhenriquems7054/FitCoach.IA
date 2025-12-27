@@ -595,8 +595,17 @@ const LoginPage: React.FC = () => {
 
             // Criar usuário no Supabase usando função RPC segura
             // Primeiro tentar inserir diretamente, se falhar usar função RPC
+            // IMPORTANTE: A sessão deve estar ativa após signIn acima para RLS funcionar
             let userError = null;
             let userCreatedInDB = false;
+            
+            // Verificar se a sessão está ativa antes de tentar inserir
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            if (!currentUser) {
+                logger.warn('Sessão não está ativa após signup, tentando criar perfil mesmo assim (vai usar função RPC como fallback)', 'LoginPage');
+            } else {
+                logger.info(`Sessão ativa confirmada para usuário: ${currentUser.id}`, 'LoginPage');
+            }
             
             try {
                 const { data: insertData, error: directInsertError } = await supabase
