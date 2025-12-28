@@ -23,12 +23,13 @@ ORDER BY ordinal_position;
 
 -- 3. Verificar constraints (CHECK constraints especialmente importantes)
 SELECT 
-    constraint_name,
-    constraint_type,
-    check_clause
+    tc.constraint_name,
+    tc.constraint_type,
+    cc.check_clause
 FROM information_schema.table_constraints tc
 LEFT JOIN information_schema.check_constraints cc 
     ON tc.constraint_name = cc.constraint_name
+    AND tc.table_schema = cc.constraint_schema
 WHERE tc.table_schema = 'public'
 AND tc.table_name = 'users'
 AND tc.constraint_type IN ('CHECK', 'FOREIGN KEY', 'PRIMARY KEY', 'UNIQUE');

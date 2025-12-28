@@ -27,6 +27,7 @@
 -- - updated_at (TIMESTAMPTZ)
 
 -- Verificar quais desses campos existem
+-- Incluindo campos extras identificados na tabela
 WITH campos_esperados AS (
     SELECT unnest(ARRAY[
         'id', 'nome', 'username', 'email', 'idade', 'genero', 'peso', 'altura',
@@ -35,7 +36,13 @@ WITH campos_esperados AS (
         'expiry_date', 'subscription_expiry', 'trial_end_date',
         'voice_daily_limit_seconds', 'voice_used_today_seconds',
         'voice_balance_upsell', 'text_msg_count_today',
-        'created_at', 'updated_at'
+        'created_at', 'updated_at',
+        -- Campos extras identificados
+        'photo_url', 'gym_id', 'gym_role', 'is_gym_managed', 'matricula',
+        'data_permissions', 'security_settings', 'access_blocked', 'blocked_at',
+        'blocked_by', 'blocked_reason', 'last_sync_at', 'gym_server_url',
+        'last_usage_date', 'last_msg_date', 'academy_id', 'tenant_role',
+        'ai_subscription_status', 'ai_trial_start_at', 'ai_trial_end_at', 'ai_plan_type'
     ]) AS campo_esperado
 )
 SELECT 
@@ -55,7 +62,7 @@ ORDER BY
     CASE WHEN c.column_name IS NOT NULL THEN 0 ELSE 1 END,
     ce.campo_esperado;
 
--- Verificar campos que existem mas não estão na lista esperada (pode ser campos extras)
+-- Verificar campos que existem mas não estão na lista esperada (pode ser campos extras não documentados)
 SELECT 
     c.column_name AS campo_extra,
     c.data_type,
@@ -70,7 +77,13 @@ AND LOWER(c.column_name) NOT IN (
     'expiry_date', 'subscription_expiry', 'trial_end_date',
     'voice_daily_limit_seconds', 'voice_used_today_seconds',
     'voice_balance_upsell', 'text_msg_count_today',
-    'created_at', 'updated_at'
+    'created_at', 'updated_at',
+    -- Campos extras já identificados
+    'photo_url', 'gym_id', 'gym_role', 'is_gym_managed', 'matricula',
+    'data_permissions', 'security_settings', 'access_blocked', 'blocked_at',
+    'blocked_by', 'blocked_reason', 'last_sync_at', 'gym_server_url',
+    'last_usage_date', 'last_msg_date', 'academy_id', 'tenant_role',
+    'ai_subscription_status', 'ai_trial_start_at', 'ai_trial_end_at', 'ai_plan_type'
 )
 ORDER BY c.ordinal_position;
 
