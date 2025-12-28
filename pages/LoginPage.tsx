@@ -453,6 +453,24 @@ const LoginPage: React.FC = () => {
 
             const userId = authData.user.id;
 
+            // IMPORTANTE: Aguardar um pouco para garantir que o usuário foi commitado em auth.users
+            // Isso previne erro de foreign key constraint
+            logger.info('Aguardando confirmação de criação do usuário em auth.users...', 'LoginPage');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Verificar se o usuário foi criado corretamente em auth.users
+            const { data: { user: authUserCheck }, error: authCheckError } = await supabase.auth.getUser();
+            if (!authUserCheck || authUserCheck.id !== userId) {
+                // Se ainda não está disponível, aguardar mais um pouco
+                logger.warn('Usuário ainda não disponível em auth.users, aguardando mais...', 'LoginPage');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const { data: { user: retryAuthUser } } = await supabase.auth.getUser();
+                if (!retryAuthUser || retryAuthUser.id !== userId) {
+                    logger.error('Usuário não foi criado corretamente em auth.users após múltiplas tentativas', 'LoginPage');
+                    // Continuar mesmo assim, a função RPC vai retornar erro se não existir
+                }
+            }
+
             // IMPORTANTE: Fazer login após signup para garantir sessão ativa
             // Isso permite que as políticas RLS funcionem corretamente (auth.uid() será válido)
             logger.info('Fazendo login após signup para garantir sessão ativa', 'LoginPage');
@@ -650,7 +668,7 @@ const LoginPage: React.FC = () => {
                 userError = directError as any;
             }
 
-            // Se inserção direta falhou, tentar função RPC
+            // Se inserção direta falhou, tentar função RPC com retry logic
             if (!userCreatedInDB && userError) {
                 try {
                     // Preparar dados do usuário em JSONB conforme a função espera
@@ -692,11 +710,44 @@ const LoginPage: React.FC = () => {
                         rpcParams.p_expiry_date = userData.expiryDate;
                     }
 
-                    logger.info('Chamando função RPC com parâmetros:', 'LoginPage', rpcParams);
-                    const { data: rpcData, error: rpcError } = await supabase.rpc('insert_user_profile_after_signup', rpcParams);
+                    // Função de retry para lidar com timing issues (foreign key constraint)
+                    const retryRpcCall = async (params: any, maxRetries = 3, delay = 1000): Promise<{ data: any; error: any }> => {
+                        for (let attempt = 0; attempt < maxRetries; attempt++) {
+                            try {
+                                logger.info(`Tentativa ${attempt + 1}/${maxRetries} de chamar função RPC`, 'LoginPage');
+                                const { data, error } = await supabase.rpc('insert_user_profile_after_signup', params);
+                                
+                                if (!error) {
+                                    return { data, error: null };
+                                }
+                                
+                                // Se for erro de foreign key (usuário não existe em auth.users), aguardar e tentar novamente
+                                if (error.code === '23503' || error.message?.includes('foreign key constraint') || error.message?.includes('não existe em auth.users')) {
+                                    if (attempt < maxRetries - 1) {
+                                        logger.warn(`Tentativa ${attempt + 1} falhou (usuário ainda não disponível em auth.users), aguardando ${delay}ms antes de tentar novamente...`, 'LoginPage');
+                                        await new Promise(resolve => setTimeout(resolve, delay));
+                                        continue;
+                                    }
+                                }
+                                
+                                // Para outros erros, retornar imediatamente
+                                return { data, error };
+                            } catch (err: any) {
+                                if (attempt === maxRetries - 1) {
+                                    return { data: null, error: err };
+                                }
+                                logger.warn(`Exceção na tentativa ${attempt + 1}, aguardando ${delay}ms...`, 'LoginPage');
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                            }
+                        }
+                        return { data: null, error: new Error('Máximo de tentativas atingido') };
+                    };
+
+                    logger.info('Chamando função RPC com parâmetros (com retry):', 'LoginPage', rpcParams);
+                    const { data: rpcData, error: rpcError } = await retryRpcCall(rpcParams);
 
                     if (rpcError) {
-                        logger.error('Erro ao criar usuário via função RPC', 'LoginPage', rpcError);
+                        logger.error('Erro ao criar usuário via função RPC após todas as tentativas', 'LoginPage', rpcError);
                         logger.error('Detalhes do erro RPC:', 'LoginPage', {
                             message: rpcError.message,
                             code: rpcError.code,

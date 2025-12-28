@@ -40,7 +40,16 @@ DECLARE
     inserted_id UUID;
     inserted_nome TEXT;
     inserted_username TEXT;
+    auth_user_exists BOOLEAN;
 BEGIN
+    -- Verificar se o usuário existe em auth.users antes de inserir
+    -- Isso previne erro de foreign key constraint se o signup ainda não foi commitado
+    SELECT EXISTS(SELECT 1 FROM auth.users WHERE id = p_user_id) INTO auth_user_exists;
+    
+    IF NOT auth_user_exists THEN
+        RAISE EXCEPTION 'Usuário com ID % não existe em auth.users. Aguarde a conclusão do cadastro antes de criar o perfil.', p_user_id;
+    END IF;
+    
     -- Inserir perfil do usuário
     -- Esta função usa SECURITY DEFINER para bypass RLS
     INSERT INTO public.users (
