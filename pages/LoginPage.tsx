@@ -444,47 +444,55 @@ const LoginPage: React.FC = () => {
             });
 
             if (authError) {
+                logger.error('Erro ao criar conta no Supabase Auth', 'LoginPage', authError);
                 throw new Error(authError.message || 'Erro ao criar conta');
             }
 
             if (!authData.user) {
+                logger.error('Signup retornou sucesso mas sem usuário', 'LoginPage', authData);
                 throw new Error('Erro ao criar usuário');
             }
 
             const userId = authData.user.id;
+            logger.info(`Usuário criado no Supabase Auth com ID: ${userId}`, 'LoginPage');
 
             // IMPORTANTE: Aguardar um pouco para garantir que o usuário foi commitado em auth.users
             // Isso previne erro de foreign key constraint
             logger.info('Aguardando confirmação de criação do usuário em auth.users...', 'LoginPage');
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Verificar se o usuário foi criado corretamente em auth.users
-            const { data: { user: authUserCheck }, error: authCheckError } = await supabase.auth.getUser();
-            if (!authUserCheck || authUserCheck.id !== userId) {
-                // Se ainda não está disponível, aguardar mais um pouco
-                logger.warn('Usuário ainda não disponível em auth.users, aguardando mais...', 'LoginPage');
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                const { data: { user: retryAuthUser } } = await supabase.auth.getUser();
-                if (!retryAuthUser || retryAuthUser.id !== userId) {
-                    logger.error('Usuário não foi criado corretamente em auth.users após múltiplas tentativas', 'LoginPage');
-                    // Continuar mesmo assim, a função RPC vai retornar erro se não existir
+            // NOTA: Não tentar fazer login imediatamente se email confirmation estiver habilitado
+            // A função RPC com SECURITY DEFINER pode criar o perfil mesmo sem sessão ativa
+            // Tentar fazer login apenas se necessário, mas não bloquear se falhar
+            let sessionActive = false;
+            try {
+                const { data: { user: authUserCheck } } = await supabase.auth.getUser();
+                if (authUserCheck && authUserCheck.id === userId) {
+                    sessionActive = true;
+                    logger.info('Sessão já está ativa após signup', 'LoginPage');
                 }
+            } catch (checkError) {
+                logger.debug('Verificação de sessão falhou (esperado se email confirmation estiver habilitado)', 'LoginPage');
             }
 
-            // IMPORTANTE: Fazer login após signup para garantir sessão ativa
-            // Isso permite que as políticas RLS funcionem corretamente (auth.uid() será válido)
-            logger.info('Fazendo login após signup para garantir sessão ativa', 'LoginPage');
-            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-                email: sanitizedEmail,
-                password: signupPassword,
-            });
+            // Tentar fazer login apenas se a sessão não estiver ativa
+            // Se email confirmation estiver habilitado, o login falhará, mas isso é OK
+            if (!sessionActive) {
+                logger.info('Tentando fazer login após signup para garantir sessão ativa', 'LoginPage');
+                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                    email: sanitizedEmail,
+                    password: signupPassword,
+                });
 
-            if (signInError) {
-                logger.warn('Erro ao fazer login após signup, continuando mesmo assim...', 'LoginPage', signInError);
-                // Continuar mesmo assim - em alguns casos a sessão já pode estar ativa após signUp
-                // Ou podemos tentar criar o perfil mesmo sem sessão (vai usar função RPC como fallback)
-            } else if (signInData?.user) {
-                logger.info('Login após signup bem-sucedido, sessão ativa', 'LoginPage');
+                if (signInError) {
+                    // Se email confirmation estiver habilitado, isso é esperado
+                    logger.warn('Erro ao fazer login após signup (pode ser email confirmation habilitado)', 'LoginPage', signInError);
+                    logger.info('Continuando com criação de perfil usando função RPC (funciona sem sessão)', 'LoginPage');
+                    // Continuar mesmo assim - função RPC com SECURITY DEFINER funciona sem sessão
+                } else if (signInData?.user) {
+                    sessionActive = true;
+                    logger.info('Login após signup bem-sucedido, sessão ativa', 'LoginPage');
+                }
             }
             const username = sanitizeInput(signupName.trim().toLowerCase().replace(/\s+/g, '_'), 50);
 
@@ -612,23 +620,30 @@ const LoginPage: React.FC = () => {
             }
 
             // Criar usuário no Supabase usando função RPC segura
-            // Primeiro tentar inserir diretamente, se falhar usar função RPC
-            // IMPORTANTE: A sessão deve estar ativa após signIn acima para RLS funcionar
+            // Se sessão não estiver ativa (email confirmation), ir direto para função RPC
             let userError = null;
             let userCreatedInDB = false;
             
-            // Verificar se a sessão está ativa antes de tentar inserir
-            const { data: { user: currentUser } } = await supabase.auth.getUser();
-            if (!currentUser) {
-                logger.warn('Sessão não está ativa após signup, tentando criar perfil mesmo assim (vai usar função RPC como fallback)', 'LoginPage');
-            } else {
-                logger.info(`Sessão ativa confirmada para usuário: ${currentUser.id}`, 'LoginPage');
+            // Verificar se a sessão está ativa antes de tentar inserir diretamente
+            let shouldTryDirectInsert = false;
+            try {
+                const { data: { user: currentUser } } = await supabase.auth.getUser();
+                if (currentUser && currentUser.id === userId) {
+                    shouldTryDirectInsert = true;
+                    logger.info(`Sessão ativa confirmada para usuário: ${currentUser.id}`, 'LoginPage');
+                } else {
+                    logger.info('Sessão não está ativa (esperado se email confirmation estiver habilitado), usando função RPC diretamente', 'LoginPage');
+                }
+            } catch (sessionError) {
+                logger.info('Não foi possível verificar sessão, usando função RPC diretamente', 'LoginPage');
             }
             
-            try {
-                const { data: insertData, error: directInsertError } = await supabase
-                    .from('users')
-                    .insert({
+            // Tentar inserção direta apenas se sessão estiver ativa
+            if (shouldTryDirectInsert) {
+                try {
+                    const { data: insertData, error: directInsertError } = await supabase
+                        .from('users')
+                        .insert({
                         id: userId,
                         nome: userData.nome,
                         username: usernameToUse,
@@ -655,21 +670,22 @@ const LoginPage: React.FC = () => {
                     })
                     .select(); // Selecionar para verificar se foi criado
 
-                if (directInsertError) {
-                    userError = directInsertError;
-                    logger.warn('Inserção direta falhou, tentando função RPC', 'LoginPage', directInsertError);
-                } else if (insertData && insertData.length > 0) {
-                    userCreatedInDB = true;
-                    logger.info('Usuário criado com sucesso na tabela users (inserção direta)', 'LoginPage');
+                    if (directInsertError) {
+                        userError = directInsertError;
+                        logger.warn('Inserção direta falhou, tentando função RPC', 'LoginPage', directInsertError);
+                    } else if (insertData && insertData.length > 0) {
+                        userCreatedInDB = true;
+                        logger.info('Usuário criado com sucesso na tabela users (inserção direta)', 'LoginPage');
+                    }
+                } catch (directError) {
+                    // Se inserção direta falhar (RLS ou outro erro), usar função RPC
+                    logger.warn('Exceção ao inserir diretamente, tentando função RPC', 'LoginPage', directError);
+                    userError = directError as any;
                 }
-            } catch (directError) {
-                // Se inserção direta falhar (RLS ou outro erro), usar função RPC
-                logger.warn('Exceção ao inserir diretamente, tentando função RPC', 'LoginPage', directError);
-                userError = directError as any;
             }
 
-            // Se inserção direta falhou, tentar função RPC com retry logic
-            if (!userCreatedInDB && userError) {
+            // Se inserção direta falhou ou não foi tentada, tentar função RPC com retry logic
+            if (!userCreatedInDB) {
                 try {
                     // Preparar dados do usuário em JSONB conforme a função espera
                     const userDataJsonb = {
@@ -722,7 +738,7 @@ const LoginPage: React.FC = () => {
                                 }
                                 
                                 // Se for erro de foreign key (usuário não existe em auth.users), aguardar e tentar novamente
-                                if (error.code === '23503' || error.message?.includes('foreign key constraint') || error.message?.includes('não existe em auth.users')) {
+                                if (error.code === '23503' || error.code === 'P0001' || error.message?.includes('foreign key constraint') || error.message?.includes('não existe em auth.users')) {
                                     if (attempt < maxRetries - 1) {
                                         logger.warn(`Tentativa ${attempt + 1} falhou (usuário ainda não disponível em auth.users), aguardando ${delay}ms antes de tentar novamente...`, 'LoginPage');
                                         await new Promise(resolve => setTimeout(resolve, delay));
@@ -730,7 +746,15 @@ const LoginPage: React.FC = () => {
                                     }
                                 }
                                 
-                                // Para outros erros, retornar imediatamente
+                                // Log detalhado do erro para debug
+                                logger.warn(`Erro na tentativa ${attempt + 1} da função RPC:`, 'LoginPage', {
+                                    code: error.code,
+                                    message: error.message,
+                                    details: error.details,
+                                    hint: error.hint
+                                });
+                                
+                                // Para outros erros, retornar imediatamente (não fazer retry)
                                 return { data, error };
                             } catch (err: any) {
                                 if (attempt === maxRetries - 1) {
