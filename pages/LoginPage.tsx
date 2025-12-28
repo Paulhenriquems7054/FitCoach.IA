@@ -730,11 +730,41 @@ const LoginPage: React.FC = () => {
                     const retryRpcCall = async (params: any, maxRetries = 3, delay = 1000): Promise<{ data: any; error: any }> => {
                         for (let attempt = 0; attempt < maxRetries; attempt++) {
                             try {
-                                logger.info(`Tentativa ${attempt + 1}/${maxRetries} de chamar função RPC`, 'LoginPage');
+                                logger.info(`Tentativa ${attempt + 1}/${maxRetries} de chamar função RPC insert_user_profile_after_signup`, 'LoginPage');
+                                logger.debug(`Parâmetros RPC (tentativa ${attempt + 1}):`, 'LoginPage', {
+                                    p_user_id: params.p_user_id,
+                                    p_nome: params.p_nome,
+                                    p_username: params.p_username,
+                                    p_plan_type: params.p_plan_type,
+                                    p_subscription_status: params.p_subscription_status,
+                                    p_email: params.p_email,
+                                    p_voice_daily_limit_seconds: params.p_voice_daily_limit_seconds,
+                                    p_expiry_date: params.p_expiry_date,
+                                    p_user_data_keys: params.p_user_data ? Object.keys(params.p_user_data) : []
+                                });
+                                
                                 const { data, error } = await supabase.rpc('insert_user_profile_after_signup', params);
                                 
                                 if (!error) {
+                                    logger.info(`✅ Função RPC executada com sucesso na tentativa ${attempt + 1}`, 'LoginPage', { data });
                                     return { data, error: null };
+                                }
+                                
+                                // Log detalhado do erro
+                                logger.error(`❌ Erro na tentativa ${attempt + 1} da função RPC:`, 'LoginPage', {
+                                    code: error.code,
+                                    message: error.message,
+                                    details: error.details,
+                                    hint: error.hint,
+                                    status: (error as any).status,
+                                    error: error
+                                });
+                                
+                                // Se for erro 400, pode ser problema de permissões ou parâmetros
+                                if ((error as any).status === 400 || error.code === '42883' || error.message?.includes('function') || error.message?.includes('does not exist')) {
+                                    logger.error('⚠️ ERRO 400 ou função não encontrada - verifique se GRANT EXECUTE foi executado e se a assinatura da função está correta', 'LoginPage');
+                                    // Não fazer retry para esse tipo de erro (é problema de configuração)
+                                    return { data, error };
                                 }
                                 
                                 // Se for erro de foreign key (usuário não existe em auth.users), aguardar e tentar novamente
@@ -746,42 +776,44 @@ const LoginPage: React.FC = () => {
                                     }
                                 }
                                 
-                                // Log detalhado do erro para debug
-                                logger.warn(`Erro na tentativa ${attempt + 1} da função RPC:`, 'LoginPage', {
-                                    code: error.code,
-                                    message: error.message,
-                                    details: error.details,
-                                    hint: error.hint
-                                });
-                                
                                 // Para outros erros, retornar imediatamente (não fazer retry)
                                 return { data, error };
                             } catch (err: any) {
+                                logger.error(`Exceção na tentativa ${attempt + 1} da função RPC:`, 'LoginPage', err);
                                 if (attempt === maxRetries - 1) {
                                     return { data: null, error: err };
                                 }
-                                logger.warn(`Exceção na tentativa ${attempt + 1}, aguardando ${delay}ms...`, 'LoginPage');
+                                logger.warn(`Aguardando ${delay}ms antes de tentar novamente...`, 'LoginPage');
                                 await new Promise(resolve => setTimeout(resolve, delay));
                             }
                         }
                         return { data: null, error: new Error('Máximo de tentativas atingido') };
                     };
 
-                    logger.info('Chamando função RPC com parâmetros (com retry):', 'LoginPage', rpcParams);
+                    logger.info('📞 Chamando função RPC insert_user_profile_after_signup com retry logic', 'LoginPage');
+                    logger.debug('Parâmetros completos que serão enviados para a função RPC:', 'LoginPage', rpcParams);
                     const { data: rpcData, error: rpcError } = await retryRpcCall(rpcParams);
 
                     if (rpcError) {
-                        logger.error('Erro ao criar usuário via função RPC após todas as tentativas', 'LoginPage', rpcError);
-                        logger.error('Detalhes do erro RPC:', 'LoginPage', {
+                        logger.error('❌ ERRO CRÍTICO: Falha ao criar usuário via função RPC após todas as tentativas', 'LoginPage', rpcError);
+                        logger.error('📋 Detalhes completos do erro RPC:', 'LoginPage', {
                             message: rpcError.message,
                             code: rpcError.code,
                             details: rpcError.details,
-                            hint: rpcError.hint
+                            hint: rpcError.hint,
+                            status: (rpcError as any).status,
+                            error_object: rpcError
                         });
+                        
+                        // Se for erro 400, adicionar mensagem específica sobre permissões
+                        if ((rpcError as any).status === 400 || rpcError.code === '42883') {
+                            logger.error('🔧 AÇÃO NECESSÁRIA: Execute o script supabase/verificar_e_corrigir_permissoes.sql no SQL Editor do Supabase para verificar/corrigir permissões GRANT EXECUTE', 'LoginPage');
+                        }
+                        
                         userError = rpcError;
                     } else {
                         userCreatedInDB = true;
-                        logger.info('Usuário criado com sucesso na tabela users (função RPC)', 'LoginPage');
+                        logger.info('✅ Usuário criado com sucesso na tabela users via função RPC', 'LoginPage', { rpcData });
                     }
                 } catch (rpcError) {
                     logger.error('Exceção ao criar usuário via função RPC', 'LoginPage', rpcError);
