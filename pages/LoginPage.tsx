@@ -628,10 +628,7 @@ const LoginPage: React.FC = () => {
                         is_anonymized: userData.isAnonymized,
                         role: userData.role,
                         plan_type: userData.planType,
-                        subscription_status: userData.subscriptionStatus,
-                        account_type: userData.accountType,
-                        trial_start_date: userData.trialStartDate || null,
-                        trial_end_date: userData.trialEndDate || null,
+                        subscription_status: (userData.subscriptionStatus === 'trial' ? 'active' : (userData.subscriptionStatus || 'active')),
                         expiry_date: userData.expiryDate || null,
                         voice_daily_limit_seconds: userData.voiceDailyLimitSeconds || (subscriptionStatus === 'trial' && !hasCouponOrInvite ? 300 : 900),
                         voice_used_today_seconds: 0,
@@ -672,17 +669,40 @@ const LoginPage: React.FC = () => {
                         role: userData.role,
                     };
 
-                    const { data: rpcData, error: rpcError } = await supabase.rpc('insert_user_profile_after_signup', {
+                    // Preparar parâmetros para a função RPC
+                    // Nota: Não passar null explicitamente, deixar undefined para valores opcionais
+                    // IMPORTANTE: subscription_status só aceita 'active', 'inactive', 'expired' - converter 'trial' para 'active'
+                    const rpcParams: any = {
                         p_user_id: userId,
                         p_nome: userData.nome,
                         p_username: usernameToUse,
                         p_plan_type: userData.planType || 'free',
-                        p_subscription_status: userData.subscriptionStatus || 'active',
+                        p_subscription_status: (userData.subscriptionStatus === 'trial' ? 'active' : (userData.subscriptionStatus || 'active')),
                         p_user_data: userDataJsonb,
-                    });
+                    };
+                    
+                    // Adicionar parâmetros opcionais apenas se tiverem valores
+                    if (sanitizedEmail) {
+                        rpcParams.p_email = sanitizedEmail;
+                    }
+                    
+                    rpcParams.p_voice_daily_limit_seconds = userData.voiceDailyLimitSeconds || (subscriptionStatus === 'trial' && !hasCouponOrInvite ? 300 : 900);
+                    
+                    if (userData.expiryDate) {
+                        rpcParams.p_expiry_date = userData.expiryDate;
+                    }
+
+                    logger.info('Chamando função RPC com parâmetros:', 'LoginPage', rpcParams);
+                    const { data: rpcData, error: rpcError } = await supabase.rpc('insert_user_profile_after_signup', rpcParams);
 
                     if (rpcError) {
                         logger.error('Erro ao criar usuário via função RPC', 'LoginPage', rpcError);
+                        logger.error('Detalhes do erro RPC:', 'LoginPage', {
+                            message: rpcError.message,
+                            code: rpcError.code,
+                            details: rpcError.details,
+                            hint: rpcError.hint
+                        });
                         userError = rpcError;
                     } else {
                         userCreatedInDB = true;
@@ -716,7 +736,8 @@ const LoginPage: React.FC = () => {
                             is_anonymized: false,
                             role: userData.role || 'user',
                             plan_type: userData.planType || 'free',
-                            subscription_status: userData.subscriptionStatus || 'active',
+                            subscription_status: ((userData.subscriptionStatus === 'trial' ? 'active' : (userData.subscriptionStatus || 'active'))),
+                            expiry_date: userData.expiryDate || null,
                             voice_daily_limit_seconds: userData.voiceDailyLimitSeconds || 300,
                             voice_used_today_seconds: 0,
                             voice_balance_upsell: 0,

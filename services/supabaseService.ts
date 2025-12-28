@@ -303,10 +303,6 @@ function userToSupabase(user: User, userId?: string): Database['public']['Tables
     plan_type: (user.planType || 'free') as any,
     subscription_status: (user.subscriptionStatus || 'trial') as any,
     expiry_date: user.expiryDate || null,
-    // Campos de trial
-    account_type: user.accountType || null,
-    trial_start_date: user.trialStartDate || null,
-    trial_end_date: user.trialEndDate || null,
     voice_daily_limit_seconds: user.voiceDailyLimitSeconds || 900,
     voice_used_today_seconds: user.voiceUsedTodaySeconds || 0,
     voice_balance_upsell: user.voiceBalanceUpsell || 0,
@@ -360,10 +356,6 @@ function supabaseToUser(row: Database['public']['Tables']['users']['Row']): User
     planType: row.plan_type || undefined,
     subscriptionStatus: row.subscription_status || undefined,
     expiryDate: row.expiry_date || undefined,
-    // Campos de trial
-    accountType: row.account_type || undefined,
-    trialStartDate: row.trial_start_date || undefined,
-    trialEndDate: row.trial_end_date || undefined,
     voiceDailyLimitSeconds: row.voice_daily_limit_seconds || undefined,
     voiceUsedTodaySeconds: row.voice_used_today_seconds || undefined,
     voiceBalanceUpsell: row.voice_balance_upsell || undefined,
@@ -972,12 +964,14 @@ export const authFlowService = {
       
       // Tentar usar função SQL que bypassa RLS
       try {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('insert_user_profile_after_signup', {
+        // Preparar parâmetros para a função RPC
+        // Nota: Não passar null explicitamente, deixar undefined para valores opcionais
+        const rpcParams: any = {
           p_user_id: userId,
           p_nome: userData.nome || username,
           p_username: username,
           p_plan_type: (isCoupon ? (couponValidation.planLinked as any) : 'free') || 'free',
-          p_subscription_status: 'active',
+          p_subscription_status: subscriptionStatus,
           p_user_data: {
             idade: userData.idade || 0,
             genero: userData.genero || 'Masculino',
@@ -993,7 +987,19 @@ export const authFlowService = {
             isAnonymized: userData.isAnonymized || false,
             role: userData.role || 'user',
           },
-        });
+          p_voice_daily_limit_seconds: 900, // Default 15 minutos
+        };
+        
+        // Adicionar parâmetros opcionais apenas se tiverem valores
+        if (userEmail) {
+          rpcParams.p_email = userEmail;
+        }
+        
+        if (subscriptionStatus === 'trial' && trialEndDate) {
+          rpcParams.p_expiry_date = trialEndDate.toISOString();
+        }
+        
+        const { data: rpcData, error: rpcError } = await supabase.rpc('insert_user_profile_after_signup', rpcParams);
 
         if (rpcError) {
           logger.error('Erro ao criar registro via função SQL', 'authFlowService', rpcError);
@@ -1263,12 +1269,10 @@ export const authService = {
       is_anonymized: false,
       role: 'user',
       plan_type: 'free',
-      subscription_status: 'trial',
-      account_type: 'individual',
-      trial_start_date: now.toISOString(),
-      trial_end_date: trialEndDate.toISOString(),
+      subscription_status: 'active',
+      expiry_date: trialEndDate.toISOString(),
       voice_daily_limit_seconds: 900, // 15 minutos
-      chat_daily_limit_messages: 600,
+      text_msg_count_today: 0,
     };
 
     // Inserir perfil do usuário

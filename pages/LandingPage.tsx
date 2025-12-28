@@ -4,7 +4,7 @@
  * Como funciona:
  * - 3 estados: 'home', 'coupon', 'register'
  * - Background animado com linhas topográficas SVG
- * - Header fixo com Logo e botão "Entrar" (redireciona para LoginPage completa)
+ * - Header fixo com Logo
  * - Slider interativo arrastável (CTA principal - redireciona para LoginPage completa)
  * - Glassmorphism e animações
  */
@@ -261,29 +261,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
 
       {/* Header fixo */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 sm:px-6 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-emerald-100 dark:border-emerald-900">
-        <div className="flex-1"></div>
         <Logo size="md" />
-        <div className="flex-1 flex justify-end">
-          {screen === 'home' && (
-            <button
-              onClick={() => {
-                // Marcar landing como vista antes de redirecionar
-                const LANDING_SEEN_KEY = 'fitcoach.landing.seen';
-                try {
-                  localStorage.setItem(LANDING_SEEN_KEY, 'true');
-                  window.dispatchEvent(new Event('landing-seen'));
-                } catch (error) {
-                  console.warn('Não foi possível salvar flag de landing vista', error);
-                }
-                // Redirecionar para login (fluxo: Landing -> Login)
-                window.location.hash = '#/login';
-              }}
-              className="px-4 py-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
-            >
-              Entrar
-            </button>
-          )}
-        </div>
       </header>
 
       {/* Conteúdo principal */}
