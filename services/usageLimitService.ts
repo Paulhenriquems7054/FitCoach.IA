@@ -315,7 +315,8 @@ export async function consumeVoiceSeconds(seconds: number): Promise<{ success: b
         }
 
         // Registrar uso no trial (se estiver em trial)
-        let trialVoiceTotal = userData.trial_voice_total_seconds || 0;
+        const userDataWithTrial = userData as any;
+        let trialVoiceTotal = userDataWithTrial.trial_voice_total_seconds || 0;
         const isInTrial = user.subscriptionStatus === 'trial' && 
                          user.trialEndDate && 
                          new Date(user.trialEndDate) > new Date();
