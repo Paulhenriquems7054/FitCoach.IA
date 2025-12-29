@@ -52,11 +52,32 @@ serve(async (req: Request) => {
     }
 
     // 3) Buscar plano correspondente na tabela subscription_plans
-    const { data: plan, error: planError } = await supabase
+    // Primeiro tentar por cakto_checkout_id direto
+    let { data: plan, error: planError } = await supabase
       .from("subscription_plans")
       .select("*")
       .eq("cakto_checkout_id", checkoutId)
-      .single();
+      .maybeSingle();
+
+    // Se não encontrou, tentar buscar por checkout_url_monthly ou checkout_url_yearly
+    if (planError || !plan) {
+      // Extrair ID do checkout da URL (ex: "3ujuqzz_703304" de "https://pay.cakto.com.br/3ujuqzz_703304")
+      const checkoutIdFromUrl = checkoutId.includes('/') 
+        ? checkoutId.split('/').pop()?.split('?')[0] 
+        : checkoutId;
+      
+      // Buscar planos que tenham esse ID nas URLs
+      const { data: plans, error: plansError } = await supabase
+        .from("subscription_plans")
+        .select("*")
+        .or(`checkout_url_monthly.ilike.%${checkoutIdFromUrl}%,checkout_url_yearly.ilike.%${checkoutIdFromUrl}%`);
+      
+      if (!plansError && plans && plans.length > 0) {
+        plan = plans[0];
+        planError = null;
+        console.log("Plano encontrado via checkout_url:", plan.slug);
+      }
+    }
 
     if (planError || !plan) {
       console.error("Plano não encontrado para checkout_id:", checkoutId, planError);
@@ -87,9 +108,13 @@ serve(async (req: Request) => {
         });
         break;
       case "b2c":
-        // Planos B2C foram removidos - não existem mais na página de vendas nem na Cakto
-        console.warn("Plano B2C recebido mas foi removido:", plan.slug);
-        // Não processar - apenas logar para auditoria
+      case "b2c_ai":
+        await handleB2CPlan({ plan, transactionId, amountPaid, customerEmail, body, checkoutId });
+        await logAuditEvent("b2c_plan_activated", {
+          planSlug: plan.slug,
+          transactionId,
+          customerEmail,
+        });
         break;
       case "recarga":
         await handleRecharge({ plan, transactionId, amountPaid, customerEmail, body });
@@ -292,20 +317,192 @@ async function handleB2CPlan(args: {
   amountPaid: number;
   customerEmail: string;
   body: any;
+  checkoutId: string;
 }) {
-  const { plan, transactionId, amountPaid, customerEmail } = args;
+  const { plan, transactionId, amountPaid, customerEmail, checkoutId } = args;
 
-  const { error } = await supabase.from("user_subscriptions").insert({
-    user_email: customerEmail,
-    plan_slug: plan.slug,
-    plan_group: plan.plan_group,
-    cakto_checkout_id: plan.cakto_checkout_id,
-    cakto_transaction_id: transactionId,
-    amount_paid: amountPaid,
-    status: "active",
-  });
+  try {
+    // 1. Buscar ou criar usuário pelo email
+    let userId: string | null = null;
+    
+    // Primeiro, tentar buscar na tabela users pelo email
+    const { data: userByEmail, error: userEmailError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", customerEmail)
+      .maybeSingle();
+    
+    if (userByEmail && !userEmailError) {
+      userId = userByEmail.id;
+      console.log(`Usuário encontrado pelo email: ${customerEmail} (${userId})`);
+    } else {
+      // Se não encontrou pelo email, tentar buscar em auth.users
+      // Nota: auth.users não é acessível diretamente, então vamos tentar criar um usuário
+      // ou usar uma função RPC que busca em auth.users
+      console.warn(`Usuário não encontrado pelo email: ${customerEmail}`);
+      
+      // Tentar buscar via função RPC se existir
+      const { data: authUser, error: authError } = await supabase
+        .rpc('get_user_id_by_email', { user_email: customerEmail })
+        .maybeSingle();
+      
+      if (authUser && !authError) {
+        userId = authUser.id;
+        console.log(`Usuário encontrado via RPC: ${customerEmail} (${userId})`);
+      }
+    }
 
-  if (error) console.error("Erro ao criar assinatura B2C:", error);
+    if (!userId) {
+      console.error(`Não foi possível encontrar ou criar usuário para email: ${customerEmail}`);
+      // Não podemos criar assinatura sem usuário
+      return;
+    }
+
+    // 2. Determinar se é mensal ou anual baseado no checkout_id usado
+    const checkoutIdFromUrl = checkoutId.includes('/') 
+      ? checkoutId.split('/').pop()?.split('?')[0] 
+      : checkoutId;
+    
+    let billingCycle: 'monthly' | 'yearly' = 'monthly';
+    if (plan.checkout_url_yearly && plan.checkout_url_yearly.includes(checkoutIdFromUrl)) {
+      billingCycle = 'yearly';
+    } else if (plan.checkout_url_monthly && plan.checkout_url_monthly.includes(checkoutIdFromUrl)) {
+      billingCycle = 'monthly';
+    }
+
+    // 3. Calcular datas do período
+    const now = new Date();
+    const periodStart = now.toISOString();
+    const periodEnd = new Date(now);
+    
+    if (billingCycle === 'monthly') {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    } else {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    }
+
+    // 4. Verificar se já existe assinatura ativa para este usuário
+    const { data: existingSubscription, error: existingError } = await supabase
+      .from("user_subscriptions")
+      .select("*")
+      .eq("user_id", userId)
+      .in("status", ["active", "trialing"])
+      .maybeSingle();
+
+    let subscription;
+    
+    if (existingSubscription && !existingError) {
+      // Atualizar assinatura existente
+      const { data: updated, error: updateError } = await supabase
+        .from("user_subscriptions")
+        .update({
+          plan_id: plan.id,
+          status: "active",
+          billing_cycle: billingCycle,
+          current_period_start: periodStart,
+          current_period_end: periodEnd.toISOString(),
+          cancel_at_period_end: false,
+          payment_provider: 'cakto',
+          provider_payment_id: transactionId,
+          cakto_transaction_id: transactionId,
+          cakto_checkout_id: checkoutIdFromUrl,
+          updated_at: now.toISOString(),
+        })
+        .eq("id", existingSubscription.id)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error("Erro ao atualizar assinatura B2C:", updateError);
+        return;
+      }
+      
+      subscription = updated;
+      console.log(`✅ Assinatura B2C atualizada: ${subscription.id}`);
+    } else {
+      // Criar nova assinatura
+      const { data: created, error: createError } = await supabase
+        .from("user_subscriptions")
+        .insert({
+          user_id: userId,
+          plan_id: plan.id,
+          status: "active",
+          billing_cycle: billingCycle,
+          current_period_start: periodStart,
+          current_period_end: periodEnd.toISOString(),
+          cancel_at_period_end: false,
+          payment_provider: 'cakto',
+          provider_payment_id: transactionId,
+          cakto_transaction_id: transactionId,
+          cakto_checkout_id: checkoutIdFromUrl,
+        })
+        .select()
+        .single();
+      
+      if (createError) {
+        console.error("Erro ao criar assinatura B2C:", createError);
+        return;
+      }
+      
+      subscription = created;
+      console.log(`✅ Assinatura B2C criada: ${subscription.id}`);
+    }
+
+    // 5. Atualizar status do usuário na tabela users
+    const { error: userUpdateError } = await supabase
+      .from("users")
+      .update({
+        subscription_status: 'active',
+        updated_at: now.toISOString(),
+      })
+      .eq("id", userId);
+
+    if (userUpdateError) {
+      console.warn("Erro ao atualizar status do usuário (não crítico):", userUpdateError);
+    } else {
+      console.log(`✅ Status do usuário atualizado para 'active'`);
+    }
+
+    // 6. Criar registro de pagamento (opcional, se a tabela existir)
+    try {
+      const { error: paymentError } = await supabase
+        .from("payments")
+        .insert({
+          amount: amountPaid,
+          currency: 'BRL',
+          status: 'succeeded',
+          payment_method: 'credit_card',
+          payment_provider: 'cakto',
+          provider_payment_id: transactionId,
+          description: `Pagamento - ${plan.display_name || plan.name} (${billingCycle})`,
+          metadata: {
+            user_id: userId,
+            plan_id: plan.id,
+            subscription_id: subscription.id,
+            billing_cycle: billingCycle,
+          },
+          paid_at: now.toISOString(),
+        });
+
+      if (paymentError) {
+        console.warn("Erro ao criar registro de pagamento (não crítico):", paymentError);
+      } else {
+        console.log("✅ Pagamento registrado");
+      }
+    } catch (paymentErr) {
+      // Tabela payments pode não existir, não é crítico
+      console.log("Tabela payments não disponível ou erro ao registrar pagamento (não crítico)");
+    }
+
+    console.log(`✅ Processo completo! Assinatura ${billingCycle} ativada para ${customerEmail}`);
+  } catch (error) {
+    console.error("Erro ao processar plano B2C:", error);
+    await logAuditEvent("b2c_plan_error", {
+      error: error instanceof Error ? error.message : String(error),
+      customer_email: customerEmail,
+      transaction_id: transactionId,
+    });
+  }
 }
 
 async function handleRecharge(args: {
