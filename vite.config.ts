@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
-        strictPort: true, // Força usar porta 3000
+        strictPort: false, // Permite usar porta alternativa se 3000 estiver ocupada
         open: true, // Abre o navegador automaticamente
         watch: {
           // Ignorar mudanças em arquivos que podem causar loops
