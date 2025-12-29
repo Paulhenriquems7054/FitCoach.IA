@@ -23,11 +23,12 @@ import { RechargeModal } from '../RechargeModal';
 interface NutriVoiceAssistantProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpen?: () => void;
 }
 
 const MAX_SESSION_TIME = 15 * 60 * 1000; // 15 minutos em milissegundos
 
-export const NutriVoiceAssistant: React.FC<NutriVoiceAssistantProps> = ({ isOpen, onClose }) => {
+export const NutriVoiceAssistant: React.FC<NutriVoiceAssistantProps> = ({ isOpen, onClose, onOpen }) => {
   const { user } = useUser();
   const { showSuccess, showError } = useToast();
   const { canAccess, getRemainingMinutes } = useSubscription();
@@ -226,7 +227,21 @@ export const NutriVoiceAssistant: React.FC<NutriVoiceAssistantProps> = ({ isOpen
     };
   }, [isOpen, stopSession]);
 
-  if (!isOpen) return null;
+  // Se o modal não estiver aberto, mostrar apenas o botão flutuante
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => onOpen?.()}
+        className="fixed bottom-24 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-sky-500 text-white shadow-xl transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300/60"
+        aria-label="Abrir Nutri.ai - Assistente de Voz"
+        title="Nutri.ai - Conversa por voz"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+        </svg>
+      </button>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
