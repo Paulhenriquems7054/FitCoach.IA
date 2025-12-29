@@ -900,5 +900,3 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
   );
 };
 
-export { NutriAssistantUnified };
-
