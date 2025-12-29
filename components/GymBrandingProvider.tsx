@@ -44,6 +44,15 @@ interface GymBrandingProviderProps {
 export const GymBrandingProvider: React.FC<GymBrandingProviderProps> = ({ children }) => {
   const { appName, logo, colors, hasBranding } = useGymBranding();
 
+  // Adicionar fallback seguro para colors - garantir que sempre seja um objeto válido
+  const safeColors = colors || {
+    primary: '#10b981',
+    secondary: '#059669',
+    accent: '#34d399',
+    background: undefined,
+    text: undefined,
+  };
+
   useEffect(() => {
     // Aplicar CSS customizado baseado no branding GLOBALMENTE
     const styleId = 'gym-branding-dynamic';
@@ -80,18 +89,18 @@ export const GymBrandingProvider: React.FC<GymBrandingProviderProps> = ({ childr
       };
     };
 
-    const primaryShades = generateColorShades(colors.primary);
-    const secondaryShades = generateColorShades(colors.secondary);
+    const primaryShades = generateColorShades(safeColors.primary);
+    const secondaryShades = generateColorShades(safeColors.secondary);
 
     // Aplicar variáveis CSS globais que serão usadas por TODO o sistema
     const css = `
       :root {
         /* Cores principais do branding */
-        --gym-primary: ${colors.primary};
-        --gym-secondary: ${colors.secondary};
-        --gym-accent: ${colors.accent};
-        ${colors.background ? `--gym-background: ${colors.background};` : ''}
-        ${colors.text ? `--gym-text: ${colors.text};` : ''}
+        --gym-primary: ${safeColors.primary};
+        --gym-secondary: ${safeColors.secondary};
+        --gym-accent: ${safeColors.accent};
+        ${safeColors.background ? `--gym-background: ${safeColors.background};` : ''}
+        ${safeColors.text ? `--gym-text: ${safeColors.text};` : ''}
         
         /* Integração com Tailwind - Sobrescrever cores primary */
         --color-primary-50: ${primaryShades['50']};
@@ -99,16 +108,16 @@ export const GymBrandingProvider: React.FC<GymBrandingProviderProps> = ({ childr
         --color-primary-200: ${primaryShades['200']};
         --color-primary-300: ${primaryShades['300']};
         --color-primary-400: ${primaryShades['400']};
-        --color-primary-500: ${colors.primary};
-        --color-primary-600: ${colors.secondary};
-        --color-primary-700: ${colors.secondary};
-        --color-primary-800: ${colors.secondary};
-        --color-primary-900: ${colors.secondary};
+        --color-primary-500: ${safeColors.primary};
+        --color-primary-600: ${safeColors.secondary};
+        --color-primary-700: ${safeColors.secondary};
+        --color-primary-800: ${safeColors.secondary};
+        --color-primary-900: ${safeColors.secondary};
         
         /* Cores para uso direto em classes */
-        --tw-color-primary: ${colors.primary};
-        --tw-color-primary-dark: ${colors.secondary};
-        --tw-color-accent: ${colors.accent};
+        --tw-color-primary: ${safeColors.primary};
+        --tw-color-primary-dark: ${safeColors.secondary};
+        --tw-color-accent: ${safeColors.accent};
       }
       
       /* Aplicar cores em TODOS os elementos que usam primary - Backgrounds */
@@ -127,7 +136,7 @@ export const GymBrandingProvider: React.FC<GymBrandingProviderProps> = ({ childr
       button.bg-primary-700,
       .btn-primary,
       [class*="bg-primary"] {
-        background-color: ${colors.primary} !important;
+        background-color: ${safeColors.primary} !important;
       }
       
       /* Text colors */
@@ -145,7 +154,7 @@ export const GymBrandingProvider: React.FC<GymBrandingProviderProps> = ({ childr
       a.text-primary-600,
       a.text-primary-700,
       [class*="text-primary"] {
-        color: ${colors.primary} !important;
+        color: ${safeColors.primary} !important;
       }
       
       /* Border colors */
@@ -160,7 +169,7 @@ export const GymBrandingProvider: React.FC<GymBrandingProviderProps> = ({ childr
       .border-primary-800,
       .border-primary-900,
       [class*="border-primary"] {
-        border-color: ${colors.primary} !important;
+        border-color: ${safeColors.primary} !important;
       }
       
       /* Hover states - Backgrounds */
@@ -178,7 +187,7 @@ export const GymBrandingProvider: React.FC<GymBrandingProviderProps> = ({ childr
       button:hover.bg-primary-600,
       button:hover.bg-primary-700,
       .btn-primary:hover {
-        background-color: ${colors.secondary} !important;
+        background-color: ${safeColors.secondary} !important;
       }
       
       /* Hover states - Text */
@@ -188,7 +197,7 @@ export const GymBrandingProvider: React.FC<GymBrandingProviderProps> = ({ childr
       a:hover.text-primary-500,
       a:hover.text-primary-600,
       a:hover.text-primary-700 {
-        color: ${colors.secondary} !important;
+        color: ${safeColors.secondary} !important;
       }
       
       /* Focus rings */
@@ -198,8 +207,8 @@ export const GymBrandingProvider: React.FC<GymBrandingProviderProps> = ({ childr
       .ring-primary-500,
       .ring-primary-600,
       .ring-primary-700 {
-        --tw-ring-color: ${colors.primary} !important;
-        border-color: ${colors.primary} !important;
+        --tw-ring-color: ${safeColors.primary} !important;
+        border-color: ${safeColors.primary} !important;
       }
       
       /* Cards e elementos com destaque */
@@ -217,19 +226,19 @@ export const GymBrandingProvider: React.FC<GymBrandingProviderProps> = ({ childr
       .bg-gradient-to-br.to-primary-700,
       [class*="from-primary"],
       [class*="to-primary"] {
-        --tw-gradient-from: ${colors.primary} !important;
-        --tw-gradient-to: ${colors.secondary} !important;
-        background-image: linear-gradient(to right, ${colors.primary}, ${colors.secondary}) !important;
+        --tw-gradient-from: ${safeColors.primary} !important;
+        --tw-gradient-to: ${safeColors.secondary} !important;
+        background-image: linear-gradient(to right, ${safeColors.primary}, ${safeColors.secondary}) !important;
       }
     `;
 
     styleElement.textContent = css;
-  }, [colors]);
+  }, [safeColors]);
 
   const value: GymBrandingContextType = {
     appName,
     logo,
-    colors,
+    colors: safeColors,
     hasBranding,
   };
 

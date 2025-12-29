@@ -77,20 +77,23 @@ export const useGymBranding = () => {
     };
   }, []);
 
+  // Garantir que colors sempre retorna um objeto válido, nunca undefined
+  const colors = {
+    primary: branding?.colors?.primary || gym?.primaryColor || '#10b981', // emerald-500
+    secondary: branding?.colors?.secondary || gym?.secondaryColor || '#059669', // emerald-600
+    accent: branding?.colors?.accent || gym?.accentColor || '#34d399', // emerald-400
+    background: branding?.colors?.background || undefined,
+    text: branding?.colors?.text || undefined,
+  };
+
   return {
     branding,
     gym,
     appName,
     logo,
     isLoading,
-    // Cores do branding (com fallback)
-    colors: {
-      primary: branding?.colors.primary || gym?.primaryColor || '#10b981', // emerald-500
-      secondary: branding?.colors.secondary || gym?.secondaryColor || '#059669', // emerald-600
-      accent: branding?.colors.accent || gym?.accentColor || '#34d399', // emerald-400
-      background: branding?.colors.background || undefined,
-      text: branding?.colors.text || undefined,
-    },
+    // Cores do branding (com fallback) - sempre retorna um objeto válido
+    colors,
     // Verificar se tem branding ativo
     hasBranding: !!branding || !!gym,
   };
