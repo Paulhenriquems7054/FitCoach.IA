@@ -30,11 +30,23 @@ export const useGymBrandingContext = () => {
         primary: '#10b981',
         secondary: '#059669',
         accent: '#34d399',
+        background: undefined,
+        text: undefined,
       },
       hasBranding: false,
     };
   }
-  return context;
+  // Garantir que colors sempre existe e tem as propriedades necessárias
+  return {
+    ...context,
+    colors: context.colors || {
+      primary: '#10b981',
+      secondary: '#059669',
+      accent: '#34d399',
+      background: undefined,
+      text: undefined,
+    },
+  };
 };
 
 interface GymBrandingProviderProps {

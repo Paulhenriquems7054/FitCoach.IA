@@ -46,6 +46,27 @@ const alertConfig = {
 export const Alert: React.FC<AlertProps> = ({ type, title, children, className = '' }) => {
   const config = alertConfig[type];
 
+  // Proteção: se config for undefined (não deveria acontecer, mas por segurança)
+  if (!config) {
+    // Fallback para 'info' se tipo inválido
+    const fallbackConfig = alertConfig.info;
+    return (
+      <div className={`rounded-md p-4 border ${fallbackConfig.bgColor} ${fallbackConfig.borderColor} ${className}`}>
+        <div className="flex">
+          <div className="flex-shrink-0">
+            {fallbackConfig.icon}
+          </div>
+          <div className="ml-3">
+            <h3 className={`text-sm font-medium ${fallbackConfig.titleColor}`}>{title}</h3>
+            <div className={`mt-2 text-sm ${fallbackConfig.textColor}`}>
+              {children}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`rounded-md p-4 border ${config.bgColor} ${config.borderColor} ${className}`}>
       <div className="flex">
