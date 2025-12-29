@@ -198,17 +198,7 @@ const NutriAssistant: React.FC<NutriAssistantProps> = ({ isOpen: externalIsOpen,
     }
   };
 
-  const togglePopup = useCallback(() => {
-    setIsOpen((current) => {
-      if (!current) {
-        initializeAssistantSession();
-      } else {
-        stopAssistantAudioSession();
-        setIsRecording(false);
-      }
-      return !current;
-    });
-  }, []);
+  // togglePopup já foi definido acima com controle interno/externo
 
   const handleResetChat = useCallback(() => {
     resetAssistantSession();
