@@ -181,9 +181,18 @@ const PremiumPage: React.FC = () => {
         }
     }, [loading, activeSubscription, hasScrolledFromHash]);
     
-    const handleSubscribe = (plan: SubscriptionPlan) => {
+    const handleSubscribe = (plan: SubscriptionPlan, useYearly: boolean = false) => {
         // Se o plano tem checkout_url, redirecionar direto para Cakto
-        const checkoutUrl = (plan as any).checkout_url_monthly || (plan as any).checkout_url_yearly;
+        // Para planos anuais, priorizar checkout_url_yearly se disponível
+        let checkoutUrl: string | null = null;
+        if (useYearly && (plan as any).checkout_url_yearly) {
+            checkoutUrl = (plan as any).checkout_url_yearly;
+        } else if ((plan as any).checkout_url_monthly) {
+            checkoutUrl = (plan as any).checkout_url_monthly;
+        } else if ((plan as any).checkout_url_yearly) {
+            checkoutUrl = (plan as any).checkout_url_yearly;
+        }
+        
         if (checkoutUrl) {
             logger.info(`Redirecionando para checkout: ${checkoutUrl}`, 'PremiumPage');
             window.open(checkoutUrl, '_blank');
