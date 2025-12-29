@@ -16,7 +16,16 @@ export const Logo: React.FC<LogoProps> = ({
   showText = false,
   className = '' 
 }) => {
-  const { logo, appName, colors, hasBranding } = useGymBrandingContext();
+  const context = useGymBrandingContext();
+  const { logo, appName, hasBranding } = context;
+  // Garantir que colors sempre existe com fallback
+  const colors = context.colors || {
+    primary: '#10b981',
+    secondary: '#059669',
+    accent: '#34d399',
+    background: undefined,
+    text: undefined,
+  };
   
   const sizeClasses = {
     sm: 'w-8 h-8',
@@ -102,7 +111,16 @@ export const Logo: React.FC<LogoProps> = ({
  * Útil para casos onde apenas o texto é necessário
  */
 export const LogoText: React.FC<{ className?: string }> = ({ className = '' }) => {
-  const { appName, colors } = useGymBrandingContext();
+  const context = useGymBrandingContext();
+  const { appName } = context;
+  // Garantir que colors sempre existe com fallback
+  const colors = context.colors || {
+    primary: '#10b981',
+    secondary: '#059669',
+    accent: '#34d399',
+    background: undefined,
+    text: undefined,
+  };
   
   // Se o appName tiver mais de uma palavra, dividir
   const parts = appName.split(' ');
