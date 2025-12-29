@@ -341,7 +341,24 @@ export const NutriVoiceAssistant: React.FC<NutriVoiceAssistantProps> = ({ isOpen
           )}
 
           {/* Controles */}
-          <div className="flex items-center justify-center gap-4 pt-4">
+          <div className="flex items-center justify-center gap-4 pt-4 flex-wrap">
+            {/* Botão para abrir chat de texto - sempre visível */}
+            {onOpenChat && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenChat();
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-400 to-sky-400 text-white rounded-full font-semibold hover:from-emerald-500 hover:to-sky-500 transition shadow-lg text-sm flex items-center gap-2"
+                title="Abrir chat de texto"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                Chat
+              </button>
+            )}
+            
             {!isConnected && !isConnecting && (
               <button
                 onClick={startSession}
