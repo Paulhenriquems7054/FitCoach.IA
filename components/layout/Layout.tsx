@@ -4,8 +4,7 @@ import Header from '../Header';
 import Sidebar from './Sidebar.tsx';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useI18n } from '../../context/I18nContext';
-import NutriAssistant from '../chatbot/NutriAssistant';
-import { NutriVoiceAssistant } from '../chatbot/NutriVoiceAssistant';
+import { NutriAssistantUnified } from '../chatbot/NutriAssistantUnified';
 import { useAutoLogout } from '../../hooks/useAutoLogout';
 import { AccessBlockChecker } from '../AccessBlockChecker';
 import { TrialExpiredChecker } from '../TrialExpiredChecker';
@@ -16,8 +15,7 @@ import { getAccountType } from '../../utils/accountType';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [nutriVoiceOpen, setNutriVoiceOpen] = useState(false);
-  const [nutriChatOpen, setNutriChatOpen] = useState(false);
+  const [nutriAssistantOpen, setNutriAssistantOpen] = useState(false);
   const isOnline = useOnlineStatus();
   const { t } = useI18n();
   const { user } = useUser();
@@ -108,21 +106,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </div>
         </div>
       )}
-      {/* IA de Voz/Chat: desabilitada para PERSONAL (USER_PERSONAL) e quando não tem acesso à IA */}
+      {/* IA Unificada: desabilitada para PERSONAL (USER_PERSONAL) e quando não tem acesso à IA */}
       {!isBlocked && hasAiAccess && accountType !== 'USER_PERSONAL' && (
-        <>
-          <NutriAssistant 
-            isOpen={nutriChatOpen}
-            onOpen={() => setNutriChatOpen(true)}
-            onClose={() => setNutriChatOpen(false)}
-          />
-          <NutriVoiceAssistant 
-            isOpen={nutriVoiceOpen} 
-            onClose={() => setNutriVoiceOpen(false)}
-            onOpen={() => setNutriVoiceOpen(true)}
-            onOpenChat={() => setNutriChatOpen(true)}
-          />
-        </>
+        <NutriAssistantUnified 
+          isOpen={nutriAssistantOpen}
+          onOpen={() => setNutriAssistantOpen(true)}
+          onClose={() => setNutriAssistantOpen(false)}
+        />
       )}
     </div>
   );
