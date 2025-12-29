@@ -63,8 +63,8 @@ export function getCaktoCheckoutLink(planName: string): string | null {
 
   const mapping: Record<string, string> = {
     // Planos B2C
-    monthly: 'zeygxve_668421',
-    annual_vip: 'wvbkepi_668441',
+    monthly: '3ujuqzz_703304',
+    annual_vip: 'xphpm5f_703310',
 
     // Planos B2B (Academias)
     academy_starter: 'cemyp2n_668537',

@@ -44,7 +44,7 @@ const AI_PLANS: AiPlan[] = [
     name: 'Plano Mensal',
     price: 34.90,
     period: 'monthly',
-    checkoutUrl: 'https://pay.cakto.com.br/zeygxve_668421',
+    checkoutUrl: 'https://pay.cakto.com.br/3ujuqzz_703304',
     checkoutPrice: 35.89,
     features: {
       chat: true,
@@ -65,7 +65,7 @@ const AI_PLANS: AiPlan[] = [
     name: 'Plano Anual VIP',
     price: 297.00,
     period: 'annual',
-    checkoutUrl: 'https://pay.cakto.com.br/wvbkepi_668441',
+    checkoutUrl: 'https://pay.cakto.com.br/xphpm5f_703310',
     checkoutPrice: 297.99,
     features: {
       chat: true,
