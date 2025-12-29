@@ -140,33 +140,13 @@ const LoginPage: React.FC = () => {
                 throw new Error('Token inválido: ID do usuário não encontrado');
             }
 
-            // Buscar usuário no Supabase
-            const supabase = getSupabaseClient();
-            const { data: userData, error: userError } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', userId)
-                .single();
-
-            if (userError) {
-                // Logger será importado dinamicamente se necessário
-                if (typeof window !== 'undefined') {
-                  logger.error('Erro ao buscar usuário', 'LoginPage', userError);
-                } else {
-                  console.error('Erro ao buscar usuário:', userError);
-                }
-                if (userError.code === 'PGRST116') {
-                    throw new Error('Usuário não encontrado. Por favor, entre em contato com o suporte.');
-                }
-                throw new Error(`Erro ao buscar usuário: ${userError.message}`);
-            }
-
-            if (!userData) {
-                throw new Error('Usuário não encontrado no banco de dados');
-            }
-
-            // Converter para formato local e fazer login
+            // Buscar usuário no Supabase usando getUserFromSupabase que trata erros corretamente
             const localUser = await getUserFromSupabase(userId);
+            
+            if (!localUser) {
+                throw new Error('Usuário não encontrado no banco de dados. Verifique se o cadastro foi concluído corretamente.');
+            }
+
             
             if (localUser) {
                 await saveLoginSession(localUser);
@@ -1138,41 +1118,13 @@ const LoginPage: React.FC = () => {
                             // Login no Supabase bem-sucedido
                             loginMethod = 'supabase';
                             
-                            // Buscar perfil do usuário
-                            const { authService } = await import('../services/supabaseService');
-                            let userProfile = await authService.getCurrentUserProfile();
+                            // Buscar perfil do usuário usando getUserFromSupabase (evita erro 406)
+                            let userProfile = await getUserFromSupabase(authData.user.id);
                             
-                            // Se não encontrou perfil, tentar buscar da tabela users diretamente
+                            // Se não encontrou perfil, tentar buscar usando authService como fallback
                             if (!userProfile) {
-                                const { data: userData } = await supabase
-                                    .from('users')
-                                    .select('*')
-                                    .eq('id', authData.user.id)
-                                    .maybeSingle();
-                                
-                                if (userData) {
-                                    // Converter dados do Supabase para formato User manualmente
-                                    userProfile = {
-                                        id: userData.id,
-                                        nome: userData.nome || sanitizedUsername,
-                                        username: userData.username || sanitizedUsername,
-                                        email: userData.email || email,
-                                        idade: userData.idade || 0,
-                                        genero: userData.genero || 'Masculino',
-                                        peso: userData.peso || 0,
-                                        altura: userData.altura || 0,
-                                        objetivo: (userData.objetivo || 'perder peso') as any,
-                                        points: userData.points || 0,
-                                        disciplineScore: userData.discipline_score || 0,
-                                        completedChallengeIds: userData.completed_challenge_ids || [],
-                                        isAnonymized: userData.is_anonymized || false,
-                                        weightHistory: [],
-                                        role: userData.role || 'user',
-                                        subscription: 'free',
-                                        planType: (userData.plan_type as any) || 'free',
-                                        subscriptionStatus: (userData.subscription_status as any) || 'active',
-                                    };
-                                }
+                                const { authService } = await import('../services/supabaseService');
+                                userProfile = await authService.getCurrentUserProfile();
                             }
                             
                             // Se ainda não encontrou perfil, criar automaticamente
