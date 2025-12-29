@@ -33,17 +33,18 @@ const PremiumPage: React.FC = () => {
     const { user } = useUser();
     const { showError, showSuccess } = useToast();
     
-    // Se for aluno, redirecionar para página de planos de IA
-    React.useEffect(() => {
-        if (user?.tenantRole === 'student') {
-            window.location.hash = '#/student-ai-plans';
-        }
-    }, [user]);
+    // Verificar se é aluno
+    const isStudent = user?.tenantRole === 'student';
     
-    // Não renderizar para alunos
-    if (user?.tenantRole === 'student') {
-        return null;
-    }
+    // Verificar se trial expirou para alunos
+    const isTrialExpired = React.useMemo(() => {
+        if (!isStudent) return false;
+        if (!user?.trialExpiresAt) return false;
+        
+        const expiryDate = new Date(user.trialExpiresAt);
+        const now = new Date();
+        return now > expiryDate;
+    }, [user, isStudent]);
     const [allPlans, setAllPlans] = useState<SubscriptionPlan[]>([]);
     const [activeSubscription, setActiveSubscription] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -124,7 +125,16 @@ const PremiumPage: React.FC = () => {
     };
     
     // Estado para controlar a aba ativa
-    const [activePage, setActivePage] = useState<'b2c' | 'b2b' | 'personal' | 'recharge'>('b2c');
+    // Para alunos: apenas 'b2c' e 'recharge'
+    // Para academias: apenas 'b2b' e 'personal'
+    const getInitialPage = (): 'b2c' | 'b2b' | 'personal' | 'recharge' => {
+        if (isStudent) {
+            return 'b2c'; // Alunos começam com planos individuais
+        }
+        return 'b2b'; // Academias começam com planos B2B
+    };
+    
+    const [activePage, setActivePage] = useState<'b2c' | 'b2b' | 'personal' | 'recharge'>(getInitialPage());
     
     // Separar planos por categoria
     const b2cPlans = useMemo(() => {
@@ -469,52 +479,86 @@ const PremiumPage: React.FC = () => {
                 </div>
             ) : (
                 <div className="space-y-8 sm:space-y-12">
+                    {/* Mensagem para alunos com trial ativo */}
+                    {isStudent && !isTrialExpired && (
+                        <Card className="border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+                            <div className="p-6 text-center">
+                                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3">
+                                    Você ainda está no período de teste! 🎉
+                                </h2>
+                                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mb-4">
+                                    Aproveite seu trial de 3 dias. Os planos estarão disponíveis após o término do período de teste.
+                                </p>
+                                {user?.trialExpiresAt && (
+                                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-500">
+                                        Seu trial expira em: {new Date(user.trialExpiresAt).toLocaleDateString('pt-BR', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })}
+                                    </p>
+                                )}
+                            </div>
+                        </Card>
+                    )}
+                    
                     {/* Navegação por Abas */}
                     <div className="flex flex-wrap justify-center gap-2 sm:gap-4 border-b border-slate-200 dark:border-slate-700 pb-4">
-                        <button
-                            onClick={() => setActivePage('b2c')}
-                            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                                activePage === 'b2c'
-                                    ? 'bg-primary-600 text-white shadow-lg'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                            }`}
-                        >
-                            Planos Individuais (IA)
-                        </button>
-                        <button
-                            onClick={() => setActivePage('b2b')}
-                            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                                activePage === 'b2b'
-                                    ? 'bg-primary-600 text-white shadow-lg'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                            }`}
-                        >
-                            Planos para Academias
-                        </button>
-                        <button
-                            onClick={() => setActivePage('personal')}
-                            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                                activePage === 'personal'
-                                    ? 'bg-primary-600 text-white shadow-lg'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                            }`}
-                        >
-                            Personal Trainers
-                        </button>
-                        <button
-                            onClick={() => setActivePage('recharge')}
-                            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                                activePage === 'recharge'
-                                    ? 'bg-primary-600 text-white shadow-lg'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                            }`}
-                        >
-                            Recargas
-                        </button>
+                        {/* Para alunos: mostrar apenas Planos Individuais e Recargas */}
+                        {isStudent ? (
+                            <>
+                                <button
+                                    onClick={() => setActivePage('b2c')}
+                                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                                        activePage === 'b2c'
+                                            ? 'bg-primary-600 text-white shadow-lg'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    Planos Individuais (IA)
+                                </button>
+                                <button
+                                    onClick={() => setActivePage('recharge')}
+                                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                                        activePage === 'recharge'
+                                            ? 'bg-primary-600 text-white shadow-lg'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    Recargas
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                {/* Para academias: mostrar apenas Planos B2B e Personal Trainers */}
+                                <button
+                                    onClick={() => setActivePage('b2b')}
+                                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                                        activePage === 'b2b'
+                                            ? 'bg-primary-600 text-white shadow-lg'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    Planos para Academias
+                                </button>
+                                <button
+                                    onClick={() => setActivePage('personal')}
+                                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                                        activePage === 'personal'
+                                            ? 'bg-primary-600 text-white shadow-lg'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    Personal Trainers
+                                </button>
+                            </>
+                        )}
                     </div>
 
-                    {/* PLANOS B2C - INDIVIDUAIS (USO DA IA) */}
-                    {activePage === 'b2c' && b2cPlans.length > 0 && (
+                    {/* PLANOS B2C - INDIVIDUAIS (USO DA IA) - Apenas para alunos após trial expirar */}
+                    {isStudent && isTrialExpired && activePage === 'b2c' && b2cPlans.length > 0 && (
                         <div>
                             <div className="text-center mb-6">
                                 <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
@@ -542,8 +586,8 @@ const PremiumPage: React.FC = () => {
                         </div>
                     )}
 
-                    {/* PLANOS B2B - ACADEMIAS */}
-                    {activePage === 'b2b' && b2bPlans.length > 0 && (
+                    {/* PLANOS B2B - ACADEMIAS - Apenas para academias */}
+                    {!isStudent && activePage === 'b2b' && b2bPlans.length > 0 && (
                         <div>
                             <div className="text-center mb-6">
                                 <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
@@ -582,8 +626,8 @@ const PremiumPage: React.FC = () => {
                         </div>
                     )}
 
-                    {/* PLANOS PERSONAL TRAINERS */}
-                    {activePage === 'personal' && personalPlans.length > 0 && (
+                    {/* PLANOS PERSONAL TRAINERS - Apenas para academias */}
+                    {!isStudent && activePage === 'personal' && personalPlans.length > 0 && (
                         <div>
                             <div className="text-center mb-6">
                                 <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
@@ -610,8 +654,8 @@ const PremiumPage: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Seção de Recargas */}
-                    {activePage === 'recharge' && (
+                    {/* Seção de Recargas - Apenas para alunos após trial expirar */}
+                    {isStudent && isTrialExpired && activePage === 'recharge' && (
                     <div>
                         <div className="text-center mb-6">
                             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
