@@ -466,6 +466,17 @@ export async function analyzeImageWithAssistant(
     if (user) {
       const { assertAiAccessOrThrow } = await import('./aiAccessService');
       await assertAiAccessOrThrow(user, 'vision');
+      
+      // Verificar limites de trial para análise de foto
+      const { canUsePhotoAnalysis, recordTrialPhotoAnalysis } = await import('./trialLimitsService');
+      const photoCheck = await canUsePhotoAnalysis(user);
+      if (!photoCheck.allowed) {
+        onError(photoCheck.message || 'Limite de análise de prato atingido no trial. Assine um plano para continuar.');
+        return;
+      }
+      
+      // Registrar uso após análise bem-sucedida (será chamado no final)
+      // Por enquanto, apenas verificamos
     }
   } catch (error: any) {
     if (error?.code === 'AI_ACCESS_DENIED') {

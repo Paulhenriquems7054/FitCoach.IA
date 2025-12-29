@@ -314,6 +314,16 @@ export async function consumeVoiceSeconds(seconds: number): Promise<{ success: b
             return { success: false, error: 'LIMIT_REACHED' };
         }
 
+        // Registrar uso no trial (se estiver em trial)
+        let trialVoiceTotal = userData.trial_voice_total_seconds || 0;
+        const isInTrial = user.subscriptionStatus === 'trial' && 
+                         user.trialEndDate && 
+                         new Date(user.trialEndDate) > new Date();
+        
+        if (isInTrial) {
+            trialVoiceTotal += seconds;
+        }
+
         // Atualizar no Supabase
         const updatePayload: Record<string, any> = {
             voice_used_today_seconds: newUsedToday,
@@ -323,6 +333,11 @@ export async function consumeVoiceSeconds(seconds: number): Promise<{ success: b
 
         updatePayload.boost_minutes_balance = newBoostMinutes;
         updatePayload.boost_expires_at = newBoostExpiresAt ? newBoostExpiresAt.toISOString() : null;
+        
+        // Adicionar total usado no trial se estiver em trial
+        if (isInTrial) {
+            updatePayload.trial_voice_total_seconds = trialVoiceTotal;
+        }
 
         const { error: updateError } = await supabase
             .from('users')

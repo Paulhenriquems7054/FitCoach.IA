@@ -144,10 +144,20 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
     try {
         const { assertAiAccessOrThrow } = await import('./aiAccessService');
         await assertAiAccessOrThrow(user, 'plan');
+        
+        // Verificar limites de trial para geração de plano alimentar
+        const { canUseMealPlan, recordTrialMealPlan } = await import('./trialLimitsService');
+        const mealPlanCheck = await canUseMealPlan(user);
+        if (!mealPlanCheck.allowed) {
+            throw new Error(mealPlanCheck.message || 'Limite de geração de plano alimentar atingido no trial. Assine um plano para continuar.');
+        }
     } catch (error: any) {
         if (error?.code === 'AI_ACCESS_DENIED') {
             logger.warn('Acesso à IA negado para geração de plano', 'geminiService', error);
             throw new Error('Seu acesso à IA está bloqueado. Assine um plano para continuar usando.');
+        }
+        if (error?.message?.includes('Limite de geração')) {
+            throw error; // Re-throw para manter a mensagem específica
         }
         logger.warn('Erro ao verificar acesso à IA', 'geminiService', error);
     }
@@ -221,6 +231,16 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
     if (localResponse) {
         if (typeof window !== 'undefined') {
             sessionStorage.setItem('lastMealPlan', JSON.stringify(localResponse));
+        }
+        
+        // Registrar uso de plano alimentar no trial
+        try {
+            if (user && user.id) {
+                const { recordTrialMealPlan } = await import('./trialLimitsService');
+                await recordTrialMealPlan(user.id as string);
+            }
+        } catch (error) {
+            logger.warn('Erro ao registrar plano alimentar no trial', 'geminiService', error);
         }
         
         // Trackar uso de IA para métricas B2B2C
