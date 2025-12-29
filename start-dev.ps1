@@ -1,39 +1,41 @@
 # Script para iniciar o servidor de desenvolvimento
-# Libera a porta 3000 se estiver em uso antes de iniciar
+# Encerra processos antigos na porta 3000 e limpa cache
 
-Write-Host "Verificando porta 3000..." -ForegroundColor Yellow
+Write-Host "🧹 Limpando processos na porta 3000..." -ForegroundColor Yellow
 
-# Encontrar processos usando a porta 3000
-$processes = netstat -ano | findstr :3000 | findstr LISTENING
+# Encontrar e encerrar processos na porta 3000
+$processes = Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique
 
 if ($processes) {
-    Write-Host "Porta 3000 está em uso. Encerrando processos..." -ForegroundColor Red
-    
-    # Extrair PIDs dos processos
-    $pids = $processes | ForEach-Object {
-        $parts = $_ -split '\s+'
-        $parts[-1]
-    } | Select-Object -Unique
-    
-    foreach ($pid in $pids) {
+    foreach ($pid in $processes) {
         try {
             $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
             if ($proc) {
-                Write-Host "Encerrando processo $pid ($($proc.ProcessName))..." -ForegroundColor Yellow
+                Write-Host "   Encerrando processo: $($proc.ProcessName) (PID: $pid)" -ForegroundColor Cyan
                 Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
             }
         } catch {
-            Write-Host "Erro ao encerrar processo $pid: $_" -ForegroundColor Red
+            Write-Host "   Aviso: Não foi possível encerrar processo $pid" -ForegroundColor Yellow
         }
     }
-    
-    # Aguardar um pouco para garantir que a porta foi liberada
     Start-Sleep -Seconds 2
-    Write-Host "Porta 3000 liberada!" -ForegroundColor Green
 } else {
-    Write-Host "Porta 3000 está livre." -ForegroundColor Green
+    Write-Host "   ✅ Nenhum processo encontrado na porta 3000" -ForegroundColor Green
 }
 
-Write-Host "Iniciando servidor de desenvolvimento..." -ForegroundColor Cyan
-npm run dev
+Write-Host "🧹 Limpando cache do Vite..." -ForegroundColor Yellow
 
+# Limpar cache do Vite
+if (Test-Path "node_modules/.vite") {
+    Remove-Item -Path "node_modules/.vite" -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "   ✅ Cache do Vite limpo" -ForegroundColor Green
+} else {
+    Write-Host "   ℹ️  Nenhum cache encontrado" -ForegroundColor Gray
+}
+
+Write-Host ""
+Write-Host "🚀 Iniciando servidor de desenvolvimento..." -ForegroundColor Green
+Write-Host ""
+
+# Iniciar o servidor
+npm run dev
