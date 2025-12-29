@@ -742,6 +742,19 @@ const LoginPage: React.FC = () => {
                                     p_expiry_date: params.p_expiry_date,
                                     p_user_data_keys: params.p_user_data ? Object.keys(params.p_user_data) : []
                                 });
+                                // Log direto no console para garantir visibilidade
+                                console.log(`[LoginPage] Tentativa ${attempt + 1}/${maxRetries} de chamar função RPC insert_user_profile_after_signup`);
+                                console.log(`[LoginPage] Parâmetros RPC (tentativa ${attempt + 1}):`, {
+                                    p_user_id: params.p_user_id,
+                                    p_nome: params.p_nome,
+                                    p_username: params.p_username,
+                                    p_plan_type: params.p_plan_type,
+                                    p_subscription_status: params.p_subscription_status,
+                                    p_email: params.p_email,
+                                    p_voice_daily_limit_seconds: params.p_voice_daily_limit_seconds,
+                                    p_expiry_date: params.p_expiry_date,
+                                    p_user_data_keys: params.p_user_data ? Object.keys(params.p_user_data) : []
+                                });
                                 
                                 const { data, error } = await supabase.rpc('insert_user_profile_after_signup', params);
                                 
@@ -752,6 +765,15 @@ const LoginPage: React.FC = () => {
                                 
                                 // Log detalhado do erro
                                 logger.error(`❌ Erro na tentativa ${attempt + 1} da função RPC:`, 'LoginPage', {
+                                    code: error.code,
+                                    message: error.message,
+                                    details: error.details,
+                                    hint: error.hint,
+                                    status: (error as any).status,
+                                    error: error
+                                });
+                                // Log direto no console para garantir visibilidade
+                                console.error(`[LoginPage] ❌ Erro na tentativa ${attempt + 1} da função RPC:`, {
                                     code: error.code,
                                     message: error.message,
                                     details: error.details,
@@ -792,11 +814,24 @@ const LoginPage: React.FC = () => {
 
                     logger.info('📞 Chamando função RPC insert_user_profile_after_signup com retry logic', 'LoginPage');
                     logger.debug('Parâmetros completos que serão enviados para a função RPC:', 'LoginPage', rpcParams);
+                    // Log direto no console para garantir visibilidade
+                    console.log('[LoginPage] 📞 Chamando função RPC insert_user_profile_after_signup com retry logic');
+                    console.log('[LoginPage] Parâmetros completos que serão enviados para a função RPC:', rpcParams);
                     const { data: rpcData, error: rpcError } = await retryRpcCall(rpcParams);
 
                     if (rpcError) {
                         logger.error('❌ ERRO CRÍTICO: Falha ao criar usuário via função RPC após todas as tentativas', 'LoginPage', rpcError);
                         logger.error('📋 Detalhes completos do erro RPC:', 'LoginPage', {
+                            message: rpcError.message,
+                            code: rpcError.code,
+                            details: rpcError.details,
+                            hint: rpcError.hint,
+                            status: (rpcError as any).status,
+                            error_object: rpcError
+                        });
+                        // Log direto no console para garantir visibilidade
+                        console.error('[LoginPage] ❌ ERRO CRÍTICO: Falha ao criar usuário via função RPC após todas as tentativas', rpcError);
+                        console.error('[LoginPage] 📋 Detalhes completos do erro RPC:', {
                             message: rpcError.message,
                             code: rpcError.code,
                             details: rpcError.details,
