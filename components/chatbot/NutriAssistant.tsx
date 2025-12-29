@@ -314,20 +314,23 @@ const NutriAssistant: React.FC = () => {
     }
   }, [isRecording, currentInputTranscription]);
 
+  // Quando o modal está fechado, mostrar apenas o botão flutuante
+  if (!isOpen) {
+    return (
+      <button
+        onClick={togglePopup}
+        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-sky-500 text-white shadow-xl transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300/60"
+        aria-label="Abrir assistente FitCoach.IA"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+      </button>
+    );
+  }
+
   return (
     <>
-      {!isOpen && (
-        <button
-          onClick={togglePopup}
-          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-sky-500 text-white shadow-xl transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300/60"
-          aria-label="Abrir assistente FitCoach.IA"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-          </svg>
-        </button>
-      )}
-
       {isOpen && (
         <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 z-40 flex h-full sm:h-[80vh] w-full sm:w-[90vw] sm:max-w-lg flex-col overflow-hidden rounded-none sm:rounded-2xl border-0 sm:border border-slate-800/60 bg-slate-950/95 shadow-2xl shadow-emerald-500/10 backdrop-blur-sm">
           <div className="flex items-center justify-between bg-gradient-to-r from-emerald-500/90 to-sky-500/90 px-3 sm:px-4 py-2 sm:py-3 text-white shadow-md flex-wrap gap-2">
