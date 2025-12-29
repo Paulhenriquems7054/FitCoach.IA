@@ -308,7 +308,7 @@ const PremiumPage: React.FC = () => {
                     highlight ? 'bg-primary-50/50 dark:bg-primary-900/20' : ''
                 }`}>
                     <Button
-                        onClick={() => handleSubscribe(plan)}
+                        onClick={() => handleSubscribe(plan, showYearlyPrice)}
                         variant={highlight ? "primary" : "secondary"}
                         className={`w-full ${
                             highlight
