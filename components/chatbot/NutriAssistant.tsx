@@ -28,8 +28,37 @@ const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }>
     reader.readAsDataURL(file);
   });
 
-const NutriAssistant: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
+interface NutriAssistantProps {
+  isOpen?: boolean;
+  onOpen?: () => void;
+  onClose?: () => void;
+}
+
+const NutriAssistant: React.FC<NutriAssistantProps> = ({ isOpen: externalIsOpen, onOpen, onClose }) => {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+  
+  const togglePopup = useCallback(() => {
+    if (externalIsOpen !== undefined) {
+      // Se controlado externamente
+      if (isOpen) {
+        onClose?.();
+      } else {
+        onOpen?.();
+      }
+    } else {
+      // Controle interno
+      setInternalIsOpen((current) => {
+        if (!current) {
+          initializeAssistantSession();
+        } else {
+          stopAssistantAudioSession();
+          setIsRecording(false);
+        }
+        return !current;
+      });
+    }
+  }, [externalIsOpen, isOpen, onOpen, onClose]);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);

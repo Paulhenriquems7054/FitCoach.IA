@@ -17,6 +17,7 @@ import { getAccountType } from '../../utils/accountType';
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [nutriVoiceOpen, setNutriVoiceOpen] = useState(false);
+  const [nutriChatOpen, setNutriChatOpen] = useState(false);
   const isOnline = useOnlineStatus();
   const { t } = useI18n();
   const { user } = useUser();
@@ -110,11 +111,16 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* IA de Voz/Chat: desabilitada para PERSONAL (USER_PERSONAL) e quando não tem acesso à IA */}
       {!isBlocked && hasAiAccess && accountType !== 'USER_PERSONAL' && (
         <>
-          <NutriAssistant />
+          <NutriAssistant 
+            isOpen={nutriChatOpen}
+            onOpen={() => setNutriChatOpen(true)}
+            onClose={() => setNutriChatOpen(false)}
+          />
           <NutriVoiceAssistant 
             isOpen={nutriVoiceOpen} 
             onClose={() => setNutriVoiceOpen(false)}
             onOpen={() => setNutriVoiceOpen(true)}
+            onOpenChat={() => setNutriChatOpen(true)}
           />
         </>
       )}

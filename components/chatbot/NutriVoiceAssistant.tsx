@@ -24,11 +24,12 @@ interface NutriVoiceAssistantProps {
   isOpen: boolean;
   onClose: () => void;
   onOpen?: () => void;
+  onOpenChat?: () => void;
 }
 
 const MAX_SESSION_TIME = 15 * 60 * 1000; // 15 minutos em milissegundos
 
-export const NutriVoiceAssistant: React.FC<NutriVoiceAssistantProps> = ({ isOpen, onClose, onOpen }) => {
+export const NutriVoiceAssistant: React.FC<NutriVoiceAssistantProps> = ({ isOpen, onClose, onOpen, onOpenChat }) => {
   const { user } = useUser();
   const { showSuccess, showError } = useToast();
   const { canAccess, getRemainingMinutes } = useSubscription();
