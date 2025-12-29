@@ -2,11 +2,9 @@ import React, { useEffect } from 'react';
 import WelcomeSurvey from '../components/WelcomeSurvey';
 import { Logo } from '../components/Logo';
 import { useUser } from '../context/UserContext';
-import { useRouter } from '../hooks/useRouter';
 
 const WelcomeSurveyPage: React.FC = () => {
   const { user } = useUser();
-  const { push } = useRouter();
 
   // Verificar se é aluno - se não for, redirecionar
   useEffect(() => {
@@ -14,10 +12,10 @@ const WelcomeSurveyPage: React.FC = () => {
       const isStudent = user.tenantRole === 'student' || user.gymRole === 'student';
       if (!isStudent) {
         // Não é aluno, redirecionar para home
-        push('#/');
+        window.location.hash = '#/';
       }
     }
-  }, [user, push]);
+  }, [user]);
 
   const handleSurveyCompleted = () => {
     // Após completar a enquete, redirecionar para a home
