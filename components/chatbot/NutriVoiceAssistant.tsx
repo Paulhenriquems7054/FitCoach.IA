@@ -124,7 +124,9 @@ export const NutriVoiceAssistant: React.FC<NutriVoiceAssistantProps> = ({ isOpen
   }, [isMicOn]);
 
   const startSession = useCallback(async () => {
-    if (!canAccess('voice')) {
+    // Desenvolvedor sempre tem acesso
+    const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+    if (!isDeveloper && !canAccess('voice')) {
       showError('Você não tem acesso a esta funcionalidade.');
       return;
     }

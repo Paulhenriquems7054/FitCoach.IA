@@ -425,20 +425,26 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
   }, [showSuccess, showError]);
 
   const startVoiceSession = useCallback(async () => {
-    // Verificar acesso via canAccess
-    const hasAccess = canAccess('voice');
-    
-    // Se não tem acesso, verificar se está em trial como fallback
-    if (!hasAccess) {
-      const isTrial = user?.subscriptionStatus === 'trial' || 
-                     (user?.expiryDate && new Date(user.expiryDate) > new Date()) ||
-                     (user?.trialEndDate && new Date(user.trialEndDate) > new Date());
+    // Desenvolvedor sempre tem acesso
+    const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+    if (isDeveloper) {
+      // Desenvolvedor tem acesso ilimitado, continuar normalmente
+    } else {
+      // Verificar acesso via canAccess
+      const hasAccess = canAccess('voice');
       
-      if (!isTrial) {
-        showError('Você não tem acesso a esta funcionalidade.');
-        return;
+      // Se não tem acesso, verificar se está em trial como fallback
+      if (!hasAccess) {
+        const isTrial = user?.subscriptionStatus === 'trial' || 
+                       (user?.expiryDate && new Date(user.expiryDate) > new Date()) ||
+                       (user?.trialEndDate && new Date(user.trialEndDate) > new Date());
+        
+        if (!isTrial) {
+          showError('Você não tem acesso a esta funcionalidade.');
+          return;
+        }
+        // Se está em trial, permitir acesso mesmo se canAccess retornou false
       }
-      // Se está em trial, permitir acesso mesmo se canAccess retornou false
     }
 
     setIsConnecting(true);
