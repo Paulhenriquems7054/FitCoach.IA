@@ -420,7 +420,24 @@ async function handleAcademyPlan(args: {
       console.log("✅ Fatura criada");
     }
 
-    // 8. Log de auditoria
+    // 8. Enviar email com código de convite e informações de ativação
+    if (inviteCodeCreated && inviteCode) {
+      try {
+        await sendActivationEmail({
+          email: customerEmail,
+          companyName: planName + " - " + customerEmail,
+          masterCode: masterCode,
+          inviteCode: inviteCode,
+          planName: planName,
+        });
+        console.log(`✅ Email de ativação enviado para ${customerEmail}`);
+      } catch (emailError) {
+        console.warn("Erro ao enviar email de ativação (não crítico):", emailError);
+        // Não falhar o processo se o email falhar
+      }
+    }
+
+    // 9. Log de auditoria
     await logAuditEvent("company_created", {
       company_id: company.id,
       master_code: masterCode,
@@ -777,6 +794,162 @@ async function handlePersonalTrainerPlan(args: {
 }
 
 // Nota: handlePersonalTrainerPlan não é mais usado, mas mantido para compatibilidade
+
+// ============ FUNÇÃO DE ENVIO DE EMAIL ============
+
+interface ActivationEmailData {
+  email: string;
+  companyName: string;
+  masterCode: string;
+  inviteCode: string;
+  planName: string;
+}
+
+async function sendActivationEmail(data: ActivationEmailData): Promise<void> {
+  const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+  const EMAIL_FROM = Deno.env.get("EMAIL_FROM") || "noreply@fitcoach.ia";
+  const APP_URL = Deno.env.get("APP_URL") || "https://pagina-de-vendas-fit-coach-ai.vercel.app";
+
+  if (!RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY não configurada, pulando envio de email");
+    return;
+  }
+
+  const activationUrl = `${APP_URL}/#/activation-success?email=${encodeURIComponent(data.email)}`;
+
+  const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Academia Ativada - FitCoach.IA</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">✅ Pagamento Confirmado!</h1>
+    <p style="color: white; margin: 10px 0 0 0; font-size: 16px;">Sua academia foi ativada com sucesso</p>
+  </div>
+  
+  <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
+    <p style="font-size: 16px; margin-bottom: 20px;">Olá,</p>
+    <p style="font-size: 16px; margin-bottom: 20px;">
+      Parabéns! Seu pagamento foi processado com sucesso e sua academia <strong>${data.companyName}</strong> 
+      está agora ativa no FitCoach.IA.
+    </p>
+
+    <div style="background: white; border: 2px solid #10b981; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h2 style="color: #059669; margin-top: 0; font-size: 20px;">📧 Código de Convite para Alunos</h2>
+      <p style="font-size: 14px; color: #6b7280; margin-bottom: 15px;">
+        Use este código para convidar seus alunos. Eles receberão <strong>3 dias grátis</strong> de IA automaticamente.
+      </p>
+      <div style="background: #f0fdf4; border: 2px solid #10b981; border-radius: 6px; padding: 15px; text-align: center; margin: 15px 0;">
+        <p style="font-size: 32px; font-weight: bold; color: #059669; font-family: monospace; letter-spacing: 3px; margin: 0;">
+          ${data.inviteCode}
+        </p>
+      </div>
+      <p style="font-size: 12px; color: #6b7280; margin-top: 10px; margin-bottom: 0;">
+        Link completo: <a href="${APP_URL}/#/login?invite=${data.inviteCode}" style="color: #10b981;">${APP_URL}/#/login?invite=${data.inviteCode}</a>
+      </p>
+    </div>
+
+    <div style="background: white; border: 2px solid #6b7280; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h2 style="color: #374151; margin-top: 0; font-size: 20px;">🔑 Código Mestre da Academia</h2>
+      <p style="font-size: 14px; color: #6b7280; margin-bottom: 15px;">
+        Este é o identificador único da sua academia. Guarde este código com segurança.
+      </p>
+      <div style="background: #f9fafb; border: 2px solid #6b7280; border-radius: 6px; padding: 15px; text-align: center; margin: 15px 0;">
+        <p style="font-size: 24px; font-weight: bold; color: #374151; font-family: monospace; margin: 0;">
+          ${data.masterCode}
+        </p>
+      </div>
+    </div>
+
+    <div style="background: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h2 style="color: #1e40af; margin-top: 0; font-size: 20px;">🚀 Próximos Passos</h2>
+      <ol style="padding-left: 20px; color: #1e3a8a;">
+        <li style="margin-bottom: 10px;">Crie sua conta de administrador usando o email: <strong>${data.email}</strong></li>
+        <li style="margin-bottom: 10px;">Use o código de convite acima para convidar seus alunos</li>
+        <li style="margin-bottom: 10px;">Seus alunos receberão <strong>3 dias grátis</strong> de IA automaticamente</li>
+        <li style="margin-bottom: 10px;">Após o trial, seus alunos podem assinar planos individuais de IA</li>
+      </ol>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${activationUrl}" 
+         style="display: inline-block; background: #10b981; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+        Acessar Página de Ativação
+      </a>
+    </div>
+
+    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 15px; margin-top: 25px;">
+      <p style="font-size: 14px; color: #92400e; margin: 0;">
+        <strong>💡 Dica:</strong> Você também pode acessar diretamente: 
+        <a href="${APP_URL}/#/login" style="color: #d97706;">${APP_URL}/#/login</a>
+      </p>
+    </div>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+    
+    <p style="font-size: 12px; color: #6b7280; text-align: center; margin: 0;">
+      Este é um email automático. Por favor, não responda.<br>
+      FitCoach.IA - Sistema de Gestão para Academias
+    </p>
+  </div>
+</body>
+</html>
+  `;
+
+  const emailText = `
+✅ Pagamento Confirmado!
+
+Sua academia foi ativada com sucesso!
+
+📧 Código de Convite para Alunos: ${data.inviteCode}
+   Link: ${APP_URL}/#/login?invite=${data.inviteCode}
+
+🔑 Código Mestre da Academia: ${data.masterCode}
+
+🚀 Próximos Passos:
+1. Crie sua conta de administrador usando o email: ${data.email}
+2. Use o código de convite acima para convidar seus alunos
+3. Seus alunos receberão 3 dias grátis de IA automaticamente
+4. Após o trial, seus alunos podem assinar planos individuais de IA
+
+Acesse: ${activationUrl}
+
+---
+FitCoach.IA - Sistema de Gestão para Academias
+  `;
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: EMAIL_FROM,
+        to: data.email,
+        subject: `✅ Academia Ativada - Código de Convite: ${data.inviteCode}`,
+        html: emailHtml,
+        text: emailText,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Resend API error: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log(`Email enviado com sucesso. ID: ${result.id}`);
+  } catch (error) {
+    console.error("Erro ao enviar email via Resend:", error);
+    throw error;
+  }
+}
 
 // ============ FUNÇÃO DE LOG DE AUDITORIA ============
 

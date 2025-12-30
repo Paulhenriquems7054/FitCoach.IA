@@ -54,6 +54,7 @@ const TrainerWorkoutPage = lazy(() => import('./pages/TrainerWorkoutPage'));
 const VideoPresentationPage = lazy(() => import('./pages/VideoPresentationPage'));
 const PremiumPage = lazy(() => import('./pages/PremiumPage'));
 const ActivationScreen = lazy(() => import('./pages/ActivationScreen'));
+const ActivationSuccessPage = lazy(() => import('./pages/ActivationSuccessPage'));
 const SubscriptionStatusScreen = lazy(() => import('./pages/SubscriptionStatusScreen'));
 const ChangePlanPage = lazy(() => import('./pages/ChangePlanPage'));
 const CreateDefaultUsersPage = lazy(() => import('./pages/CreateDefaultUsersPage'));
@@ -795,6 +796,7 @@ const App: React.FC = () => {
             case '/premium': return <PremiumPage />;
             case '/student-ai-plans': return <StudentAiPlansPage />;
             case '/activation': return <ActivationScreen />;
+            case '/activation-success': return <ActivationSuccessPage />;
             case '/subscription-status': return <SubscriptionStatusScreen />;
             case '/change-plan': return <ChangePlanPage />;
             case '/create-default-users': return <CreateDefaultUsersPage />;
