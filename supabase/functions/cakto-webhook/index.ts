@@ -89,8 +89,12 @@ serve(async (req: Request) => {
     // 4) Filtrar só eventos de pagamento confirmado (ajustar depois conforme Cakto)
     const isPaidEvent =
       eventType === "payment.completed" ||
+      eventType === "payment.paid" ||
       eventType === "subscription.created" ||
-      eventType === "subscription.payment_succeeded";
+      eventType === "subscription.payment_succeeded" ||
+      eventType === "purchase_approved" ||
+      eventType === "purchase.completed" ||
+      eventType === "checkout.completed";
 
     if (!isPaidEvent) {
       console.log("Evento não é de pagamento confirmado, ignorando:", eventType);
