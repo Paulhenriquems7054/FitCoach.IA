@@ -146,7 +146,7 @@ serve(async (req: Request) => {
     // 5) Processar por tipo de plano
     switch (plan.plan_group) {
       case "b2b_academia":
-        await handleAcademyPlan({ plan, transactionId, amountPaid, customerEmail, body });
+        await handleAcademyPlan({ plan, transactionId, amountPaid, customerEmail, body, checkoutId: cleanCheckoutId });
         await logAuditEvent("academy_plan_activated", {
           planSlug: plan.name || plan.slug,
           transactionId,
@@ -205,8 +205,14 @@ async function handleAcademyPlan(args: {
   amountPaid: number;
   customerEmail: string;
   body: any;
+  checkoutId: string;
 }) {
-  const { plan, transactionId, amountPaid, customerEmail } = args;
+  const { plan, transactionId, amountPaid, customerEmail, checkoutId } = args;
+  
+  // Limpar checkoutId
+  const cleanCheckoutId = checkoutId.includes('/') 
+    ? checkoutId.split('/').pop()?.split('?')[0] 
+    : checkoutId.split('?')[0];
 
   try {
     // 1. Gerar master_code usando função SQL
@@ -558,8 +564,14 @@ async function handleRecharge(args: {
   amountPaid: number;
   customerEmail: string;
   body: any;
+  checkoutId: string;
 }) {
-  const { plan, transactionId, amountPaid, customerEmail } = args;
+  const { plan, transactionId, amountPaid, customerEmail, checkoutId } = args;
+  
+  // Limpar checkoutId
+  const cleanCheckoutId = checkoutId.includes('/') 
+    ? checkoutId.split('/').pop()?.split('?')[0] 
+    : checkoutId.split('?')[0];
 
   // 1. Mapear plan.slug para recharge_type
   const rechargeTypeMap: Record<string, string> = {
@@ -660,8 +672,14 @@ async function handlePersonalTrainerPlan(args: {
   amountPaid: number;
   customerEmail: string;
   body: any;
+  checkoutId: string;
 }) {
-  const { plan, transactionId, amountPaid, customerEmail } = args;
+  const { plan, transactionId, amountPaid, customerEmail, checkoutId } = args;
+  
+  // Limpar checkoutId
+  const cleanCheckoutId = checkoutId.includes('/') 
+    ? checkoutId.split('/').pop()?.split('?')[0] 
+    : checkoutId.split('?')[0];
 
   const { error } = await supabase.from("personal_subscriptions").insert({
     personal_email: customerEmail,
