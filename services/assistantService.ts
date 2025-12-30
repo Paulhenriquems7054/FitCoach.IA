@@ -954,7 +954,9 @@ export async function startAssistantAudioSession(
         onError('Permissão do microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.');
         stopAssistantAudioSession();
         return;
-      } else if (errorName === 'NotFoundError' || errorName.includes('not-found')) {
+      } else if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError' || 
+                 errorName.includes('not-found') || mediaError?.message?.includes('not found') || 
+                 mediaError?.message?.includes('Requested device not found')) {
         onError('Nenhum microfone encontrado. Verifique se o microfone está conectado.');
         stopAssistantAudioSession();
         return;

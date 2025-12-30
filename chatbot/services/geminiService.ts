@@ -553,7 +553,41 @@ export async function startLiveAudioSession(
 
   try {
     const ai = getGeminiClient();
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    
+    // Solicitar acesso ao microfone com tratamento de erro específico
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (mediaError: any) {
+      const errorName = mediaError?.name || '';
+      const errorMessage = mediaError?.message || '';
+      
+      // Tratamento específico para diferentes tipos de erros de dispositivo
+      if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError' || 
+          errorMessage.includes('not found') || errorMessage.includes('Requested device not found')) {
+        const friendlyError = 'Nenhum dispositivo de áudio encontrado. Verifique se o microfone está conectado e tente novamente.';
+        logger.error('Dispositivo de áudio não encontrado', 'chatbot/geminiService', mediaError);
+        onError(friendlyError, false);
+        return;
+      } else if (errorName === 'NotAllowedError' || errorMessage.includes('not allowed') || errorMessage.includes('permission denied')) {
+        const friendlyError = 'Permissão do microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.';
+        logger.error('Permissão do microfone negada', 'chatbot/geminiService', mediaError);
+        onError(friendlyError, false);
+        return;
+      } else if (errorName === 'NotReadableError' || errorMessage.includes('not readable') || errorMessage.includes('could not start')) {
+        const friendlyError = 'Não foi possível acessar o microfone. Verifique se ele não está sendo usado por outro aplicativo.';
+        logger.error('Microfone não pode ser acessado', 'chatbot/geminiService', mediaError);
+        onError(friendlyError, false);
+        return;
+      } else if (errorName === 'OverconstrainedError' || errorMessage.includes('constraint')) {
+        const friendlyError = 'As configurações do microfone não são suportadas. Tente usar outro dispositivo de áudio.';
+        logger.error('Configurações do microfone não suportadas', 'chatbot/geminiService', mediaError);
+        onError(friendlyError, false);
+        return;
+      }
+      
+      // Para outros erros, re-lançar para ser tratado no catch externo
+      throw mediaError;
+    }
 
     interface WindowWithAudioContext extends Window {
       AudioContext?: typeof AudioContext;
@@ -813,8 +847,20 @@ export async function startLiveAudioSession(
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error("Erro ao iniciar sessão de áudio ao vivo", 'chatbot/geminiService', error);
-    const isApiKeyIssue = errorMessage.includes("API key was reported as leaked") || errorMessage.includes("Requested entity was not found.");
-    onError(`Failed to start audio session: ${errorMessage}`, isApiKeyIssue); // Pass isApiKeyIssue
+    
+    // Verificar se é um erro de dispositivo (caso não tenha sido capturado antes)
+    if (errorMessage.includes('not found') || errorMessage.includes('Requested device not found') || 
+        errorMessage.includes('NotFoundError') || errorMessage.includes('DevicesNotFoundError')) {
+      onError('Nenhum dispositivo de áudio encontrado. Verifique se o microfone está conectado e tente novamente.', false);
+    } else if (errorMessage.includes('not allowed') || errorMessage.includes('permission denied') || 
+               errorMessage.includes('NotAllowedError')) {
+      onError('Permissão do microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.', false);
+    } else {
+      // Para outros erros, verificar se é problema de API key
+      const isApiKeyIssue = errorMessage.includes("API key was reported as leaked") || errorMessage.includes("Requested entity was not found.");
+      onError(`Erro ao iniciar sessão de áudio: ${errorMessage}`, isApiKeyIssue);
+    }
+    
     await stopLiveAudioSession();
   }
 }
