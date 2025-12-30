@@ -56,10 +56,24 @@ const MAX_SESSION_TIME = 15 * 60 * 1000; // 15 minutos em milissegundos
 export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ isOpen, onClose, onOpen }) => {
   const { user } = useUser();
   const { showSuccess, showError } = useToast();
-  const { canAccess, getRemainingMinutes } = useSubscription();
+  const { canAccess, getRemainingMinutes, status } = useSubscription();
   
-  // Estado do modo (texto ou voz)
-  const [mode, setMode] = useState<'text' | 'voice'>('text');
+  // Verificar se está em trial
+  const isTrial = status?.planType === 'trial' || 
+                  user?.subscriptionStatus === 'trial' ||
+                  (user?.expiryDate && new Date(user.expiryDate) > new Date() && !status?.isActive);
+  
+  // Rastrear imagens analisadas durante trial (máximo 1)
+  const TRIAL_PHOTOS_KEY = `trial_photos_analyzed_${user?.id || 'default'}`;
+  const getTrialPhotosAnalyzed = (): number => {
+    if (typeof window === 'undefined') return 0;
+    const stored = localStorage.getItem(TRIAL_PHOTOS_KEY);
+    return stored ? parseInt(stored, 10) : 0;
+  };
+  const [trialPhotosAnalyzed, setTrialPhotosAnalyzed] = useState(getTrialPhotosAnalyzed());
+  
+  // Estado do modo (texto ou voz - foto integrada ao modo texto)
+  const [mode, setMode] = useState<'text' | 'voice' | 'photo'>('text');
   
   // Estados para modo texto
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
@@ -152,10 +166,8 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
   };
 
   useEffect(() => {
-    if (mode === 'text') {
-      scrollToBottom();
-    }
-  }, [messages, mode]);
+    scrollToBottom();
+  }, [messages]);
 
   // Auto-resize textarea
   const autoResizeTextarea = useCallback(() => {
@@ -199,6 +211,13 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
   const handleSendMessage = useCallback(async () => {
     if (!input.trim() || isLoading) return;
 
+    // Verificar limite de imagens para trial (máximo 1 imagem durante todo o trial)
+    if (lastUploadedImage && isTrial && trialPhotosAnalyzed >= 1) {
+      showError('Você já utilizou sua análise de imagem gratuita do trial. Assine um plano para continuar analisando imagens.');
+      setLastUploadedImage(null);
+      return;
+    }
+
     const userContent = input.trim();
     setMessages((prev) => [
       ...prev,
@@ -215,6 +234,14 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
       setMessages((prev) => [...prev, { role: 'assistant', content: '', isStreaming: true }]);
 
       if (lastUploadedImage && userContent.toLowerCase().startsWith('editar:')) {
+        // Edição de imagem também conta como análise para trial
+        if (isTrial && trialPhotosAnalyzed >= 1) {
+          showError('Você já utilizou sua análise de imagem gratuita do trial. Assine um plano para continuar editando imagens.');
+          setLastUploadedImage(null);
+          setIsLoading(false);
+          return;
+        }
+        
         await editImageWithAssistant(
           lastUploadedImage.base64,
           lastUploadedImage.mimeType,
@@ -225,10 +252,16 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
               { role: 'assistant', content: '', isStreaming: false, imageUrl },
             ]);
           },
-          (chunk) => appendStreamingMessage(chunk),
-          () => finalizeStreamingMessage(),
           (error) => handleAssistantError(`Erro ao editar imagem: ${error}`),
         );
+        
+        // Incrementar contador de imagens analisadas no trial
+        if (isTrial) {
+          const newCount = trialPhotosAnalyzed + 1;
+          setTrialPhotosAnalyzed(newCount);
+          localStorage.setItem(TRIAL_PHOTOS_KEY, newCount.toString());
+        }
+        
         setLastUploadedImage(null);
       } else if (lastUploadedImage) {
         await analyzeImageWithAssistant(
@@ -238,14 +271,25 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
           (chunk) => appendStreamingMessage(chunk),
           (error) => handleAssistantError(`Erro ao analisar imagem: ${error}`),
         );
+        
+        // Incrementar contador de imagens analisadas no trial
+        if (isTrial) {
+          const newCount = trialPhotosAnalyzed + 1;
+          setTrialPhotosAnalyzed(newCount);
+          localStorage.setItem(TRIAL_PHOTOS_KEY, newCount.toString());
+        }
+        
         setLastUploadedImage(null);
       } else {
         await sendAssistantMessage(
           userContent,
           (chunk) => appendStreamingMessage(chunk),
-          () => finalizeStreamingMessage(),
-          (error) => handleAssistantError(error),
+          (error) => {
+            handleAssistantError(error);
+            finalizeStreamingMessage();
+          },
         );
+        finalizeStreamingMessage();
       }
     } catch (error: any) {
       handleAssistantError(`Erro ao processar mensagem: ${error.message || 'Erro desconhecido'}`);
@@ -357,7 +401,9 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
         protein: meal.protein,
         carbs: meal.carbs,
         fats: meal.fats,
-        mealType: meal.mealType,
+        mealType: (meal.mealType === 'breakfast' || meal.mealType === 'lunch' || meal.mealType === 'dinner' || meal.mealType === 'snack') 
+          ? (meal.mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack')
+          : ('snack' as 'breakfast' | 'lunch' | 'dinner' | 'snack'),
         description: meal.description,
       });
       setMealNotification(`✅ ${meal.foodName} registrado! ${mealItem.calories} kcal`);
@@ -369,9 +415,20 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
   }, [showSuccess, showError]);
 
   const startVoiceSession = useCallback(async () => {
-    if (!canAccess('voice')) {
-      showError('Você não tem acesso a esta funcionalidade.');
-      return;
+    // Verificar acesso via canAccess
+    const hasAccess = canAccess('voice');
+    
+    // Se não tem acesso, verificar se está em trial como fallback
+    if (!hasAccess) {
+      const isTrial = user?.subscriptionStatus === 'trial' || 
+                     (user?.expiryDate && new Date(user.expiryDate) > new Date()) ||
+                     (user?.trialEndDate && new Date(user.trialEndDate) > new Date());
+      
+      if (!isTrial) {
+        showError('Você não tem acesso a esta funcionalidade.');
+        return;
+      }
+      // Se está em trial, permitir acesso mesmo se canAccess retornou false
     }
 
     setIsConnecting(true);
@@ -466,14 +523,14 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
     }
   }, [mode]);
 
-  // Se o modal não estiver aberto, mostrar apenas o botão flutuante
+  // Se o modal não estiver aberto, mostrar apenas o botão flutuante (apenas ícone)
   if (!isOpen) {
     return (
       <button
         onClick={() => onOpen?.()}
         className="fixed bottom-24 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-sky-500 text-white shadow-xl transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300/60"
-        aria-label="Abrir Nutri.ai - Assistente"
-        title="Nutri.ai - Assistente de IA"
+        aria-label="Abrir FitCoach.IA - Conversas, análise de fotos e assistente de voz"
+        title="Conversas, análise de fotos e assistente de voz"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -486,77 +543,33 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
     <>
       <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 z-50 flex h-full sm:h-[85vh] w-full sm:w-[90vw] sm:max-w-2xl flex-col overflow-hidden rounded-none sm:rounded-2xl border-0 sm:border border-slate-800/60 bg-slate-950/95 shadow-2xl shadow-emerald-500/10 backdrop-blur-sm">
         {/* Header */}
-        <div className="flex items-center justify-between bg-gradient-to-r from-emerald-500/90 to-sky-500/90 px-3 sm:px-4 py-2 sm:py-3 text-white shadow-md">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base sm:text-lg font-semibold truncate">Nutri.ai - Assistente</h2>
-            <p className="text-xs text-emerald-50/80 hidden sm:block">Conversas, análise de fotos e assistente de voz</p>
-          </div>
-          
-          {/* Abas para alternar entre Texto e Voz */}
-          <div className="flex items-center gap-2 mr-2">
-            <button
-              onClick={() => setMode('text')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                mode === 'text'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-white/10 text-white/70 hover:bg-white/15'
-              }`}
-            >
-              💬 Texto
-            </button>
-            <button
-              onClick={() => setMode('voice')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                mode === 'voice'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-white/10 text-white/70 hover:bg-white/15'
-              }`}
-            >
-              🎤 Voz
-            </button>
-          </div>
+        <div className="flex flex-col bg-gradient-to-r from-emerald-500/90 to-sky-500/90 text-white shadow-md">
+          <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold truncate">FitCoach.IA</h2>
+              <p className="text-xs text-emerald-50/90 hidden sm:block">Conversas, análise de fotos e assistente de voz</p>
+            </div>
 
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-            {mode === 'text' && (
-              <>
-                <button
-                  onClick={() => setShowPromptEditor((prev) => !prev)}
-                  className="rounded-full px-2 sm:px-3 py-1 text-xs font-semibold text-emerald-50/90 transition hover:bg-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-white/50 whitespace-nowrap"
-                >
-                  <span className="hidden sm:inline">{showPromptEditor ? 'Ocultar prompt' : 'Prompt'}</span>
-                  <span className="sm:hidden">{showPromptEditor ? 'Ocultar' : 'Prompt'}</span>
-                </button>
-                <button
-                  onClick={handleCopyConversation}
-                  className="rounded-full p-2 transition hover:bg-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-white/50"
-                  aria-label="Copiar conversa"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M7 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V7Zm2-1a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H9Z" />
-                    <path d="M5 5a2 2 0 0 1 2-2h7a1 1 0 1 1 0 2H7v12a1 1 0 1 1-2 0V5Z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={handleResetChat}
-                  className="rounded-full p-2 transition hover:bg-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-white/50"
-                  aria-label="Excluir conversa"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M9 3a1 1 0 0 0-.894.553L7.382 5H5a1 1 0 1 0 0 2h.262l.823 11.521A2 2 0 0 0 8.08 20.5h7.84a2 2 0 0 0 1.995-1.979L18.738 7H19a1 1 0 1 0 0-2h-2.382l-.724-1.447A1 1 0 0 0 15 3H9Zm1.118 4.553a1 1 0 0 1 1.06.93l.5 8.5a1 1 0 1 1-1.996.118l-.5-8.5a1 1 0 0 1 .936-1.048Zm4.764 0a1 1 0 0 1 .936 1.048l-.5 8.5a1 1 0 0 1-1.996-.118l.5-8.5a1 1 0 0 1 1.06-.93Z" />
-                  </svg>
-                </button>
-              </>
-            )}
-            {mode === 'voice' && isConnected && (
-              <div className="flex items-center gap-2 text-xs">
-                <div className={`w-2 h-2 rounded-full ${
-                  connectionStatus === 'connected' ? 'bg-green-300 animate-pulse' :
-                  connectionStatus === 'connecting' ? 'bg-yellow-300 animate-pulse' :
-                  'bg-gray-400'
-                }`} />
-                <span>{timeRemaining}m</span>
-              </div>
-            )}
+            <button
+              onClick={handleCopyConversation}
+              className="rounded-full p-2 transition hover:bg-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-white/50"
+              aria-label="Copiar conversa"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M7 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V7Zm2-1a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H9Z" />
+                <path d="M5 5a2 2 0 0 1 2-2h7a1 1 0 1 1 0 2H7v12a1 1 0 1 1-2 0V5Z" />
+              </svg>
+            </button>
+            <button
+              onClick={handleResetChat}
+              className="rounded-full p-2 transition hover:bg-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-white/50"
+              aria-label="Excluir conversa"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 3a1 1 0 0 0-.894.553L7.382 5H5a1 1 0 1 0 0 2h.262l.823 11.521A2 2 0 0 0 8.08 20.5h7.84a2 2 0 0 0 1.995-1.979L18.738 7H19a1 1 0 1 0 0-2h-2.382l-.724-1.447A1 1 0 0 0 15 3H9Zm1.118 4.553a1 1 0 0 1 1.06.93l.5 8.5a1 1 0 1 1-1.996.118l-.5-8.5a1 1 0 0 1 .936-1.048Zm4.764 0a1 1 0 0 1 .936 1.048l-.5 8.5a1 1 0 0 1-1.996-.118l.5-8.5a1 1 0 0 1 1.06-.93Z" />
+              </svg>
+            </button>
             <button
               onClick={onClose}
               className="rounded-full p-2 transition hover:bg-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-white/50"
@@ -567,50 +580,12 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
               </svg>
             </button>
           </div>
-        </div>
-
-        {/* Conteúdo do Editor de Prompt (modo texto) */}
-        {mode === 'text' && showPromptEditor && (
-          <div className="border-b border-slate-800/70 bg-slate-900/50 px-4 py-3">
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold text-slate-300">Prompt Customizado</label>
-              <textarea
-                value={promptDraft}
-                onChange={(e) => setPromptDraft(e.target.value)}
-                placeholder="Digite um prompt customizado para personalizar o comportamento do assistente..."
-                className="w-full rounded-lg bg-slate-800/60 px-3 py-2 text-sm text-slate-100 outline-none ring-2 ring-transparent transition focus:ring-emerald-400/60"
-                rows={3}
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-400">
-                  {promptSavedAt && `Salvo em ${new Date(promptSavedAt).toLocaleTimeString()}`}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setPromptDraft(customPrompt);
-                      setShowPromptEditor(false);
-                    }}
-                    className="rounded-lg px-3 py-2 text-emerald-100 transition hover:bg-emerald-500/20"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleApplyCustomPrompt}
-                    className="rounded-lg bg-emerald-400 px-3 py-2 font-semibold text-slate-900 transition hover:bg-emerald-300"
-                    disabled={promptDraft === customPrompt}
-                  >
-                    Aplicar prompt
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
-        )}
+        </div>
 
         {/* Área de conteúdo principal */}
         <div className="flex-1 space-y-3 overflow-y-auto bg-slate-950/70 px-4 py-4 text-sm text-slate-100">
-          {mode === 'text' ? (
+          {mode !== 'voice' && (
             <>
               {/* Mensagens de texto */}
               {messages.map((msg, index) => (
@@ -669,18 +644,20 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
 
               <div ref={messagesEndRef} />
             </>
-          ) : (
+          )}
+
+          {mode === 'voice' && (
             <>
               {/* Modo Voz */}
               <div className="space-y-4">
                 {/* Avatar e status */}
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-3xl">
-                    👨‍🍳
+                    🎤
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-bold text-white">Nutri.ai</h3>
-                    <p className="text-sm text-slate-300">Sua nutricionista pessoal por voz</p>
+                    <h3 className="text-lg font-bold text-white">Assistente de Voz</h3>
+                    <p className="text-sm text-slate-300">Converse com a IA por voz</p>
                   </div>
                 </div>
 
@@ -726,7 +703,7 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
                   )}
                   {voiceOutputTranscription && (
                     <div className="bg-sky-100 dark:bg-sky-900/30 rounded-lg p-3">
-                      <p className="text-xs text-sky-700 dark:text-sky-300 font-medium mb-1">Nutri.ai:</p>
+                      <p className="text-xs text-sky-700 dark:text-sky-300 font-medium mb-1">FitCoach.IA:</p>
                       <p className="text-sm text-slate-800 dark:text-slate-200">{voiceOutputTranscription}</p>
                     </div>
                   )}
@@ -796,10 +773,39 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
               </div>
             </>
           )}
+
+          {/* Modo Foto de Prato - integrado ao modo texto */}
+          {mode !== 'voice' && lastUploadedImage && (
+            <div className="space-y-4">
+              <div className="relative">
+                <img
+                  src={`data:${lastUploadedImage.mimeType};base64,${lastUploadedImage.base64}`}
+                  alt="Prato enviado"
+                  className="w-full max-w-md mx-auto rounded-lg shadow-lg"
+                />
+                <button
+                  onClick={() => setLastUploadedImage(null)}
+                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition"
+                  aria-label="Remover imagem"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="bg-slate-800/60 rounded-lg p-4">
+                <p className="text-sm text-slate-300 mb-2">Digite uma pergunta sobre a foto ou use:</p>
+                <ul className="text-xs text-slate-400 space-y-1 list-disc list-inside">
+                  <li>"Analise esta imagem" - para análise completa</li>
+                  <li>"editar: [descrição]" - para melhorar o prato</li>
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Barra de entrada (apenas modo texto) */}
-        {mode === 'text' && (
+        {/* Barra de entrada */}
+        {mode !== 'voice' && (
           <div className="flex items-center gap-2 border-t border-slate-800/70 bg-slate-900/70 px-4 py-3">
             <input
               type="file"
@@ -819,32 +825,26 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
               </svg>
             </button>
             <button
-              onClick={handleRecordButtonClick}
+              onClick={() => setMode('voice')}
               className={`rounded-full p-3 transition focus:outline-none focus:ring-2 ${
-                isRecording
-                  ? 'bg-rose-500 text-white hover:bg-rose-400 focus:ring-rose-300/60'
+                mode === 'voice'
+                  ? 'bg-emerald-500 text-white hover:bg-emerald-400 focus:ring-emerald-300/60'
                   : 'text-slate-300 hover:text-emerald-300 focus:ring-emerald-300/60'
               }`}
-              disabled={isLoading && !isRecording}
-              aria-label={isRecording ? 'Encerrar captura de áudio' : 'Iniciar captura de áudio'}
+              disabled={isLoading}
+              aria-label="Modo voz"
+              title="Conversa por voz"
             >
-              {isRecording ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm-2-9a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9Z" clipRule="evenodd" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 0 0-6 0v4a3 3 0 0 0 3 3Zm7-3a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.93V20H9a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2h-2v-2.07A7 7 0 0 0 19 11Z" />
-                </svg>
-              )}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 0 0-6 0v4a3 3 0 0 0 3 3Zm7-3a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.93V20H9a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2h-2v-2.07A7 7 0 0 0 19 11Z" />
+              </svg>
             </button>
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder='Pergunte algo ou escreva "Analise esta imagem:" / "editar: melhore o prato"...'
-              className="flex-1 resize-none rounded-2xl bg-slate-900/60 px-4 py-2 text-sm text-slate-100 outline-none ring-2 ring-transparent transition focus:ring-emerald-400/60 disabled:opacity-50"
+              className="flex-1 resize-none rounded-2xl bg-slate-900/60 px-4 py-2 text-sm text-slate-100 outline-none border-2 border-slate-700/50 transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/30 disabled:opacity-50"
               rows={1}
               disabled={isLoading}
             />
@@ -855,6 +855,19 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
               aria-label="Enviar mensagem"
             >
               Enviar
+            </button>
+          </div>
+        )}
+        
+        {/* Barra de entrada para modo voz - botão para voltar ao texto */}
+        {mode === 'voice' && (
+          <div className="flex items-center justify-center gap-2 border-t border-slate-800/70 bg-slate-900/70 px-4 py-3">
+            <button
+              onClick={() => setMode('text')}
+              className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition text-sm"
+              aria-label="Voltar para modo texto"
+            >
+              ← Voltar para Texto
             </button>
           </div>
         )}

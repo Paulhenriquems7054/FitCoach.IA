@@ -4,7 +4,7 @@ import Header from '../Header';
 import Sidebar from './Sidebar.tsx';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useI18n } from '../../context/I18nContext';
-import { NutriAssistantUnified } from '../chatbot/NutriAssistantUnified';
+import { NutriAssistantUnified } from '../chatbot/NutriAssistantUnified.tsx';
 import { useAutoLogout } from '../../hooks/useAutoLogout';
 import { AccessBlockChecker } from '../AccessBlockChecker';
 import { TrialExpiredChecker } from '../TrialExpiredChecker';
@@ -48,21 +48,36 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           setHasAiAccess(false);
         }
       } else {
-        // Para outros usuários, verificar trial de plataforma
-        if (user.subscriptionStatus !== 'trial') {
-          setHasAiAccess(true);
-          return;
+        // Para outros usuários, verificar através do subscriptionService (inclui trial)
+        try {
+          const { checkSubscriptionStatus } = await import('../../services/subscriptionService');
+          const subscriptionStatus = await checkSubscriptionStatus(user.id);
+          // Permitir acesso se tiver assinatura ativa (incluindo trial) ou se for trial de plataforma
+          if (subscriptionStatus.isActive) {
+            setHasAiAccess(true);
+            return;
+          }
+          // Verificar trial de plataforma como fallback
+          if (user.subscriptionStatus === 'trial') {
+            const expiryDate = user.expiryDate || user.trialEndDate;
+            if (!expiryDate) {
+              setHasAiAccess(true);
+              return;
+            }
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const expiry = new Date(expiryDate);
+            expiry.setHours(0, 0, 0, 0);
+            setHasAiAccess(today <= expiry);
+          } else {
+            // Se não tem assinatura ativa nem trial, verificar se tem acesso premium de outra forma
+            setHasAiAccess(subscriptionStatus.isActive);
+          }
+        } catch (error) {
+          console.error('Erro ao verificar acesso à IA via subscription', error);
+          // Fallback: permitir acesso se tiver subscriptionStatus diferente de null
+          setHasAiAccess(user.subscriptionStatus !== null && user.subscriptionStatus !== 'expired');
         }
-        const expiryDate = user.expiryDate || user.trialEndDate;
-        if (!expiryDate) {
-          setHasAiAccess(true);
-          return;
-        }
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const expiry = new Date(expiryDate);
-        expiry.setHours(0, 0, 0, 0);
-        setHasAiAccess(today <= expiry);
       }
     };
 

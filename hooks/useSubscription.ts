@@ -66,9 +66,37 @@ export function useSubscription() {
   }, [refresh]);
 
   const canAccess = useCallback((feature: string): boolean => {
-    if (!status || !status.isActive) return false;
-    return status.features[feature as keyof typeof status.features] === true;
-  }, [status]);
+    // Se status está carregando, permitir acesso (evita bloqueio durante carregamento)
+    if (loading) return true;
+    
+    // Se não tem status, verificar se usuário está em trial de outra forma
+    if (!status) {
+      // Verificar trial através do user object
+      if (user?.subscriptionStatus === 'trial') {
+        const expiryDate = user.expiryDate || user.trialEndDate;
+        if (expiryDate) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const expiry = new Date(expiryDate);
+          expiry.setHours(0, 0, 0, 0);
+          if (today <= expiry) {
+            return true; // Trial ativo - permitir acesso
+          }
+        } else {
+          return true; // Trial sem data de expiração - permitir acesso
+        }
+      }
+      return false;
+    }
+    
+    // Se status está ativo (inclui trial), verificar feature
+    if (status.isActive) {
+      return status.features[feature as keyof typeof status.features] === true;
+    }
+    
+    // Se não está ativo, verificar se é trial expirado ou nunca teve assinatura
+    return false;
+  }, [status, loading, user]);
 
   const getRemainingMinutes = useCallback((): number => {
     if (!status || !status.isActive) return 0;
