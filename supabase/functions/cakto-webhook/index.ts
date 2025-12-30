@@ -338,6 +338,40 @@ async function handleAcademyPlan(args: {
       console.log(`✅ Gym criado: ${company.id}`);
     }
 
+    // 5.5. Criar código de convite padrão para alunos automaticamente
+    // Gera código aleatório de 6 caracteres (mesmo formato do inviteService)
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    // Expira em 1 ano (365 dias) - tempo suficiente para a academia usar
+    const inviteExpiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    
+    let inviteCodeCreated = false;
+    const { data: invite, error: inviteError } = await supabase
+      .from("invites")
+      .insert({
+        academy_id: company.id,
+        created_by_user_id: company.id, // Usar company.id como criador (será atualizado quando owner criar conta)
+        invited_role: 'student',
+        code: inviteCode,
+        expires_at: inviteExpiresAt.toISOString(),
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    if (inviteError) {
+      console.warn("Erro ao criar código de convite padrão (não crítico):", inviteError);
+    } else {
+      inviteCodeCreated = true;
+      console.log(`✅ Código de convite padrão criado automaticamente: ${inviteCode} (expira em 1 ano)`);
+      // Registrar no log de auditoria
+      await logAuditEvent("default_invite_created", {
+        company_id: company.id,
+        invite_code: inviteCode,
+        master_code: masterCode,
+        expires_at: inviteExpiresAt.toISOString(),
+      });
+    }
+
     // 6. Criar registro de pagamento
     const { error: paymentError } = await supabase
       .from("payments")
@@ -393,9 +427,14 @@ async function handleAcademyPlan(args: {
       plan_slug: planSlug,
       customer_email: customerEmail,
       transaction_id: transactionId,
+      default_invite_code: inviteCodeCreated ? inviteCode : null,
     });
 
     console.log(`✅ Processo completo! Código mestre gerado: ${masterCode} para ${customerEmail}`);
+    if (inviteCodeCreated) {
+      console.log(`📧 Código de convite padrão para alunos: ${inviteCode}`);
+      console.log(`   A academia pode usar este código para convidar alunos.`);
+    }
   } catch (error) {
     console.error("Erro ao processar plano de academia:", error);
     await logAuditEvent("company_creation_error", {
