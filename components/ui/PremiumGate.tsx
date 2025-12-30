@@ -23,6 +23,13 @@ export const PremiumGate: React.FC<PremiumGateProps> = ({
 }) => {
   const { isPremium, requirePremium } = usePremiumAccess();
   const { user } = useUser();
+  
+  // Desenvolvedor sempre tem acesso
+  const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+  if (isDeveloper) {
+    return <>{children}</>;
+  }
+  
   const check = requirePremium(feature);
   
   if (check.allowed) {

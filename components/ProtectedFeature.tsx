@@ -25,6 +25,12 @@ export function ProtectedFeature({
   const { canAccess, isPremium } = useSubscription();
   const { user } = useUser();
 
+  // Desenvolvedor sempre tem acesso
+  const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+  if (isDeveloper) {
+    return <>{children}</>;
+  }
+
   if (canAccess(feature)) {
     return <>{children}</>;
   }

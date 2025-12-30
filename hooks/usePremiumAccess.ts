@@ -36,10 +36,20 @@ export const usePremiumAccess = () => {
   const { user } = useUser();
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  
+
+  // Verificar se é desenvolvedor
+  const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+
   useEffect(() => {
     const checkSubscription = async () => {
       if (!user?.username) {
+        setIsLoading(false);
+        return;
+      }
+      
+      // Desenvolvedor sempre tem acesso, não precisa verificar assinatura
+      if (isDeveloper) {
+        setHasActiveSubscription(true);
         setIsLoading(false);
         return;
       }
@@ -56,10 +66,11 @@ export const usePremiumAccess = () => {
     };
     
     checkSubscription();
-  }, [user?.username, user?.planType, user?.subscriptionStatus]);
-  
-  // Verifica se é Premium baseado no planType OU assinatura ativa
-  const isPremium = isPremiumPlan(user?.planType) || 
+  }, [user?.username, user?.planType, user?.subscriptionStatus, isDeveloper]);
+
+  // Verifica se é Premium baseado no planType OU assinatura ativa OU desenvolvedor
+  const isPremium = isDeveloper ||
+                    isPremiumPlan(user?.planType) || 
                     (user?.subscriptionStatus === 'active' && hasActiveSubscription) ||
                     user?.subscription === 'premium';
   
@@ -80,11 +91,11 @@ export const usePremiumAccess = () => {
   
   /**
    * Verifica se o usuário pode gerar relatórios
-   * Premium: ilimitado | Free: limitado
+   * Desenvolvedor/Premium: ilimitado | Free: limitado
    */
   const canGenerateReport = (reportCount: number = 0): boolean => {
-    if (isPremium) {
-      return true; // Ilimitado para Premium
+    if (isDeveloper || isPremium) {
+      return true; // Ilimitado para Desenvolvedor/Premium
     }
     // Free: máximo 5 relatórios por semana (pode ser ajustado)
     return reportCount < 5;

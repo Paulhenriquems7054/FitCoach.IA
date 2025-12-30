@@ -37,6 +37,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         return;
       }
 
+      // Desenvolvedor sempre tem acesso total
+      const isDeveloper = user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor';
+      if (isDeveloper) {
+        setHasAiAccess(true);
+        return;
+      }
+
       // Para alunos, verificar acesso à IA usando aiAccessService
       if (user.tenantRole === 'student') {
         try {
