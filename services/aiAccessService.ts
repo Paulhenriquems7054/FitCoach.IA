@@ -49,6 +49,12 @@ export async function getAiAccessStatus(user: User): Promise<AiAccessStatus> {
     return { hasAccess: false, reason: 'none' };
   }
 
+  // Desenvolvedor sempre tem acesso total
+  const isDeveloper = user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor';
+  if (isDeveloper) {
+    return { hasAccess: true, reason: 'subscription' };
+  }
+
   const isStudent = user.tenantRole === 'student' || user.gymRole === 'student';
 
   // 1. Verificar assinatura ativa individual de IA (B2C)
@@ -110,6 +116,12 @@ export async function getAiAccessStatus(user: User): Promise<AiAccessStatus> {
  * Lança erro com code/reason para o frontend exibir paywall
  */
 export async function assertAiAccessOrThrow(user: User, feature: 'chat' | 'voice' | 'vision' | 'plan') {
+  // Desenvolvedor sempre tem acesso
+  const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+  if (isDeveloper) {
+    return; // Desenvolvedor tem acesso, não lançar erro
+  }
+
   const status = await getAiAccessStatus(user);
   if (!status.hasAccess) {
     const error: any = new Error('AI_ACCESS_DENIED');

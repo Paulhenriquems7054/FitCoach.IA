@@ -25,6 +25,13 @@ export const AiAccessGate: React.FC<AiAccessGateProps> = ({ feature, children })
         return;
       }
 
+      // Desenvolvedor sempre tem acesso
+      const isDeveloper = user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor';
+      if (isDeveloper) {
+        setAllowed(true);
+        return;
+      }
+
       // Se não é aluno, não mostra paywall de IA (deixa outros gates cuidarem)
       if (user.tenantRole !== 'student') {
         setAllowed(true);

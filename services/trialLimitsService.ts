@@ -314,6 +314,12 @@ export async function canUsePhotoAnalysis(user: User): Promise<{ allowed: boolea
  * Verifica se pode gerar plano alimentar (trial)
  */
 export async function canUseMealPlan(user: User): Promise<{ allowed: boolean; message?: string }> {
+  // Desenvolvedor sempre tem acesso
+  const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+  if (isDeveloper) {
+    return { allowed: true };
+  }
+
   if (!isInTrial(user)) {
     return { allowed: true };
   }
