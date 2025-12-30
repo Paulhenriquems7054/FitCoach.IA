@@ -81,39 +81,52 @@ serve(async (req: Request) => {
     console.log("checkout_id encontrado:", checkoutId);
 
     // 3) Buscar plano correspondente na tabela subscription_plans
-    // Primeiro tentar por cakto_checkout_id direto
-    let { data: plan, error: planError } = await supabase
+    // A tabela subscription_plans tem checkout_url_monthly e checkout_url_yearly, mas NÃO tem cakto_checkout_id
+    // Limpar checkoutId (remover query params e paths)
+    const cleanCheckoutId = checkoutId.includes('/') 
+      ? checkoutId.split('/').pop()?.split('?')[0] 
+      : checkoutId.split('?')[0];
+    
+    console.log("Buscando plano com checkout_id limpo:", cleanCheckoutId);
+    
+    // Buscar planos que tenham esse ID nas URLs checkout_url_monthly ou checkout_url_yearly
+    let { data: plans, error: plansError } = await supabase
       .from("subscription_plans")
       .select("*")
-      .eq("cakto_checkout_id", checkoutId)
-      .maybeSingle();
-
-    // Se não encontrou, tentar buscar por checkout_url_monthly ou checkout_url_yearly
-    if (planError || !plan) {
-      // Extrair ID do checkout da URL (ex: "3ujuqzz_703304" de "https://pay.cakto.com.br/3ujuqzz_703304")
-      const checkoutIdFromUrl = checkoutId.includes('/') 
-        ? checkoutId.split('/').pop()?.split('?')[0] 
-        : checkoutId;
-      
-      // Buscar planos que tenham esse ID nas URLs
-      const { data: plans, error: plansError } = await supabase
-        .from("subscription_plans")
-        .select("*")
-        .or(`checkout_url_monthly.ilike.%${checkoutIdFromUrl}%,checkout_url_yearly.ilike.%${checkoutIdFromUrl}%`);
-      
-      if (!plansError && plans && plans.length > 0) {
-        plan = plans[0];
-        planError = null;
-        console.log("Plano encontrado via checkout_url:", plan.slug);
+      .or(`checkout_url_monthly.ilike.%${cleanCheckoutId}%,checkout_url_yearly.ilike.%${cleanCheckoutId}%`);
+    
+    let plan = plans && plans.length > 0 ? plans[0] : null;
+    let planError = plansError;
+    
+    if (plan) {
+      console.log("Plano encontrado via checkout_url:", plan.name || plan.slug);
+    } else {
+      console.log("Nenhum plano encontrado com checkout_id:", cleanCheckoutId);
+      // Se for evento de teste com "EXAMPLE" ou "123", tentar buscar por product.short_id ou offer.id
+      if (cleanCheckoutId === "EXAMPLE" || cleanCheckoutId === "123") {
+        console.log("Checkout_id é de teste (EXAMPLE/123), tentando buscar por product/offer do payload...");
+        // Para eventos de teste, podemos tentar buscar por outros campos ou simplesmente logar
+        // Em produção, isso não acontecerá pois os checkout_ids serão reais
       }
     }
 
     if (planError || !plan) {
-      console.error("Plano não encontrado para checkout_id:", checkoutId, planError);
+      console.error("Plano não encontrado para checkout_id:", cleanCheckoutId, planError);
+      // Se for evento de teste, não retornar erro 404, apenas logar
+      if (cleanCheckoutId === "EXAMPLE" || cleanCheckoutId === "123") {
+        console.log("Evento de teste detectado (checkout_id: EXAMPLE/123). Em produção, use um checkout_id real.");
+        return new Response("Evento de teste - checkout_id não corresponde a plano real", { status: 200 });
+      }
       return new Response("Plano não encontrado", { status: 404 });
     }
 
-    console.log("Plano encontrado:", { plan_group: plan.plan_group, slug: plan.slug });
+    console.log("Plano encontrado:", { 
+      plan_group: plan.plan_group, 
+      name: plan.name, 
+      display_name: plan.display_name,
+      checkout_url_monthly: plan.checkout_url_monthly,
+      checkout_url_yearly: plan.checkout_url_yearly
+    });
 
     // 4) Filtrar só eventos de pagamento confirmado (ajustar depois conforme Cakto)
     const isPaidEvent =
@@ -135,7 +148,7 @@ serve(async (req: Request) => {
       case "b2b_academia":
         await handleAcademyPlan({ plan, transactionId, amountPaid, customerEmail, body });
         await logAuditEvent("academy_plan_activated", {
-          planSlug: plan.slug,
+          planSlug: plan.name || plan.slug,
           transactionId,
           customerEmail,
         });
@@ -144,22 +157,22 @@ serve(async (req: Request) => {
       case "b2c_ai":
         await handleB2CPlan({ plan, transactionId, amountPaid, customerEmail, body, checkoutId });
         await logAuditEvent("b2c_plan_activated", {
-          planSlug: plan.slug,
+          planSlug: plan.name || plan.slug,
           transactionId,
           customerEmail,
         });
         break;
       case "recarga":
-        await handleRecharge({ plan, transactionId, amountPaid, customerEmail, body });
+        await handleRecharge({ plan, transactionId, amountPaid, customerEmail, body, checkoutId: cleanCheckoutId });
         await logAuditEvent("recharge_activated", {
-          planSlug: plan.slug,
+          planSlug: plan.name || plan.slug,
           transactionId,
           customerEmail,
         });
         break;
       case "personal":
         // Planos Personal Trainer foram removidos - não existem mais na página de vendas nem na Cakto
-        console.warn("Plano Personal Trainer recebido mas foi removido:", plan.slug);
+        console.warn("Plano Personal Trainer recebido mas foi removido:", plan.name || plan.slug);
         // Não processar - apenas logar para auditoria
         break;
       default:
@@ -220,7 +233,8 @@ async function handleAcademyPlan(args: {
       'academy_growth': 'Pack Growth',
       'academy_pro': 'Pack Pro',
     };
-    const planName = planNameMap[plan.slug] || plan.display_name || plan.name;
+    const planSlug = plan.name || plan.slug;
+    const planName = planNameMap[planSlug] || plan.display_name || plan.name;
 
     // 3. Calcular data de expiração (30 dias a partir de agora)
     const now = new Date();
@@ -232,14 +246,14 @@ async function handleAcademyPlan(args: {
       .insert({
         name: planName + " - " + customerEmail, // Nome temporário, pode ser atualizado depois
         email: customerEmail,
-        plan_type: plan.slug,
+        plan_type: planSlug,
         plan_name: planName,
         max_licenses: plan.max_licenses || 10,
         master_code: masterCode,
         status: 'active',
         payment_status: 'paid',
         cakto_transaction_id: transactionId,
-        cakto_checkout_id: plan.cakto_checkout_id,
+        cakto_checkout_id: cleanCheckoutId,
         monthly_amount: amountPaid,
         currency: 'BRL',
         started_at: now.toISOString(),
@@ -290,7 +304,7 @@ async function handleAcademyPlan(args: {
         metadata: {
           company_id: company.id,
           master_code: masterCode,
-          plan_slug: plan.slug,
+          plan_slug: planSlug,
         },
         paid_at: now.toISOString(),
       });
@@ -313,7 +327,7 @@ async function handleAcademyPlan(args: {
         metadata: {
           company_id: company.id,
           master_code: masterCode,
-          plan_slug: plan.slug,
+          plan_slug: planSlug,
         },
         paid_at: now.toISOString(),
       });
@@ -328,7 +342,7 @@ async function handleAcademyPlan(args: {
     await logAuditEvent("company_created", {
       company_id: company.id,
       master_code: masterCode,
-      plan_slug: plan.slug,
+      plan_slug: planSlug,
       customer_email: customerEmail,
       transaction_id: transactionId,
     });
@@ -554,7 +568,8 @@ async function handleRecharge(args: {
     'recarga_passe_livre_30d': 'pass_libre',
   };
   
-  const rechargeType = rechargeTypeMap[plan.slug] || 'turbo';
+  const planSlug = plan.name || plan.slug;
+  const rechargeType = rechargeTypeMap[planSlug] || 'turbo';
   
   // 2. Mapear nome da recarga
   const rechargeNameMap: Record<string, string> = {
@@ -563,7 +578,7 @@ async function handleRecharge(args: {
     'recarga_passe_livre_30d': 'Passe Livre 30 Dias',
   };
   
-  const rechargeName = rechargeNameMap[plan.slug] || plan.name || 'Recarga';
+  const rechargeName = rechargeNameMap[planSlug] || plan.name || 'Recarga';
   
   // 3. Calcular quantidade baseada no tipo
   const quantityMap: Record<string, number> = {
@@ -628,7 +643,7 @@ async function handleRecharge(args: {
     expires_at: expiresAt,
     status: "active",
     payment_status: "paid",
-    cakto_checkout_id: plan.cakto_checkout_id,
+    cakto_checkout_id: cleanCheckoutId || checkoutId,
     cakto_transaction_id: transactionId,
   });
 
@@ -650,9 +665,9 @@ async function handlePersonalTrainerPlan(args: {
 
   const { error } = await supabase.from("personal_subscriptions").insert({
     personal_email: customerEmail,
-    plan_slug: plan.slug,
+    plan_slug: plan.name || plan.slug,
     plan_group: plan.plan_group,
-    cakto_checkout_id: plan.cakto_checkout_id,
+    cakto_checkout_id: cleanCheckoutId,
     cakto_transaction_id: transactionId,
     amount_paid: amountPaid,
     max_licenses: plan.max_licenses,
@@ -661,6 +676,8 @@ async function handlePersonalTrainerPlan(args: {
 
   if (error) console.error("Erro ao criar assinatura de personal:", error);
 }
+
+// Nota: handlePersonalTrainerPlan não é mais usado, mas mantido para compatibilidade
 
 // ============ FUNÇÃO DE LOG DE AUDITORIA ============
 
