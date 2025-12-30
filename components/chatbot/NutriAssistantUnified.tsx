@@ -211,8 +211,12 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
   const handleSendMessage = useCallback(async () => {
     if (!input.trim() || isLoading) return;
 
+    // Verificar se é desenvolvedor (acesso ilimitado)
+    const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+
     // Verificar limite de imagens para trial (máximo 1 imagem durante todo o trial)
-    if (lastUploadedImage && isTrial && trialPhotosAnalyzed >= 1) {
+    // Desenvolvedor tem acesso ilimitado
+    if (lastUploadedImage && isTrial && trialPhotosAnalyzed >= 1 && !isDeveloper) {
       showError('Você já utilizou sua análise de imagem gratuita do trial. Assine um plano para continuar analisando imagens.');
       setLastUploadedImage(null);
       return;
@@ -234,8 +238,12 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
       setMessages((prev) => [...prev, { role: 'assistant', content: '', isStreaming: true }]);
 
       if (lastUploadedImage && userContent.toLowerCase().startsWith('editar:')) {
+        // Verificar se é desenvolvedor (acesso ilimitado)
+        const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+        
         // Edição de imagem também conta como análise para trial
-        if (isTrial && trialPhotosAnalyzed >= 1) {
+        // Desenvolvedor tem acesso ilimitado
+        if (isTrial && trialPhotosAnalyzed >= 1 && !isDeveloper) {
           showError('Você já utilizou sua análise de imagem gratuita do trial. Assine um plano para continuar editando imagens.');
           setLastUploadedImage(null);
           setIsLoading(false);
@@ -255,8 +263,9 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
           (error) => handleAssistantError(`Erro ao editar imagem: ${error}`),
         );
         
-        // Incrementar contador de imagens analisadas no trial
-        if (isTrial) {
+        // Incrementar contador de imagens analisadas no trial (desenvolvedor não incrementa)
+        const isDeveloperEdit = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+        if (isTrial && !isDeveloperEdit) {
           const newCount = trialPhotosAnalyzed + 1;
           setTrialPhotosAnalyzed(newCount);
           localStorage.setItem(TRIAL_PHOTOS_KEY, newCount.toString());
@@ -272,8 +281,9 @@ export const NutriAssistantUnified: React.FC<NutriAssistantUnifiedProps> = ({ is
           (error) => handleAssistantError(`Erro ao analisar imagem: ${error}`),
         );
         
-        // Incrementar contador de imagens analisadas no trial
-        if (isTrial) {
+        // Incrementar contador de imagens analisadas no trial (desenvolvedor não incrementa)
+        const isDeveloperAnalyze = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+        if (isTrial && !isDeveloperAnalyze) {
           const newCount = trialPhotosAnalyzed + 1;
           setTrialPhotosAnalyzed(newCount);
           localStorage.setItem(TRIAL_PHOTOS_KEY, newCount.toString());

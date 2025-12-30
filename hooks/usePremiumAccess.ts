@@ -92,9 +92,13 @@ export const usePremiumAccess = () => {
   
   /**
    * Verifica se o usuário pode analisar fotos
-   * Premium: ilimitado | Free: limitado
+   * Desenvolvedor/Premium: ilimitado | Free: limitado
    */
   const canAnalyzePhoto = (photosAnalyzedToday: number = 0): boolean => {
+    // Desenvolvedor tem acesso ilimitado
+    if (isDeveloper) {
+      return true;
+    }
     if (isPremium) {
       return true; // Ilimitado para Premium
     }

@@ -14,6 +14,7 @@
     "generate-icons": "node scripts/generate-icons.js",
     "generate-favicon": "node scripts/generate-favicon.js",
     "generate-app-icons": "node scripts/generate-app-icons.js",
+    "check-config": "node scripts/check-config.js",
     "server": "node server/gym-server.js"
   },
   "dependencies": {

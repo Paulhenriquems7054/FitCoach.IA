@@ -13,7 +13,7 @@ interface DefaultUser {
   password: string;
   email: string;
   gymRole: 'admin';
-  role: 'professional';
+  role: 'professional' | 'developer';
 }
 
 const DEFAULT_USERS: DefaultUser[] = [
@@ -23,7 +23,7 @@ const DEFAULT_USERS: DefaultUser[] = [
     password: 'dev123',
     email: 'dev123@fitcoach.ia',
     gymRole: 'admin',
-    role: 'professional',
+    role: 'developer', // Role especial para desenvolvedor
   },
   {
     nome: 'Administrador',
@@ -144,11 +144,11 @@ async function createUserProfile(userId: string, userConfig: DefaultUser): Promi
       discipline_score: 0,
       completed_challenge_ids: [],
       is_anonymized: false,
-      role: userConfig.role,
+      role: userConfig.username === 'dev123' ? 'developer' : userConfig.role, // Role especial para desenvolvedor
       gym_role: userConfig.gymRole,
       gym_id: null,
       is_gym_managed: false,
-      plan_type: 'monthly', // Premium
+      plan_type: userConfig.username === 'dev123' ? 'developer' : 'monthly', // Developer para dev123, Premium para admin
       subscription_status: 'active',
       data_permissions: {
         allowWeightHistory: true,
@@ -162,7 +162,8 @@ async function createUserProfile(userId: string, userConfig: DefaultUser): Promi
         securityNotifications: true,
       },
       access_blocked: false,
-      voice_daily_limit_seconds: 999999, // Praticamente ilimitado
+      // Desenvolvedor tem limites ilimitados
+      voice_daily_limit_seconds: userConfig.username === 'dev123' ? 999999999 : 999999, // Ilimitado para dev123
       voice_used_today_seconds: 0,
       voice_balance_upsell: 0,
       text_msg_count_today: 0,

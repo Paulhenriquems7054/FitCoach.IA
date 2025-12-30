@@ -82,8 +82,11 @@ const AnalyzerPage: React.FC = () => {
     const handleAnalyze = async () => {
         if (!selectedImage) return;
 
-        // Verificar limite de análises
-        if (!canAnalyzePhoto(photosAnalyzedToday)) {
+        // Verificar se é desenvolvedor (acesso ilimitado)
+        const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
+
+        // Verificar limite de análises (desenvolvedor tem acesso ilimitado)
+        if (!isDeveloper && !canAnalyzePhoto(photosAnalyzedToday)) {
             const limitMessage = getLimitMessage('análise de fotos', '3 análises por dia');
             setError(limitMessage);
             showWarning(limitMessage);

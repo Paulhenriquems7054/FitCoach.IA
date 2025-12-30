@@ -86,8 +86,25 @@ class Logger {
     // Em produção, ainda logamos erros críticos
     console.error(this.formatMessage('error', message, context), error);
     
-    // Aqui você pode adicionar integração com serviços de error tracking
-    // como Sentry, se necessário
+    // Integração com error tracking (se disponível)
+    if (typeof window !== 'undefined') {
+      try {
+        // Importação dinâmica para evitar dependência circular
+        import('./errorTracking').then(({ errorTracking }) => {
+          errorTracking.captureError(
+            error instanceof Error ? error : new Error(message),
+            {
+              feature: context,
+              additionalData: { message },
+            }
+          );
+        }).catch(() => {
+          // Error tracking não disponível, continuar normalmente
+        });
+      } catch {
+        // Ignorar erros de importação
+      }
+    }
   }
 
   /**

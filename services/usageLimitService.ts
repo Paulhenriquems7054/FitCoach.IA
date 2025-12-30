@@ -45,6 +45,19 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
             };
         }
         
+        // Desenvolvedor tem acesso ilimitado
+        const isDeveloper = user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor';
+        if (isDeveloper) {
+            return {
+                canUse: true,
+                remainingDaily: Infinity,
+                remainingBoost: 0,
+                remainingReserve: 0,
+                totalRemaining: Infinity,
+                isUnlimited: true
+            };
+        }
+        
         // Verificar acesso baseado em trial
         const accessCheck = await checkAccess(user, 'voice');
         if (!accessCheck.allowed) {
@@ -192,6 +205,12 @@ export async function consumeVoiceSeconds(seconds: number): Promise<{ success: b
         const user = await getUser();
         if (!user || !user.id) {
             return { success: false, error: 'Usuário não encontrado' };
+        }
+
+        // Desenvolvedor não consome segundos (acesso ilimitado)
+        const isDeveloper = user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor';
+        if (isDeveloper) {
+            return { success: true };
         }
 
         const supabase = getSupabaseClient();
@@ -370,6 +389,17 @@ export async function checkTextUsage(): Promise<TextUsageStatus> {
                 limit: 600,
                 remaining: 0,
                 error: 'Usuário não encontrado'
+            };
+        }
+        
+        // Desenvolvedor tem acesso ilimitado
+        const isDeveloper = user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor';
+        if (isDeveloper) {
+            return {
+                canSend: true,
+                countToday: 0,
+                limit: Infinity,
+                remaining: Infinity
             };
         }
         
