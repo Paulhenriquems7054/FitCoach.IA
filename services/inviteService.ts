@@ -127,8 +127,9 @@ export async function validateInvite(code: string): Promise<InviteValidationResu
 }
 
 /**
- * Aceita um convite: vincula usuário à academia e inicia trial de IA se for aluno
- * MODELO B2B2C: Alunos sempre recebem trial de 7 dias ao aceitar convite
+ * Aceita um convite: vincula usuário à academia
+ * NOVA LÓGICA: Alunos que acessam pelo código da academia NÃO recebem trial
+ * Trial é apenas para usuários indicados pelos alunos (sem código de academia)
  * 🔒 SEGURANÇA: Valida se usuário já está vinculado a outra academia
  */
 export async function acceptInvite(code: string, userId: string): Promise<void> {
@@ -168,33 +169,24 @@ export async function acceptInvite(code: string, userId: string): Promise<void> 
   // Se já está vinculado à mesma academia, permitir (pode estar revalidando ou atualizando)
   if (existingUser?.academy_id === academyId) {
     logger.info(`Usuário ${userId} já está vinculado à academia ${academyId}`, 'inviteService');
-    // Continuar para atualizar dados do trial se necessário
+    // Continuar para atualizar dados se necessário
   }
 
-  // Se for aluno, ativar trial de IA automaticamente (7 dias)
-  const now = new Date();
-  const trialExpiresAt = invitedRole === 'student' 
-    ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
-    : null;
-
-  // Atualizar usuário com academy_id, tenant_role e trial de IA (campos simplificados e legado)
+  // NOVA LÓGICA: Alunos que acessam pelo código da academia NÃO recebem trial
+  // Apenas vinculam à academia sem trial
   const updateData: any = {
     academy_id: academyId,
     tenant_role: invitedRole,
+    // Alunos não recebem trial ao acessar pelo código da academia
+    trial_active: false,
+    trial_expires_at: null,
+    ai_subscription_status: 'none',
+    ai_trial_start_at: null,
+    ai_trial_end_at: null,
   };
 
-  if (invitedRole === 'student') {
-    // Campos simplificados (novos)
-    updateData.trial_active = true;
-    updateData.trial_expires_at = trialExpiresAt;
-    // Campos legado (manter compatibilidade)
-    updateData.ai_subscription_status = 'trial';
-    updateData.ai_trial_start_at = now.toISOString();
-    updateData.ai_trial_end_at = trialExpiresAt;
-    // Limites de uso: trial tem 5 minutos de voz por dia
-    updateData.voice_daily_limit_seconds = 300; // 5 minutos
-  } else {
-    // Personal trainers não recebem trial de IA
+  // Personal trainers também não recebem trial
+  if (invitedRole === 'personal') {
     updateData.trial_active = false;
     updateData.trial_expires_at = null;
     updateData.ai_subscription_status = 'none';
@@ -207,14 +199,9 @@ export async function acceptInvite(code: string, userId: string): Promise<void> 
     .update(updateData)
     .eq('id', userId);
 
-  // Registrar evento de trial iniciado (métricas)
-  if (invitedRole === 'student') {
-    try {
-      const { trackTrialStarted } = await import('./aiMetricsService');
-      await trackTrialStarted(userId, academyId);
-    } catch (error) {
-      logger.warn('Erro ao registrar trial iniciado (métricas)', 'inviteService', error);
-    }
+  if (userError) {
+    logger.error('Erro ao aceitar convite (atualizar usuário)', 'inviteService', userError);
+    throw new Error('Não foi possível vincular o convite ao usuário.');
   }
 
   if (userError) {

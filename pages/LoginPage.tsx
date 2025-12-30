@@ -913,7 +913,38 @@ const LoginPage: React.FC = () => {
                 }
             }
 
-            // Se veio de invite acadêmico, aceitar convite (vincular academy_id/tenant_role/trial IA)
+            // NOVA LÓGICA: Trial apenas para usuários indicados (sem código de academia)
+            // Se o usuário NÃO tem código de convite da academia, dar trial de 3 dias
+            const isReferredUser = !inviteCode && !signupCouponCode.trim();
+            
+            if (isReferredUser) {
+                try {
+                    const now = new Date();
+                    const trialExpiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(); // 3 dias
+                    
+                    const { error: trialError } = await supabase
+                        .from('users')
+                        .update({
+                            trial_active: true,
+                            trial_expires_at: trialExpiresAt,
+                            ai_subscription_status: 'trial',
+                            ai_trial_start_at: now.toISOString(),
+                            ai_trial_end_at: trialExpiresAt,
+                            voice_daily_limit_seconds: 300, // 5 minutos por dia durante trial
+                        })
+                        .eq('id', userId);
+                    
+                    if (trialError) {
+                        logger.warn('Erro ao ativar trial para usuário indicado', 'LoginPage', trialError);
+                    } else {
+                        logger.info(`Trial de 3 dias ativado para usuário indicado ${userId}`, 'LoginPage');
+                    }
+                } catch (err) {
+                    logger.warn('Erro ao processar trial para usuário indicado', 'LoginPage', err);
+                }
+            }
+
+            // Se veio de invite acadêmico, aceitar convite (vincular academy_id/tenant_role - SEM trial)
             if (inviteCode && inviteInfo) {
                 try {
                     await acceptInvite(inviteCode, userId);

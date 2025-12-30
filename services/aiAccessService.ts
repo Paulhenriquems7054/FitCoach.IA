@@ -58,10 +58,13 @@ export async function getAiAccessStatus(user: User): Promise<AiAccessStatus> {
     return { hasAccess: true, reason: 'subscription' };
   }
 
-  // 2. Verificar trial ativo (prioridade: campos simplificados trialActive/trialExpiresAt)
+  // 2. Verificar trial ativo (apenas para usuários indicados, não alunos)
+  // Alunos que acessam pelo código da academia NÃO têm trial
+  const isStudent = user.tenantRole === 'student' || user.gymRole === 'student';
   const trialExpires = user.trialExpiresAt || user.aiTrialEndAt || null;
-  const isTrialActive = user.trialActive === true || 
-    (user.aiSubscriptionStatus === 'trial' && trialExpires && new Date(trialExpires) > new Date());
+  const isTrialActive = !isStudent && 
+    (user.trialActive === true || 
+     (user.aiSubscriptionStatus === 'trial' && trialExpires && new Date(trialExpires) > new Date()));
   
   if (isTrialActive && trialExpires) {
     const daysRemaining = getDaysRemaining(trialExpires);

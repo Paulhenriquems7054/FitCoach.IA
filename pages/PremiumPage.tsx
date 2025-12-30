@@ -33,18 +33,21 @@ const PremiumPage: React.FC = () => {
     const { user } = useUser();
     const { showError, showSuccess } = useToast();
     
-    // Verificar se é aluno
-    const isStudent = user?.tenantRole === 'student';
+    // Verificar se é aluno (acessou pelo código da academia)
+    const isStudent = user?.tenantRole === 'student' || user?.gymRole === 'student';
     
-    // Verificar se trial expirou para alunos
+    // Verificar se é usuário indicado (sem código de academia, com trial)
+    const isReferredUser = !isStudent && user?.trialActive && user?.trialExpiresAt;
+    
+    // Verificar se trial expirou para usuários indicados
     const isTrialExpired = React.useMemo(() => {
-        if (!isStudent) return false;
+        if (!isReferredUser) return false;
         if (!user?.trialExpiresAt) return false;
         
         const expiryDate = new Date(user.trialExpiresAt);
         const now = new Date();
         return now > expiryDate;
-    }, [user, isStudent]);
+    }, [user, isReferredUser]);
     const [allPlans, setAllPlans] = useState<SubscriptionPlan[]>([]);
     const [activeSubscription, setActiveSubscription] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -488,8 +491,8 @@ const PremiumPage: React.FC = () => {
                 </div>
             ) : (
                 <div className="space-y-8 sm:space-y-12">
-                    {/* Mensagem para alunos com trial ativo */}
-                    {isStudent && !isTrialExpired && (
+                    {/* Mensagem para usuários indicados com trial ativo */}
+                    {isReferredUser && !isTrialExpired && (
                         <Card className="border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
                             <div className="p-6 text-center">
                                 <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3">
@@ -513,10 +516,24 @@ const PremiumPage: React.FC = () => {
                         </Card>
                     )}
                     
+                    {/* Mensagem para alunos (sem trial) */}
+                    {isStudent && (
+                        <Card className="border-2 border-emerald-500 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20">
+                            <div className="p-6 text-center">
+                                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3">
+                                    Aluno da Academia 🏋️
+                                </h2>
+                                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mb-4">
+                                    Como aluno, você pode assinar planos individuais ou recargas para continuar usando todas as funcionalidades de IA.
+                                </p>
+                            </div>
+                        </Card>
+                    )}
+                    
                     {/* Navegação por Abas */}
                     <div className="flex flex-wrap justify-center gap-2 sm:gap-4 border-b border-slate-200 dark:border-slate-700 pb-4">
-                        {/* Para alunos: mostrar apenas Planos Individuais e Recargas */}
-                        {isStudent ? (
+                        {/* Para alunos e usuários indicados após trial: mostrar apenas Planos Individuais e Recargas */}
+                        {(isStudent || (isReferredUser && isTrialExpired)) ? (
                             <>
                                 <button
                                     onClick={() => setActivePage('b2c')}
@@ -566,8 +583,8 @@ const PremiumPage: React.FC = () => {
                         )}
                     </div>
 
-                    {/* PLANOS B2C - INDIVIDUAIS (USO DA IA) - Apenas para alunos após trial expirar */}
-                    {isStudent && isTrialExpired && activePage === 'b2c' && b2cPlans.length > 0 && (
+                    {/* PLANOS B2C - INDIVIDUAIS (USO DA IA) - Para alunos e usuários indicados após trial expirar */}
+                    {(isStudent || (isReferredUser && isTrialExpired)) && activePage === 'b2c' && b2cPlans.length > 0 && (
                         <div>
                             <div className="text-center mb-6">
                                 <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
@@ -663,8 +680,8 @@ const PremiumPage: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Seção de Recargas - Apenas para alunos após trial expirar */}
-                    {isStudent && isTrialExpired && activePage === 'recharge' && (
+                    {/* Seção de Recargas - Para alunos e usuários indicados após trial expirar */}
+                    {(isStudent || (isReferredUser && isTrialExpired)) && activePage === 'recharge' && (
                     <div>
                         <div className="text-center mb-6">
                             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">

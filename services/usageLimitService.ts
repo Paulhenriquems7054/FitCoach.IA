@@ -314,12 +314,15 @@ export async function consumeVoiceSeconds(seconds: number): Promise<{ success: b
             return { success: false, error: 'LIMIT_REACHED' };
         }
 
-        // Registrar uso no trial (se estiver em trial)
+        // Registrar uso no trial (se estiver em trial - apenas para usuários indicados, não alunos)
         const userDataWithTrial = userData as any;
         let trialVoiceTotal = userDataWithTrial.trial_voice_total_seconds || 0;
-        const isInTrial = user.subscriptionStatus === 'trial' && 
-                         user.trialEndDate && 
-                         new Date(user.trialEndDate) > new Date();
+        // Verificar se é aluno (não deve ter trial)
+        const isStudent = user.tenantRole === 'student' || user.gymRole === 'student';
+        const isInTrial = !isStudent && 
+                         user.trialActive === true && 
+                         user.trialExpiresAt && 
+                         new Date(user.trialExpiresAt) > new Date();
         
         if (isInTrial) {
             trialVoiceTotal += seconds;
