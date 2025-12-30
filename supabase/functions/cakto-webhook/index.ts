@@ -120,8 +120,13 @@ serve(async (req: Request) => {
       return new Response("Plano não encontrado", { status: 404 });
     }
 
+    // Determinar categoria do plano (priorizar plan_category, fallback para plan_group)
+    const planCategory = plan.plan_category || plan.plan_group;
+    
     console.log("Plano encontrado:", { 
-      plan_group: plan.plan_group, 
+      plan_category: plan.plan_category,
+      plan_group: plan.plan_group,
+      categoria_usada: planCategory,
       name: plan.name, 
       display_name: plan.display_name,
       checkout_url_monthly: plan.checkout_url_monthly,
@@ -144,39 +149,76 @@ serve(async (req: Request) => {
     }
 
     // 5) Processar por tipo de plano
-    switch (plan.plan_group) {
+    // Mapear plan_category (usado na página) para handlers do webhook
+    // Suporta tanto plan_category quanto plan_group para compatibilidade
+    switch (planCategory) {
+      // B2B - Academias (plan_category: 'b2b_platform' ou plan_group: 'b2b_academia')
+      case "b2b_platform":
       case "b2b_academia":
+      case "b2b":
         await handleAcademyPlan({ plan, transactionId, amountPaid, customerEmail, body, checkoutId: cleanCheckoutId });
         await logAuditEvent("academy_plan_activated", {
           planSlug: plan.name || plan.slug,
+          planCategory: planCategory,
           transactionId,
           customerEmail,
         });
         break;
-      case "b2c":
+      
+      // B2C - Individuais (plan_category: 'b2c_ai' ou plan_group: 'b2c'/'b2c_ai')
       case "b2c_ai":
+      case "b2c":
         await handleB2CPlan({ plan, transactionId, amountPaid, customerEmail, body, checkoutId });
         await logAuditEvent("b2c_plan_activated", {
           planSlug: plan.name || plan.slug,
+          planCategory: planCategory,
           transactionId,
           customerEmail,
         });
         break;
+      
+      // Recargas (plan_category: 'recharge' ou plan_group: 'recarga')
+      case "recharge":
       case "recarga":
         await handleRecharge({ plan, transactionId, amountPaid, customerEmail, body, checkoutId: cleanCheckoutId });
         await logAuditEvent("recharge_activated", {
           planSlug: plan.name || plan.slug,
+          planCategory: planCategory,
           transactionId,
           customerEmail,
         });
         break;
+      
+      // Personal Trainers (plan_category: 'personal_platform' ou plan_group: 'personal')
+      case "personal_platform":
       case "personal":
         // Planos Personal Trainer foram removidos - não existem mais na página de vendas nem na Cakto
         console.warn("Plano Personal Trainer recebido mas foi removido:", plan.name || plan.slug);
         // Não processar - apenas logar para auditoria
+        await logAuditEvent("personal_plan_ignored", {
+          planSlug: plan.name || plan.slug,
+          planCategory: planCategory,
+          transactionId,
+          customerEmail,
+          reason: "Planos Personal Trainer foram removidos"
+        });
         break;
+      
       default:
-        console.warn("plan_group desconhecido:", plan.plan_group);
+        console.warn("⚠️ Categoria/grupo de plano desconhecido:", {
+          plan_category: plan.plan_category,
+          plan_group: plan.plan_group,
+          categoria_usada: planCategory,
+          plan_name: plan.name
+        });
+        await logAuditEvent("unknown_plan_category", {
+          planSlug: plan.name || plan.slug,
+          planCategory: planCategory,
+          plan_category: plan.plan_category,
+          plan_group: plan.plan_group,
+          transactionId,
+          customerEmail,
+        });
         break;
     }
 
