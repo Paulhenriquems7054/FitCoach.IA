@@ -96,9 +96,19 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
 
   // Memoizar arrays de navegação para evitar re-renders desnecessários
   const mainNavigation = useMemo(() => {
-    // Desenvolvedor: apenas dashboard administrativo
+    // Desenvolvedor: acesso completo a todas funcionalidades + dashboard administrativo
     if (isDeveloper) {
       return [
+        { name: t('sidebar.home'), href: '#/', icon: HomeIcon },
+        { name: 'Meu Plano de Treino', href: '#/wellness', icon: HeartIcon },
+        { name: 'Biblioteca de Exercícios', href: '#/biblioteca', icon: BookOpenIcon },
+        { name: t('sidebar.challenges'), href: '#/desafios', icon: TrophyIcon },
+        { name: t('sidebar.progressAnalysis'), href: '#/analysis', icon: TrendingUpIcon },
+        { name: t('sidebar.aiReports'), href: '#/reports', icon: ChartBarIcon },
+        { name: t('sidebar.planGenerator'), href: '#/generator', icon: SparklesIcon },
+        { name: t('sidebar.smartMeal'), href: '#/smart-meal', icon: WandIcon },
+        { name: t('sidebar.plateAnalyzer'), href: '#/analyzer', icon: CameraIcon },
+        { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon },
         { name: 'Controle de Academias e Assinaturas', href: '#/admin-dashboard', icon: ChartBarIcon },
       ];
     }
@@ -161,9 +171,14 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
   }, [t, permissions.canViewStudents, isAdmin, isStudent, isTrainer, isDeveloper, accountType]);
 
   const userNavigation = useMemo(() => {
-    // Se for desenvolvedor, não mostrar navegação de usuário
+    // Desenvolvedor: acesso completo a todas opções de usuário
     if (isDeveloper) {
-      return [];
+      return [
+        { name: 'Perfil', href: '#/perfil', icon: UserCircleIcon },
+        { name: t('sidebar.privacy'), href: '#/privacy', icon: ShieldCheckIcon },
+        { name: t('sidebar.settings'), href: '#/configuracoes', icon: CogIcon },
+        { name: 'Gerenciar Permissões', href: '#/permissions', icon: KeyIcon },
+      ];
     }
     
     return [
