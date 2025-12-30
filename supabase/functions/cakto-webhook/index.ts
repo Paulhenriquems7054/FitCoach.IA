@@ -87,9 +87,20 @@ serve(async (req: Request) => {
       ? checkoutId.split('/').pop()?.split('?')[0] 
       : checkoutId.split('?')[0];
     
+    // 4) Verificar se é evento de teste ANTES de buscar no banco
+    if (cleanCheckoutId === "EXAMPLE" || cleanCheckoutId === "123") {
+      console.log("✅ Evento de teste detectado (checkout_id: EXAMPLE/123). Em produção, use um checkout_id real.");
+      await logAuditEvent("test_event_received", {
+        checkoutId: cleanCheckoutId,
+        transactionId: body?.data?.id || body?.data?.transaction_id,
+        message: "Evento de teste - checkout_id não corresponde a plano real"
+      });
+      return new Response("Evento de teste - checkout_id não corresponde a plano real", { status: 200 });
+    }
+    
     console.log("Buscando plano com checkout_id limpo:", cleanCheckoutId);
     
-    // Buscar planos que tenham esse ID nas URLs checkout_url_monthly ou checkout_url_yearly
+    // 5) Buscar planos que tenham esse ID nas URLs checkout_url_monthly ou checkout_url_yearly
     let { data: plans, error: plansError } = await supabase
       .from("subscription_plans")
       .select("*")
@@ -99,24 +110,13 @@ serve(async (req: Request) => {
     let planError = plansError;
     
     if (plan) {
-      console.log("Plano encontrado via checkout_url:", plan.name || plan.slug);
+      console.log("✅ Plano encontrado via checkout_url:", plan.name || plan.slug);
     } else {
-      console.log("Nenhum plano encontrado com checkout_id:", cleanCheckoutId);
-      // Se for evento de teste com "EXAMPLE" ou "123", tentar buscar por product.short_id ou offer.id
-      if (cleanCheckoutId === "EXAMPLE" || cleanCheckoutId === "123") {
-        console.log("Checkout_id é de teste (EXAMPLE/123), tentando buscar por product/offer do payload...");
-        // Para eventos de teste, podemos tentar buscar por outros campos ou simplesmente logar
-        // Em produção, isso não acontecerá pois os checkout_ids serão reais
-      }
+      console.warn("⚠️ Nenhum plano encontrado com checkout_id:", cleanCheckoutId);
     }
 
     if (planError || !plan) {
-      console.error("Plano não encontrado para checkout_id:", cleanCheckoutId, planError);
-      // Se for evento de teste, não retornar erro 404, apenas logar
-      if (cleanCheckoutId === "EXAMPLE" || cleanCheckoutId === "123") {
-        console.log("Evento de teste detectado (checkout_id: EXAMPLE/123). Em produção, use um checkout_id real.");
-        return new Response("Evento de teste - checkout_id não corresponde a plano real", { status: 200 });
-      }
+      console.error("❌ Plano não encontrado para checkout_id:", cleanCheckoutId, planError?.message || null);
       return new Response("Plano não encontrado", { status: 404 });
     }
 
