@@ -37,9 +37,6 @@ export const usePremiumAccess = () => {
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Verificar se é desenvolvedor
-  const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
-
   useEffect(() => {
     const checkSubscription = async () => {
       if (!user?.username) {
@@ -48,7 +45,7 @@ export const usePremiumAccess = () => {
       }
       
       // Desenvolvedor sempre tem acesso, não precisa verificar assinatura
-      if (isDeveloper) {
+      if (isDeveloper(user)) {
         setHasActiveSubscription(true);
         setIsLoading(false);
         return;

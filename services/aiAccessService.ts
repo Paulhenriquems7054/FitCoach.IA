@@ -1,6 +1,7 @@
 import type { User } from '../types';
 import { getSupabaseClient } from './supabaseService';
 import { logger } from '../utils/logger';
+import { isDeveloper } from '../utils/developerUtils';
 
 export type AiAccessReason = 'subscription' | 'trial' | 'trial_expired' | 'none';
 
@@ -50,8 +51,7 @@ export async function getAiAccessStatus(user: User): Promise<AiAccessStatus> {
   }
 
   // Desenvolvedor sempre tem acesso total
-  const isDeveloper = user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor';
-  if (isDeveloper) {
+  if (isDeveloper(user)) {
     return { hasAccess: true, reason: 'subscription' };
   }
 
@@ -117,8 +117,7 @@ export async function getAiAccessStatus(user: User): Promise<AiAccessStatus> {
  */
 export async function assertAiAccessOrThrow(user: User, feature: 'chat' | 'voice' | 'vision' | 'plan') {
   // Desenvolvedor sempre tem acesso
-  const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
-  if (isDeveloper) {
+  if (isDeveloper(user)) {
     return; // Desenvolvedor tem acesso, não lançar erro
   }
 

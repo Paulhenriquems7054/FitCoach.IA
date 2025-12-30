@@ -8,6 +8,7 @@ import { getSupabaseClient } from './supabaseService';
 import { logger } from '../utils/logger';
 import type { User } from '../types';
 import { checkAccess, updateTrialStatus } from './trialAccessService';
+import { isDeveloper } from '../utils/developerUtils';
 
 export interface VoiceUsageStatus {
     canUse: boolean;
@@ -46,8 +47,7 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
         }
         
         // Desenvolvedor tem acesso ilimitado
-        const isDeveloper = user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor';
-        if (isDeveloper) {
+        if (isDeveloper(user)) {
             return {
                 canUse: true,
                 remainingDaily: Infinity,
@@ -208,8 +208,7 @@ export async function consumeVoiceSeconds(seconds: number): Promise<{ success: b
         }
 
         // Desenvolvedor não consome segundos (acesso ilimitado)
-        const isDeveloper = user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor';
-        if (isDeveloper) {
+        if (isDeveloper(user)) {
             return { success: true };
         }
 
@@ -393,8 +392,7 @@ export async function checkTextUsage(): Promise<TextUsageStatus> {
         }
         
         // Desenvolvedor tem acesso ilimitado
-        const isDeveloper = user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor';
-        if (isDeveloper) {
+        if (isDeveloper(user)) {
             return {
                 canSend: true,
                 countToday: 0,

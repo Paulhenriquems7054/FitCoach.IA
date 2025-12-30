@@ -9,6 +9,7 @@ import type { User } from '../types';
 import { getSupabaseClient } from './supabaseService';
 import { logger } from '../utils/logger';
 import { getTrialDaysRemaining } from './trialAccessService';
+import { isDeveloper } from '../utils/developerUtils';
 
 export interface TrialLimitsStatus {
   voice: {
@@ -315,8 +316,7 @@ export async function canUsePhotoAnalysis(user: User): Promise<{ allowed: boolea
  */
 export async function canUseMealPlan(user: User): Promise<{ allowed: boolean; message?: string }> {
   // Desenvolvedor sempre tem acesso
-  const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
-  if (isDeveloper) {
+  if (isDeveloper(user)) {
     return { allowed: true };
   }
 
