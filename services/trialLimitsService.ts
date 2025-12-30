@@ -32,17 +32,11 @@ export interface TrialLimitsStatus {
 
 /**
  * Verifica se o usuário está em trial
- * NOVA LÓGICA: Trial apenas para usuários indicados (não alunos)
- * Alunos que acessam pelo código da academia NÃO têm trial
+ * ESTRATÉGIA: Alunos recebem 3 dias grátis de IA, usuários indicados também
+ * Após trial, alunos precisam assinar plano individual (B2C)
  */
 function isInTrial(user: User): boolean {
-  // Verificar se é aluno (não deve ter trial)
-  const isStudent = user.tenantRole === 'student' || user.gymRole === 'student';
-  if (isStudent) {
-    return false; // Alunos não têm trial
-  }
-  
-  // Verificar se é usuário indicado com trial ativo
+  // Verificar se tem trial ativo (alunos e usuários indicados)
   return user.trialActive === true && 
          user.trialExpiresAt && 
          new Date(user.trialExpiresAt) > new Date();

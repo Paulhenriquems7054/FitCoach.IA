@@ -39,15 +39,24 @@ const PremiumPage: React.FC = () => {
     // Verificar se é usuário indicado (sem código de academia, com trial)
     const isReferredUser = !isStudent && user?.trialActive && user?.trialExpiresAt;
     
-    // Verificar se trial expirou para usuários indicados
+    // Verificar se aluno está em trial (3 dias grátis de IA)
+    const isStudentInTrial = React.useMemo(() => {
+        if (!isStudent) return false;
+        if (!user?.trialActive || !user?.trialExpiresAt) return false;
+        
+        const expiryDate = new Date(user.trialExpiresAt);
+        const now = new Date();
+        return now <= expiryDate;
+    }, [user, isStudent]);
+    
+    // Verificar se trial expirou (para alunos e usuários indicados)
     const isTrialExpired = React.useMemo(() => {
-        if (!isReferredUser) return false;
         if (!user?.trialExpiresAt) return false;
         
         const expiryDate = new Date(user.trialExpiresAt);
         const now = new Date();
         return now > expiryDate;
-    }, [user, isReferredUser]);
+    }, [user]);
     const [allPlans, setAllPlans] = useState<SubscriptionPlan[]>([]);
     const [activeSubscription, setActiveSubscription] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -491,6 +500,53 @@ const PremiumPage: React.FC = () => {
                 </div>
             ) : (
                 <div className="space-y-8 sm:space-y-12">
+                    {/* Mensagem para alunos em trial (3 dias grátis) */}
+                    {isStudent && isStudentInTrial && (
+                        <Card className="border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+                            <div className="p-6 text-center">
+                                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3">
+                                    Período de Teste Grátis! 🎉
+                                </h2>
+                                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mb-2">
+                                    Você tem <strong>3 dias grátis</strong> para experimentar todas as funcionalidades de IA.
+                                </p>
+                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-4">
+                                    💡 <strong>Modelo de Pagamento:</strong> A academia fornece acesso à plataforma. 
+                                    Você paga diretamente pela IA (sem custo adicional para a academia).
+                                </p>
+                                {user?.trialExpiresAt && (
+                                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-500">
+                                        Seu trial expira em: {new Date(user.trialExpiresAt).toLocaleDateString('pt-BR', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })}
+                                    </p>
+                                )}
+                            </div>
+                        </Card>
+                    )}
+                    
+                    {/* Mensagem para alunos após trial expirar */}
+                    {isStudent && !isStudentInTrial && isTrialExpired && (
+                        <Card className="border-2 border-amber-500 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20">
+                            <div className="p-6 text-center">
+                                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3">
+                                    Seu Período de Teste Expirou ⏰
+                                </h2>
+                                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mb-2">
+                                    Para continuar usando as funcionalidades de IA, assine um plano individual abaixo.
+                                </p>
+                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-4">
+                                    💡 <strong>Você paga diretamente pela IA</strong> - a academia não tem custo adicional. 
+                                    Escolha o plano que melhor se adapta às suas necessidades.
+                                </p>
+                            </div>
+                        </Card>
+                    )}
+                    
                     {/* Mensagem para usuários indicados com trial ativo */}
                     {isReferredUser && !isTrialExpired && (
                         <Card className="border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
@@ -516,23 +572,9 @@ const PremiumPage: React.FC = () => {
                         </Card>
                     )}
                     
-                    {/* Mensagem para alunos (sem trial) */}
-                    {isStudent && (
-                        <Card className="border-2 border-emerald-500 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20">
-                            <div className="p-6 text-center">
-                                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3">
-                                    Aluno da Academia 🏋️
-                                </h2>
-                                <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mb-4">
-                                    Como aluno, você pode assinar planos individuais ou recargas para continuar usando todas as funcionalidades de IA.
-                                </p>
-                            </div>
-                        </Card>
-                    )}
-                    
                     {/* Navegação por Abas */}
                     <div className="flex flex-wrap justify-center gap-2 sm:gap-4 border-b border-slate-200 dark:border-slate-700 pb-4">
-                        {/* Para alunos e usuários indicados após trial: mostrar apenas Planos Individuais e Recargas */}
+                        {/* Para alunos (com ou sem trial) e usuários indicados após trial: mostrar apenas Planos Individuais e Recargas */}
                         {(isStudent || (isReferredUser && isTrialExpired)) ? (
                             <>
                                 <button
@@ -583,15 +625,26 @@ const PremiumPage: React.FC = () => {
                         )}
                     </div>
 
-                    {/* PLANOS B2C - INDIVIDUAIS (USO DA IA) - Para alunos e usuários indicados após trial expirar */}
+                    {/* PLANOS B2C - INDIVIDUAIS (USO DA IA) - Para alunos (sempre) e usuários indicados após trial expirar */}
                     {(isStudent || (isReferredUser && isTrialExpired)) && activePage === 'b2c' && b2cPlans.length > 0 && (
                         <div>
+                            {isStudent && (
+                                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
+                                        💰 <strong>Modelo de Pagamento:</strong> Você paga diretamente pela IA. 
+                                        A academia fornece acesso à plataforma sem custo adicional para você.
+                                    </p>
+                                </div>
+                            )}
                             <div className="text-center mb-6">
                                 <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
                                     Planos Individuais - Uso da IA
                                 </h2>
                                 <p className="text-slate-600 dark:text-slate-400">
-                                    Escolha o plano ideal para continuar usando todas as funcionalidades de IA
+                                    {isStudent 
+                                        ? "Escolha o plano ideal para continuar usando todas as funcionalidades de IA após seu período de teste"
+                                        : "Escolha o plano ideal para continuar usando todas as funcionalidades de IA"
+                                    }
                                 </p>
                             </div>
                             
@@ -680,17 +733,28 @@ const PremiumPage: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Seção de Recargas - Para alunos e usuários indicados após trial expirar */}
+                    {/* Seção de Recargas - Para alunos (sempre) e usuários indicados após trial expirar */}
                     {(isStudent || (isReferredUser && isTrialExpired)) && activePage === 'recharge' && (
-                    <div>
-                        <div className="text-center mb-6">
-                            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
-                                Recarga Instantânea
-                            </h2>
-                            <p className="text-slate-600 dark:text-slate-400">
-                                Precisa de mais tempo de conversa? Seu plano diário acabou, mas você pode continuar com nossos pacotes de recarga instantânea.
-                            </p>
-                        </div>
+                        <div>
+                            {isStudent && (
+                                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
+                                        💰 <strong>Modelo de Pagamento:</strong> Você paga diretamente pelas recargas. 
+                                        A academia não tem custo adicional.
+                                    </p>
+                                </div>
+                            )}
+                            <div className="text-center mb-6">
+                                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                                    Recarga Instantânea
+                                </h2>
+                                <p className="text-slate-600 dark:text-slate-400">
+                                    {isStudent
+                                        ? "Precisa de mais tempo de conversa? Use nossos pacotes de recarga instantânea para continuar usando a IA."
+                                        : "Precisa de mais tempo de conversa? Seu plano diário acabou, mas você pode continuar com nossos pacotes de recarga instantânea."
+                                    }
+                                </p>
+                            </div>
 
                         {rechargePlans.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">

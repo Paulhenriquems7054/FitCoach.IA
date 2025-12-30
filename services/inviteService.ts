@@ -127,9 +127,9 @@ export async function validateInvite(code: string): Promise<InviteValidationResu
 }
 
 /**
- * Aceita um convite: vincula usuário à academia
- * NOVA LÓGICA: Alunos que acessam pelo código da academia NÃO recebem trial
- * Trial é apenas para usuários indicados pelos alunos (sem código de academia)
+ * Aceita um convite: vincula usuário à academia e inicia trial de IA de 3 dias para alunos
+ * ESTRATÉGIA: Alunos recebem 3 dias grátis de IA, depois precisam assinar plano individual
+ * Academia paga apenas pela plataforma, aluno paga pela IA
  * 🔒 SEGURANÇA: Valida se usuário já está vinculado a outra academia
  */
 export async function acceptInvite(code: string, userId: string): Promise<void> {
@@ -172,21 +172,28 @@ export async function acceptInvite(code: string, userId: string): Promise<void> 
     // Continuar para atualizar dados se necessário
   }
 
-  // NOVA LÓGICA: Alunos que acessam pelo código da academia NÃO recebem trial
-  // Apenas vinculam à academia sem trial
+  // ESTRATÉGIA: Alunos recebem trial de 3 dias de IA grátis
+  const now = new Date();
   const updateData: any = {
     academy_id: academyId,
     tenant_role: invitedRole,
-    // Alunos não recebem trial ao acessar pelo código da academia
-    trial_active: false,
-    trial_expires_at: null,
-    ai_subscription_status: 'none',
-    ai_trial_start_at: null,
-    ai_trial_end_at: null,
   };
 
-  // Personal trainers também não recebem trial
-  if (invitedRole === 'personal') {
+  if (invitedRole === 'student') {
+    // Alunos recebem trial de 3 dias de IA
+    const trialExpiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(); // 3 dias
+    
+    updateData.trial_active = true;
+    updateData.trial_expires_at = trialExpiresAt;
+    updateData.ai_subscription_status = 'trial';
+    updateData.ai_trial_start_at = now.toISOString();
+    updateData.ai_trial_end_at = trialExpiresAt;
+    // Limites de uso: trial tem 5 minutos de voz por dia
+    updateData.voice_daily_limit_seconds = 300; // 5 minutos
+    
+    logger.info(`Trial de 3 dias de IA ativado para aluno ${userId} da academia ${academyId}`, 'inviteService');
+  } else if (invitedRole === 'personal') {
+    // Personal trainers não recebem trial de IA
     updateData.trial_active = false;
     updateData.trial_expires_at = null;
     updateData.ai_subscription_status = 'none';
@@ -204,9 +211,14 @@ export async function acceptInvite(code: string, userId: string): Promise<void> 
     throw new Error('Não foi possível vincular o convite ao usuário.');
   }
 
-  if (userError) {
-    logger.error('Erro ao aceitar convite (atualizar usuário)', 'inviteService', userError);
-    throw new Error('Não foi possível vincular o convite ao usuário.');
+  // Registrar evento de trial iniciado (métricas) para alunos
+  if (invitedRole === 'student') {
+    try {
+      const { trackTrialStarted } = await import('./aiMetricsService');
+      await trackTrialStarted(userId, academyId);
+    } catch (error) {
+      logger.warn('Erro ao registrar trial iniciado (métricas)', 'inviteService', error);
+    }
   }
 
   // Marcar convite como aceito

@@ -49,22 +49,36 @@ export async function getAiAccessStatus(user: User): Promise<AiAccessStatus> {
     return { hasAccess: false, reason: 'none' };
   }
 
-  // 1. Verificar assinatura ativa (prioridade: campo simplificado ou tabela subscriptions)
+  const isStudent = user.tenantRole === 'student' || user.gymRole === 'student';
+
+  // 1. Verificar assinatura ativa individual de IA (B2C)
+  // Para alunos: verificar se têm assinatura individual de IA (não da academia)
   const hasActiveSubscription = user.subscriptionActive === true || 
     (user.aiSubscriptionStatus === 'active') ||
     await getActiveUserAiSubscription(user.id as any) !== null;
   
   if (hasActiveSubscription) {
-    return { hasAccess: true, reason: 'subscription' };
+    // Verificar se é plano individual de IA (B2C) para alunos
+    if (isStudent) {
+      const subscription = await getActiveUserAiSubscription(user.id as any);
+      if (subscription) {
+        // Verificar se o plano é individual (ai_monthly, ai_annual_vip)
+        const plan = subscription.plan;
+        if (plan && (plan.name === 'ai_monthly' || plan.name === 'ai_annual_vip')) {
+          return { hasAccess: true, reason: 'subscription' };
+        }
+      }
+      // Se aluno tem subscriptionActive mas não é plano individual, verificar trial
+    } else {
+      // Usuário não-aluno: qualquer assinatura ativa dá acesso
+      return { hasAccess: true, reason: 'subscription' };
+    }
   }
 
-  // 2. Verificar trial ativo (apenas para usuários indicados, não alunos)
-  // Alunos que acessam pelo código da academia NÃO têm trial
-  const isStudent = user.tenantRole === 'student' || user.gymRole === 'student';
+  // 2. Verificar trial ativo (alunos recebem 3 dias grátis)
   const trialExpires = user.trialExpiresAt || user.aiTrialEndAt || null;
-  const isTrialActive = !isStudent && 
-    (user.trialActive === true || 
-     (user.aiSubscriptionStatus === 'trial' && trialExpires && new Date(trialExpires) > new Date()));
+  const isTrialActive = user.trialActive === true || 
+    (user.aiSubscriptionStatus === 'trial' && trialExpires && new Date(trialExpires) > new Date());
   
   if (isTrialActive && trialExpires) {
     const daysRemaining = getDaysRemaining(trialExpires);
