@@ -41,15 +41,44 @@ serve(async (req: Request) => {
 
     // ⚠️ Estes campos você precisa ajustar depois com base no JSON REAL da Cakto
     const eventType: string = body?.event || body?.type || "";
-    const checkoutId: string = body?.data?.checkout_id || body?.data?.checkoutId || "";
+    
+    // Extrair checkout_id de várias fontes possíveis
+    let checkoutId: string = 
+      body?.data?.checkout_id || 
+      body?.data?.checkoutId || 
+      body?.data?.checkout?.toString() || 
+      "";
+    
+    // Se não encontrou, tentar extrair da checkoutUrl
+    if (!checkoutId && body?.data?.checkoutUrl) {
+      const urlMatch = body.data.checkoutUrl.match(/pay\.cakto\.com\.br\/([^/?]+)/);
+      if (urlMatch && urlMatch[1]) {
+        checkoutId = urlMatch[1].split('?')[0]; // Remove query params
+        console.log("checkout_id extraído da checkoutUrl:", checkoutId);
+      }
+    }
+    
+    // Se ainda não encontrou, tentar extrair do product.short_id ou offer.id
+    if (!checkoutId) {
+      checkoutId = body?.data?.product?.short_id || 
+                   body?.data?.offer?.id || 
+                   "";
+    }
+    
     const transactionId: string = body?.data?.id || body?.data?.transaction_id || "";
-    const amountPaid: number = body?.data?.amount || 0;
-    const customerEmail: string = body?.data?.customer_email || body?.data?.buyer?.email || "";
+    const amountPaid: number = body?.data?.amount || body?.data?.baseAmount || 0;
+    const customerEmail: string = 
+      body?.data?.customer_email || 
+      body?.data?.customer?.email || 
+      body?.data?.buyer?.email || 
+      "";
 
     if (!checkoutId) {
-      console.error("checkout_id não encontrado no payload");
+      console.error("checkout_id não encontrado no payload. Payload recebido:", JSON.stringify(body, null, 2));
       return new Response("checkout_id ausente", { status: 400 });
     }
+    
+    console.log("checkout_id encontrado:", checkoutId);
 
     // 3) Buscar plano correspondente na tabela subscription_plans
     // Primeiro tentar por cakto_checkout_id direto
