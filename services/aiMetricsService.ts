@@ -107,6 +107,9 @@ export async function trackConversion(userId: string, planId: string, academyId?
 
 /**
  * Registra uso de IA (chat, voz, visão, planos)
+ * 
+ * IMPORTANTE: Esta função é totalmente desacoplada do fluxo principal.
+ * Falhas no tracking NÃO devem quebrar o sistema de IA.
  */
 export async function trackAiUsage(
   userId: string,
@@ -116,7 +119,7 @@ export async function trackAiUsage(
 ): Promise<void> {
   try {
     const supabase = getSupabaseClient();
-    const { error } = await supabase.from('ai_usage').insert({
+    const { error, status } = await supabase.from('ai_usage').insert({
       user_id: userId,
       academy_id: academyId,
       feature,
@@ -125,10 +128,38 @@ export async function trackAiUsage(
     });
 
     if (error) {
-      logger.error('Erro ao registrar uso de IA', 'aiMetricsService', error);
+      // Tratar especificamente erro 404 (tabela não existe)
+      const errorStatus = (error as any)?.status || (error as any)?.code;
+      if (errorStatus === 404 || errorStatus === 'PGRST116' || error?.message?.includes('404')) {
+        // Tabela não existe - apenas log de warning em dev, não gerar erro
+        if (import.meta.env.DEV) {
+          console.warn('[AI_USAGE] Endpoint /ai_usage não configurado (404). Tracking desabilitado.');
+        }
+        return; // Silenciosamente retornar sem propagar erro
+      }
+      
+      // Outros erros: log de warning sem quebrar o sistema
+      if (import.meta.env.DEV) {
+        console.warn('[AI_USAGE] Falha ao registrar uso de IA:', error);
+      }
+      logger.warn('Erro ao registrar uso de IA', 'aiMetricsService', error);
     }
-  } catch (error) {
-    logger.error('Erro fatal ao registrar uso de IA', 'aiMetricsService', error);
+  } catch (error: any) {
+    // Tratar especificamente erro 404 em exceptions
+    const errorStatus = error?.status || error?.code || error?.response?.status;
+    if (errorStatus === 404 || error?.message?.includes('404')) {
+      if (import.meta.env.DEV) {
+        console.warn('[AI_USAGE] Endpoint /ai_usage não configurado (404). Tracking desabilitado.');
+      }
+      return; // Silenciosamente retornar sem propagar erro
+    }
+    
+    // Outros erros: log de warning sem quebrar o sistema
+    if (import.meta.env.DEV) {
+      console.warn('[AI_USAGE] Erro ao registrar uso de IA:', error);
+    }
+    logger.warn('Erro ao registrar uso de IA', 'aiMetricsService', error);
+    // NÃO propagar erro - tracking é opcional
   }
 }
 

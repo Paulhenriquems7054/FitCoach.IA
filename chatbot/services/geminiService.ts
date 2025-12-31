@@ -13,6 +13,10 @@ let nextStartTime = 0;
 const outputSources = new Set<AudioBufferSourceNode>();
 let mediaStream: MediaStream | undefined;
 let mediaStreamSource: MediaStreamAudioSourceNode | undefined;
+// NOTE: ScriptProcessorNode is deprecated in favor of AudioWorkletNode
+// See: https://developer.mozilla.org/en-US/docs/Web/API/ScriptProcessorNode
+// TODO: Migrate to AudioWorkletNode for better performance and future compatibility
+// Current implementation works but will show deprecation warnings in console
 let scriptProcessor: ScriptProcessorNode | undefined;
 let monitoringInterval: NodeJS.Timeout | null = null; // Para monitorar uso de voz
 
@@ -675,6 +679,8 @@ export async function startLiveAudioSession(
     if (outputAudioContext.state === 'suspended') await outputAudioContext.resume();
     
     mediaStreamSource = inputAudioContext.createMediaStreamSource(mediaStream);
+    // DEPRECATED: ScriptProcessorNode - migrate to AudioWorkletNode in future
+    // This is safe to use but shows deprecation warnings
     scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
 
     const tools: FunctionDeclaration[] = [];

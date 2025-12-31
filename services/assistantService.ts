@@ -126,6 +126,10 @@ let inputAudioContext: AudioContext | undefined;
 let outputAudioContext: AudioContext | undefined;
 let mediaStream: MediaStream | undefined;
 let mediaStreamSource: MediaStreamAudioSourceNode | undefined;
+// NOTE: ScriptProcessorNode is deprecated in favor of AudioWorkletNode
+// See: https://developer.mozilla.org/en-US/docs/Web/API/ScriptProcessorNode
+// TODO: Migrate to AudioWorkletNode for better performance and future compatibility
+// Current implementation works but will show deprecation warnings in console
 let scriptProcessor: ScriptProcessorNode | undefined;
 const outputSources = new Set<AudioBufferSourceNode>();
 let nextStartTime = 0;
@@ -972,6 +976,8 @@ export async function startAssistantAudioSession(
     outputAudioContext = new AudioContext({ sampleRate: 24_000 });
 
     mediaStreamSource = inputAudioContext.createMediaStreamSource(mediaStream);
+    // DEPRECATED: ScriptProcessorNode - migrate to AudioWorkletNode in future
+    // This is safe to use but shows deprecation warnings
     scriptProcessor = inputAudioContext.createScriptProcessor(4_096, 1, 1);
 
     let audioChunkCount = 0;
