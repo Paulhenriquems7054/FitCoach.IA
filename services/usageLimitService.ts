@@ -137,12 +137,53 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
 
         // Se não encontrar no Supabase, usar dados locais como fallback simples
         if (error || !userData) {
+            // Verificar se é erro técnico (404, rede, etc) - FAIL-OPEN
+            const errorCode = (error as any)?.code;
+            const errorStatus = (error as any)?.status;
+            const isTechnicalError = 
+                errorCode === 'PGRST116' || 
+                errorStatus === 404 || 
+                error?.message?.includes('404') ||
+                error?.message?.includes('network') ||
+                error?.message?.includes('fetch');
+
+            if (isTechnicalError) {
+                // Erro técnico: permitir uso (fail-open)
+                if (import.meta.env.DEV) {
+                    console.warn('[checkVoiceUsage] Erro técnico ao buscar do Supabase. Permitindo uso (fail-open).', error);
+                }
+                return {
+                    canUse: true,
+                    remainingDaily: Infinity,
+                    remainingBoost: 0,
+                    remainingReserve: 0,
+                    totalRemaining: Infinity,
+                    isUnlimited: true
+                };
+            }
+
+            // Outro tipo de erro: tentar usar dados locais
             const dailyLimit = user.voiceDailyLimitSeconds || 900;
             const usedToday = user.voiceUsedTodaySeconds || 0;
             const reserveBalance = user.voiceBalanceUpsell || 0;
 
             const remainingDaily = Math.max(0, dailyLimit - usedToday);
             const totalRemaining = remainingDaily + reserveBalance;
+
+            // Se dados locais também não têm limite, permitir uso (fail-open)
+            if (totalRemaining <= 0 && !dailyLimit) {
+                if (import.meta.env.DEV) {
+                    console.warn('[checkVoiceUsage] Sem dados de limite disponíveis. Permitindo uso (fail-open).');
+                }
+                return {
+                    canUse: true,
+                    remainingDaily: Infinity,
+                    remainingBoost: 0,
+                    remainingReserve: 0,
+                    totalRemaining: Infinity,
+                    isUnlimited: true
+                };
+            }
 
             return {
                 canUse: totalRemaining > 0,
@@ -238,15 +279,46 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
             isUnlimited,
             unlimitedUntil
         };
-    } catch (error) {
-        logger.error('Erro ao verificar uso de voz', 'usageLimitService', error);
+    } catch (error: any) {
+        // FAIL-OPEN: Em caso de erro técnico, permitir uso ao invés de bloquear
+        const errorCode = error?.code;
+        const errorStatus = error?.status;
+        const isTechnicalError = 
+            errorCode === 'PGRST116' || 
+            errorStatus === 404 || 
+            error?.message?.includes('404') ||
+            error?.message?.includes('network') ||
+            error?.message?.includes('fetch') ||
+            error?.message?.includes('Failed to fetch');
+
+        if (isTechnicalError) {
+            // Erro técnico: permitir uso (fail-open)
+            if (import.meta.env.DEV) {
+                console.warn('[checkVoiceUsage] Erro técnico na verificação. Permitindo uso (fail-open).', error);
+            }
+            logger.warn('Erro técnico ao verificar uso de voz - permitindo uso (fail-open)', 'usageLimitService', error);
+            return {
+                canUse: true,
+                remainingDaily: Infinity,
+                remainingBoost: 0,
+                remainingReserve: 0,
+                totalRemaining: Infinity,
+                isUnlimited: true
+            };
+        }
+
+        // Outro tipo de erro: também permitir uso por segurança (fail-open)
+        if (import.meta.env.DEV) {
+            console.warn('[checkVoiceUsage] Erro na verificação. Permitindo uso por segurança (fail-open).', error);
+        }
+        logger.warn('Erro ao verificar uso de voz - permitindo uso por segurança (fail-open)', 'usageLimitService', error);
         return {
-            canUse: false,
-            remainingDaily: 0,
+            canUse: true,
+            remainingDaily: Infinity,
             remainingBoost: 0,
             remainingReserve: 0,
-            totalRemaining: 0,
-            error: 'Erro ao verificar limites de uso'
+            totalRemaining: Infinity,
+            isUnlimited: true
         };
     }
 }
