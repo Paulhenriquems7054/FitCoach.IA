@@ -536,36 +536,65 @@ export async function startLiveAudioSession(
   // Verificar limite de voz antes de iniciar
   console.log('[geminiService] Verificando limite de voz antes de iniciar sessão...');
   try {
-    // Verificação extra de desenvolvedor antes de checar limites (camada de segurança)
+    // Verificação DIRETA e SIMPLES de desenvolvedor (camada de segurança prioritária)
     try {
       const { getUser } = await import('../../services/databaseService');
-      const { isDeveloper } = await import('../../utils/developerUtils');
       const user = await getUser();
-      if (user && isDeveloper(user)) {
-        console.log('[geminiService] ✅ Usuário é desenvolvedor - BYPASS de limites');
-        logger.info('Usuário desenvolvedor detectado - bypass de limites de voz', 'chatbot/geminiService');
-        // Desenvolvedores têm acesso ilimitado, pular verificação de limites
+      
+      // Verificação direta inline (não depende de função externa)
+      if (user) {
+        const username = (user.username || '').toLowerCase().trim();
+        const nome = (user.nome || '').toLowerCase().trim();
+        const isDev = 
+          username === 'dev123' || 
+          username === 'dev' || 
+          username === 'developer' || 
+          username === 'desenvolvedor' ||
+          nome === 'desenvolvedor' || 
+          nome === 'developer' || 
+          nome === 'dev' ||
+          user.role === 'developer' || 
+          user.role === 'admin';
+        
+        if (isDev) {
+          console.log('[geminiService] ✅✅✅ USUÁRIO É DESENVOLVEDOR - BYPASS TOTAL DE LIMITES');
+          console.log('[geminiService] Username:', user.username, 'Nome:', user.nome, 'Role:', user.role);
+          logger.info('Usuário desenvolvedor detectado - bypass total de limites de voz', 'chatbot/geminiService');
+          // Desenvolvedores têm acesso ilimitado, pular TODA verificação de limites
+        } else {
+          console.log('[geminiService] Usuário NÃO é desenvolvedor - verificando limites...');
+          console.log('[geminiService] Username:', user.username, 'Nome:', user.nome, 'Role:', user.role);
+          // Não é desenvolvedor, verificar limites normalmente
+          const { checkVoiceUsage } = await import('../../services/usageLimitService');
+          console.log('[geminiService] checkVoiceUsage importado, chamando função...');
+          const voiceStatus = await checkVoiceUsage();
+          console.log('[geminiService] Status de voz retornado:', { 
+            canUse: voiceStatus.canUse, 
+            isUnlimited: voiceStatus.isUnlimited, 
+            error: voiceStatus.error || 'nenhum',
+            remainingDaily: voiceStatus.remainingDaily,
+            totalRemaining: voiceStatus.totalRemaining
+          });
+          logger.info(`Status de voz retornado: canUse=${voiceStatus.canUse}, isUnlimited=${voiceStatus.isUnlimited}, error=${voiceStatus.error || 'nenhum'}`, 'chatbot/geminiService');
+          if (!voiceStatus.canUse) {
+            console.log('[geminiService] ❌ Acesso de voz NEGADO - canUse é false');
+            logger.warn(`❌ Acesso de voz negado: ${voiceStatus.error || 'Limite diário atingido'}`, 'chatbot/geminiService');
+            onError('Limite diário atingido. Gerencie sua conta em nosso site.', false);
+            return;
+          }
+          console.log('[geminiService] ✅ Acesso de voz PERMITIDO');
+          logger.info('✅ Acesso de voz permitido', 'chatbot/geminiService');
+        }
       } else {
-        // Não é desenvolvedor, verificar limites normalmente
+        console.log('[geminiService] ⚠️ Usuário não encontrado, tentando verificação normal...');
+        // Se não encontrou usuário, tentar verificação normal
         const { checkVoiceUsage } = await import('../../services/usageLimitService');
-        console.log('[geminiService] checkVoiceUsage importado, chamando função...');
         const voiceStatus = await checkVoiceUsage();
-        console.log('[geminiService] Status de voz retornado:', { 
-          canUse: voiceStatus.canUse, 
-          isUnlimited: voiceStatus.isUnlimited, 
-          error: voiceStatus.error || 'nenhum',
-          remainingDaily: voiceStatus.remainingDaily,
-          totalRemaining: voiceStatus.totalRemaining
-        });
-        logger.info(`Status de voz retornado: canUse=${voiceStatus.canUse}, isUnlimited=${voiceStatus.isUnlimited}, error=${voiceStatus.error || 'nenhum'}`, 'chatbot/geminiService');
         if (!voiceStatus.canUse) {
-          console.log('[geminiService] ❌ Acesso de voz NEGADO - canUse é false');
           logger.warn(`❌ Acesso de voz negado: ${voiceStatus.error || 'Limite diário atingido'}`, 'chatbot/geminiService');
           onError('Limite diário atingido. Gerencie sua conta em nosso site.', false);
           return;
         }
-        console.log('[geminiService] ✅ Acesso de voz PERMITIDO');
-        logger.info('✅ Acesso de voz permitido', 'chatbot/geminiService');
       }
     } catch (devCheckError) {
       console.error('[geminiService] Erro ao verificar desenvolvedor, tentando verificação normal:', devCheckError);
