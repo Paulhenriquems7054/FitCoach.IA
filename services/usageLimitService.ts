@@ -34,7 +34,35 @@ export interface TextUsageStatus {
  */
 export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
     try {
-        const user = await getUser();
+        // Tentar buscar usuário do Supabase primeiro (dados mais atualizados)
+        let user: User | null = null;
+        try {
+            const supabase = getSupabaseClient();
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            
+            if (authUser) {
+                const { authService } = await import('./supabaseService');
+                const supabaseUser = await authService.getCurrentUserProfile();
+                if (supabaseUser) {
+                    user = supabaseUser;
+                    // Sincronizar com IndexedDB local
+                    try {
+                        const { saveUser } = await import('./databaseService');
+                        await saveUser(supabaseUser);
+                    } catch (syncError) {
+                        logger.warn('Erro ao sincronizar usuário do Supabase para IndexedDB', 'usageLimitService');
+                    }
+                }
+            }
+        } catch (supabaseError) {
+            logger.debug('Não foi possível buscar do Supabase, usando IndexedDB local', 'usageLimitService');
+        }
+        
+        // Se não conseguiu buscar do Supabase, usar IndexedDB local
+        if (!user) {
+            user = await getUser();
+        }
+        
         if (!user) {
             return {
                 canUse: false,
@@ -46,8 +74,9 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
             };
         }
         
-        // Desenvolvedor tem acesso ilimitado
+        // Desenvolvedor tem acesso ilimitado (verificação deve vir antes de qualquer outra)
         if (isDeveloper(user)) {
+            logger.debug(`Usuário identificado como desenvolvedor: ${user.username || user.nome}`, 'usageLimitService');
             return {
                 canUse: true,
                 remainingDaily: Infinity,
