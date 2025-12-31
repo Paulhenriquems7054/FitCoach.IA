@@ -536,25 +536,48 @@ export async function startLiveAudioSession(
   // Verificar limite de voz antes de iniciar
   console.log('[geminiService] Verificando limite de voz antes de iniciar sessão...');
   try {
-    const { checkVoiceUsage } = await import('../../services/usageLimitService');
-    console.log('[geminiService] checkVoiceUsage importado, chamando função...');
-    const voiceStatus = await checkVoiceUsage();
-    console.log('[geminiService] Status de voz retornado:', { 
-      canUse: voiceStatus.canUse, 
-      isUnlimited: voiceStatus.isUnlimited, 
-      error: voiceStatus.error || 'nenhum',
-      remainingDaily: voiceStatus.remainingDaily,
-      totalRemaining: voiceStatus.totalRemaining
-    });
-    logger.info(`Status de voz retornado: canUse=${voiceStatus.canUse}, isUnlimited=${voiceStatus.isUnlimited}, error=${voiceStatus.error || 'nenhum'}`, 'chatbot/geminiService');
-    if (!voiceStatus.canUse) {
-      console.log('[geminiService] ❌ Acesso de voz NEGADO - canUse é false');
-      logger.warn(`❌ Acesso de voz negado: ${voiceStatus.error || 'Limite diário atingido'}`, 'chatbot/geminiService');
-      onError('Limite diário atingido. Gerencie sua conta em nosso site.', false);
-      return;
+    // Verificação extra de desenvolvedor antes de checar limites (camada de segurança)
+    try {
+      const { getUser } = await import('../../services/databaseService');
+      const { isDeveloper } = await import('../../utils/developerUtils');
+      const user = await getUser();
+      if (user && isDeveloper(user)) {
+        console.log('[geminiService] ✅ Usuário é desenvolvedor - BYPASS de limites');
+        logger.info('Usuário desenvolvedor detectado - bypass de limites de voz', 'chatbot/geminiService');
+        // Desenvolvedores têm acesso ilimitado, pular verificação de limites
+      } else {
+        // Não é desenvolvedor, verificar limites normalmente
+        const { checkVoiceUsage } = await import('../../services/usageLimitService');
+        console.log('[geminiService] checkVoiceUsage importado, chamando função...');
+        const voiceStatus = await checkVoiceUsage();
+        console.log('[geminiService] Status de voz retornado:', { 
+          canUse: voiceStatus.canUse, 
+          isUnlimited: voiceStatus.isUnlimited, 
+          error: voiceStatus.error || 'nenhum',
+          remainingDaily: voiceStatus.remainingDaily,
+          totalRemaining: voiceStatus.totalRemaining
+        });
+        logger.info(`Status de voz retornado: canUse=${voiceStatus.canUse}, isUnlimited=${voiceStatus.isUnlimited}, error=${voiceStatus.error || 'nenhum'}`, 'chatbot/geminiService');
+        if (!voiceStatus.canUse) {
+          console.log('[geminiService] ❌ Acesso de voz NEGADO - canUse é false');
+          logger.warn(`❌ Acesso de voz negado: ${voiceStatus.error || 'Limite diário atingido'}`, 'chatbot/geminiService');
+          onError('Limite diário atingido. Gerencie sua conta em nosso site.', false);
+          return;
+        }
+        console.log('[geminiService] ✅ Acesso de voz PERMITIDO');
+        logger.info('✅ Acesso de voz permitido', 'chatbot/geminiService');
+      }
+    } catch (devCheckError) {
+      console.error('[geminiService] Erro ao verificar desenvolvedor, tentando verificação normal:', devCheckError);
+      // Se falhar verificação de desenvolvedor, tentar verificação normal
+      const { checkVoiceUsage } = await import('../../services/usageLimitService');
+      const voiceStatus = await checkVoiceUsage();
+      if (!voiceStatus.canUse) {
+        logger.warn(`❌ Acesso de voz negado: ${voiceStatus.error || 'Limite diário atingido'}`, 'chatbot/geminiService');
+        onError('Limite diário atingido. Gerencie sua conta em nosso site.', false);
+        return;
+      }
     }
-    console.log('[geminiService] ✅ Acesso de voz PERMITIDO');
-    logger.info('✅ Acesso de voz permitido', 'chatbot/geminiService');
   } catch (error) {
     console.error('[geminiService] Erro ao verificar limite de voz:', error);
     logger.warn('Erro ao verificar limite de voz', 'chatbot/geminiService', error);
