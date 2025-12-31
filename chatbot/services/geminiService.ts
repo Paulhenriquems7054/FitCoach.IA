@@ -538,6 +538,9 @@ export async function startLiveAudioSession(
   }
 
   // Verificar limite de voz antes de iniciar
+  // Variável no escopo da função para armazenar se é desenvolvedor (usada também no monitoramento)
+  let isDeveloperUser = false;
+  
   console.log('[geminiService] Verificando limite de voz antes de iniciar sessão...');
   try {
     // Verificação DIRETA e SIMPLES de desenvolvedor (camada de segurança prioritária)
@@ -549,7 +552,7 @@ export async function startLiveAudioSession(
       if (user) {
         const username = (user.username || '').toLowerCase().trim();
         const nome = (user.nome || '').toLowerCase().trim();
-        const isDev = 
+        isDeveloperUser = 
           username === 'dev123' || 
           username === 'dev' || 
           username === 'developer' || 
@@ -560,7 +563,7 @@ export async function startLiveAudioSession(
           user.role === 'developer' || 
           user.role === 'admin';
         
-        if (isDev) {
+        if (isDeveloperUser) {
           console.log('[geminiService] ✅✅✅ USUÁRIO É DESENVOLVEDOR - BYPASS TOTAL DE LIMITES');
           console.log('[geminiService] Username:', user.username, 'Nome:', user.nome, 'Role:', user.role);
           logger.info('Usuário desenvolvedor detectado - bypass total de limites de voz', 'chatbot/geminiService');
@@ -724,30 +727,7 @@ export async function startLiveAudioSession(
           lastCheckTime = Date.now();
           
           // Iniciar monitoramento de tempo
-          // Verificar se é desenvolvedor uma vez antes do intervalo (para não verificar a cada segundo)
-          let isDeveloperUser = false;
-          try {
-            const { getUser } = await import('../../services/databaseService');
-            const currentUser = await getUser();
-            if (currentUser) {
-              const username = (currentUser.username || '').toLowerCase().trim();
-              const nome = (currentUser.nome || '').toLowerCase().trim();
-              isDeveloperUser = 
-                username === 'dev123' || 
-                username === 'dev' || 
-                username === 'developer' || 
-                username === 'desenvolvedor' ||
-                nome === 'desenvolvedor' || 
-                nome === 'developer' || 
-                nome === 'dev' ||
-                currentUser.role === 'developer' || 
-                currentUser.role === 'admin';
-            }
-          } catch (devCheckErr) {
-            // Se falhar verificação, assumir que não é desenvolvedor (mas não bloquear)
-            isDeveloperUser = false;
-          }
-
+          // Usar variável isDeveloperUser já definida no escopo da função
           monitoringInterval = setInterval(async () => {
             try {
               const elapsed = Math.floor((Date.now() - lastCheckTime) / 1000);
