@@ -232,14 +232,28 @@ export async function getStudentAiUsageMetrics(studentId: string): Promise<Stude
       throw userError || new Error('Aluno não encontrado');
     }
 
-    // Buscar uso de IA
+    // Buscar uso de IA (tabela opcional - pode não existir)
     const { data: usage, error: usageError } = await supabase
       .from('ai_usage')
       .select('feature, amount')
       .eq('user_id', studentId);
 
+    // Tratar erro 404 ou PGRST116 (tabela não existe) silenciosamente
     if (usageError) {
-      throw usageError;
+      const errorCode = (usageError as any)?.code;
+      const errorStatus = (usageError as any)?.status;
+      if (errorCode === 'PGRST116' || errorStatus === 404 || usageError.message?.includes('404')) {
+        // Tabela não existe - continuar com dados vazios
+        if (import.meta.env.DEV) {
+          console.warn('[AI_USAGE] Tabela ai_usage não existe. Retornando métricas vazias.');
+        }
+      } else {
+        // Outros erros: logar mas continuar
+        if (import.meta.env.DEV) {
+          console.warn('[AI_USAGE] Erro ao buscar uso de IA:', usageError);
+        }
+      }
+      // Continuar com usage = [] (dados vazios)
     }
 
     const metrics: StudentAiUsageMetrics = {
