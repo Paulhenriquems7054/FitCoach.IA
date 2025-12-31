@@ -1034,6 +1034,8 @@ const LoginPage: React.FC = () => {
                 // Limpar sessão anterior e salvar nova
                 const { clearLoginSession } = await import('../services/databaseService');
                 await clearLoginSession();
+                // IMPORTANTE: Salvar usuário no IndexedDB para que checkVoiceUsage() possa encontrá-lo
+                await saveUser(devUser as any);
                 await saveLoginSession(devUser.username);
                 setUser(devUser as any);
                 showSuccess('Login como Desenvolvedor realizado com sucesso!');
