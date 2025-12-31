@@ -239,6 +239,7 @@ export async function getStudentAiUsageMetrics(studentId: string): Promise<Stude
       .eq('user_id', studentId);
 
     // Tratar erro 404 ou PGRST116 (tabela não existe) silenciosamente
+    let usageData = usage || [];
     if (usageError) {
       const errorCode = (usageError as any)?.code;
       const errorStatus = (usageError as any)?.status;
@@ -247,13 +248,14 @@ export async function getStudentAiUsageMetrics(studentId: string): Promise<Stude
         if (import.meta.env.DEV) {
           console.warn('[AI_USAGE] Tabela ai_usage não existe. Retornando métricas vazias.');
         }
+        usageData = [];
       } else {
-        // Outros erros: logar mas continuar
+        // Outros erros: logar mas continuar com dados vazios
         if (import.meta.env.DEV) {
           console.warn('[AI_USAGE] Erro ao buscar uso de IA:', usageError);
         }
+        usageData = [];
       }
-      // Continuar com usage = [] (dados vazios)
     }
 
     const metrics: StudentAiUsageMetrics = {
@@ -269,7 +271,7 @@ export async function getStudentAiUsageMetrics(studentId: string): Promise<Stude
     };
 
     // Agregar uso por feature
-    usage?.forEach((item) => {
+    usageData.forEach((item) => {
       switch (item.feature) {
         case 'chat':
           metrics.totalChatMessages += item.amount;
