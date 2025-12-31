@@ -75,8 +75,13 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
         }
         
         // Desenvolvedor tem acesso ilimitado (verificação deve vir antes de qualquer outra)
-        if (isDeveloper(user)) {
-            logger.debug(`Usuário identificado como desenvolvedor: ${user.username || user.nome}`, 'usageLimitService');
+        // Log detalhado para debug
+        logger.info(`Verificando desenvolvedor - username: ${user.username || 'não definido'}, nome: ${user.nome || 'não definido'}, role: ${user.role || 'não definido'}`, 'usageLimitService');
+        const developerCheck = isDeveloper(user);
+        logger.info(`Resultado verificação desenvolvedor: ${developerCheck}`, 'usageLimitService');
+        
+        if (developerCheck) {
+            logger.info(`✅ Usuário identificado como desenvolvedor: ${user.username || user.nome}`, 'usageLimitService');
             return {
                 canUse: true,
                 remainingDaily: Infinity,

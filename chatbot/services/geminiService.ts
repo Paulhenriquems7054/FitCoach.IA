@@ -537,10 +537,13 @@ export async function startLiveAudioSession(
   try {
     const { checkVoiceUsage } = await import('../../services/usageLimitService');
     const voiceStatus = await checkVoiceUsage();
+    logger.info(`Status de voz retornado: canUse=${voiceStatus.canUse}, isUnlimited=${voiceStatus.isUnlimited}, error=${voiceStatus.error || 'nenhum'}`, 'chatbot/geminiService');
     if (!voiceStatus.canUse) {
+      logger.warn(`❌ Acesso de voz negado: ${voiceStatus.error || 'Limite diário atingido'}`, 'chatbot/geminiService');
       onError('Limite diário atingido. Gerencie sua conta em nosso site.', false);
       return;
     }
+    logger.info('✅ Acesso de voz permitido', 'chatbot/geminiService');
   } catch (error) {
     logger.warn('Erro ao verificar limite de voz', 'chatbot/geminiService', error);
     // Continuar mesmo se falhar a verificação
