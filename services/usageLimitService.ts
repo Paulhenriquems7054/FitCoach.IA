@@ -78,14 +78,18 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
         }
         
         if (!user) {
-            console.log('[checkVoiceUsage] ❌ ERRO: Usuário não encontrado');
+            // FAIL-OPEN: Se não encontrar usuário, permitir uso ao invés de bloquear
+            console.log('[checkVoiceUsage] ⚠️ Usuário não encontrado - permitindo uso (fail-open)');
+            if (import.meta.env.DEV) {
+                console.warn('[checkVoiceUsage] Usuário não encontrado. Permitindo uso por segurança (fail-open).');
+            }
             return {
-                canUse: false,
-                remainingDaily: 0,
+                canUse: true,
+                remainingDaily: Infinity,
                 remainingBoost: 0,
                 remainingReserve: 0,
-                totalRemaining: 0,
-                error: 'Usuário não encontrado'
+                totalRemaining: Infinity,
+                isUnlimited: true
             };
         }
         
