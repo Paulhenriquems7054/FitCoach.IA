@@ -724,10 +724,40 @@ export async function startLiveAudioSession(
           lastCheckTime = Date.now();
           
           // Iniciar monitoramento de tempo
+          // Verificar se é desenvolvedor uma vez antes do intervalo (para não verificar a cada segundo)
+          let isDeveloperUser = false;
+          try {
+            const { getUser } = await import('../../services/databaseService');
+            const currentUser = await getUser();
+            if (currentUser) {
+              const username = (currentUser.username || '').toLowerCase().trim();
+              const nome = (currentUser.nome || '').toLowerCase().trim();
+              isDeveloperUser = 
+                username === 'dev123' || 
+                username === 'dev' || 
+                username === 'developer' || 
+                username === 'desenvolvedor' ||
+                nome === 'desenvolvedor' || 
+                nome === 'developer' || 
+                nome === 'dev' ||
+                currentUser.role === 'developer' || 
+                currentUser.role === 'admin';
+            }
+          } catch (devCheckErr) {
+            // Se falhar verificação, assumir que não é desenvolvedor (mas não bloquear)
+            isDeveloperUser = false;
+          }
+
           monitoringInterval = setInterval(async () => {
             try {
               const elapsed = Math.floor((Date.now() - lastCheckTime) / 1000);
               if (elapsed > 0) {
+                // Desenvolvedores não precisam verificar limites durante monitoramento
+                if (isDeveloperUser) {
+                  lastCheckTime = Date.now();
+                  return; // Pular verificação de limites para desenvolvedores
+                }
+
                 const { consumeVoiceSeconds, checkVoiceUsage } = await import('../../services/usageLimitService');
                 
                 // Consumir segundos decorridos
