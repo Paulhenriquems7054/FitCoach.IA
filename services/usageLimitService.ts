@@ -33,6 +33,7 @@ export interface TextUsageStatus {
  * Verifica se o usuário pode usar voz e retorna status
  */
 export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
+    console.log('[checkVoiceUsage] Iniciando verificação de uso de voz...');
     try {
         // Tentar buscar usuário do Supabase primeiro (dados mais atualizados)
         let user: User | null = null;
@@ -41,9 +42,11 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
             const { data: { user: authUser } } = await supabase.auth.getUser();
             
             if (authUser) {
+                console.log('[checkVoiceUsage] Usuário autenticado no Supabase encontrado:', authUser.id);
                 const { authService } = await import('./supabaseService');
                 const supabaseUser = await authService.getCurrentUserProfile();
                 if (supabaseUser) {
+                    console.log('[checkVoiceUsage] Perfil do Supabase carregado:', { username: supabaseUser.username, nome: supabaseUser.nome, role: supabaseUser.role });
                     user = supabaseUser;
                     // Sincronizar com IndexedDB local
                     try {
@@ -52,18 +55,30 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
                     } catch (syncError) {
                         logger.warn('Erro ao sincronizar usuário do Supabase para IndexedDB', 'usageLimitService');
                     }
+                } else {
+                    console.log('[checkVoiceUsage] Perfil do Supabase não encontrado');
                 }
+            } else {
+                console.log('[checkVoiceUsage] Nenhum usuário autenticado no Supabase');
             }
         } catch (supabaseError) {
+            console.log('[checkVoiceUsage] Erro ao buscar do Supabase, usando IndexedDB local:', supabaseError);
             logger.debug('Não foi possível buscar do Supabase, usando IndexedDB local', 'usageLimitService');
         }
         
         // Se não conseguiu buscar do Supabase, usar IndexedDB local
         if (!user) {
+            console.log('[checkVoiceUsage] Buscando usuário do IndexedDB local...');
             user = await getUser();
+            if (user) {
+                console.log('[checkVoiceUsage] Usuário do IndexedDB carregado:', { username: user.username, nome: user.nome, role: user.role });
+            } else {
+                console.log('[checkVoiceUsage] Nenhum usuário encontrado no IndexedDB');
+            }
         }
         
         if (!user) {
+            console.log('[checkVoiceUsage] ❌ ERRO: Usuário não encontrado');
             return {
                 canUse: false,
                 remainingDaily: 0,
@@ -76,11 +91,14 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
         
         // Desenvolvedor tem acesso ilimitado (verificação deve vir antes de qualquer outra)
         // Log detalhado para debug
+        console.log(`[checkVoiceUsage] Verificando desenvolvedor - username: ${user.username || 'não definido'}, nome: ${user.nome || 'não definido'}, role: ${user.role || 'não definido'}`);
         logger.info(`Verificando desenvolvedor - username: ${user.username || 'não definido'}, nome: ${user.nome || 'não definido'}, role: ${user.role || 'não definido'}`, 'usageLimitService');
         const developerCheck = isDeveloper(user);
+        console.log(`[checkVoiceUsage] Resultado verificação desenvolvedor: ${developerCheck}`);
         logger.info(`Resultado verificação desenvolvedor: ${developerCheck}`, 'usageLimitService');
         
         if (developerCheck) {
+            console.log(`[checkVoiceUsage] ✅ Usuário identificado como desenvolvedor: ${user.username || user.nome} - RETORNANDO ACESSO ILIMITADO`);
             logger.info(`✅ Usuário identificado como desenvolvedor: ${user.username || user.nome}`, 'usageLimitService');
             return {
                 canUse: true,
@@ -91,6 +109,8 @@ export async function checkVoiceUsage(): Promise<VoiceUsageStatus> {
                 isUnlimited: true
             };
         }
+        
+        console.log('[checkVoiceUsage] Usuário NÃO é desenvolvedor, continuando verificação normal...');
         
         // Verificar acesso baseado em trial
         const accessCheck = await checkAccess(user, 'voice');

@@ -73,12 +73,18 @@ export const LiveConversation: React.FC<LiveConversationProps> = ({
 
   const checkVoiceAccess = async () => {
     try {
+      console.log('[LiveConversation] Verificando acesso de voz...');
       const status = await checkVoiceUsage();
+      console.log('[LiveConversation] Status retornado:', { canUse: status.canUse, isUnlimited: status.isUnlimited, error: status.error });
       setVoiceStatus(status);
       if (!status.canUse) {
+        console.log('[LiveConversation] ❌ Acesso negado:', status.error);
         setError(status.error || 'Limite diário atingido. Gerencie sua conta em nosso site.');
+      } else {
+        console.log('[LiveConversation] ✅ Acesso permitido');
       }
     } catch (err) {
+      console.error('[LiveConversation] Erro ao verificar acesso de voz:', err);
       logger.error('Erro ao verificar acesso de voz', 'LiveConversation', err);
       setError('Erro ao verificar limites de uso');
     }
