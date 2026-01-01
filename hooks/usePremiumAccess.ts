@@ -32,10 +32,20 @@ const isPremiumPlan = (planType?: string): boolean => {
   return premiumPlans.includes(planType);
 };
 
+/**
+ * Verifica se o usuário é desenvolvedor
+ */
+const isDeveloper = (user: { username?: string; nome?: string } | null | undefined): boolean => {
+  if (!user) return false;
+  return user.username === 'dev123' || user.username === 'dev' || user.nome === 'Desenvolvedor' || user.username === 'Desenvolvedor';
+};
+
 export const usePremiumAccess = () => {
   const { user } = useUser();
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const userIsDeveloper = isDeveloper(user);
 
   useEffect(() => {
     const checkSubscription = async () => {
@@ -45,7 +55,7 @@ export const usePremiumAccess = () => {
       }
       
       // Desenvolvedor sempre tem acesso, não precisa verificar assinatura
-      if (isDeveloper(user)) {
+      if (userIsDeveloper) {
         setHasActiveSubscription(true);
         setIsLoading(false);
         return;
@@ -63,10 +73,10 @@ export const usePremiumAccess = () => {
     };
     
     checkSubscription();
-  }, [user?.username, user?.planType, user?.subscriptionStatus, isDeveloper]);
+  }, [user?.username, user?.planType, user?.subscriptionStatus, userIsDeveloper]);
 
   // Verifica se é Premium baseado no planType OU assinatura ativa OU desenvolvedor
-  const isPremium = isDeveloper ||
+  const isPremium = userIsDeveloper ||
                     isPremiumPlan(user?.planType) || 
                     (user?.subscriptionStatus === 'active' && hasActiveSubscription) ||
                     user?.subscription === 'premium';
@@ -91,7 +101,7 @@ export const usePremiumAccess = () => {
    * Desenvolvedor/Premium: ilimitado | Free: limitado
    */
   const canGenerateReport = (reportCount: number = 0): boolean => {
-    if (isDeveloper || isPremium) {
+    if (userIsDeveloper || isPremium) {
       return true; // Ilimitado para Desenvolvedor/Premium
     }
     // Free: máximo 5 relatórios por semana (pode ser ajustado)
@@ -104,7 +114,7 @@ export const usePremiumAccess = () => {
    */
   const canAnalyzePhoto = (photosAnalyzedToday: number = 0): boolean => {
     // Desenvolvedor tem acesso ilimitado
-    if (isDeveloper) {
+    if (userIsDeveloper) {
       return true;
     }
     if (isPremium) {

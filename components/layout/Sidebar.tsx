@@ -282,7 +282,11 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
                       <a
                         key={item.name}
                         href={item.href}
-                        onClick={() => setOpen(false)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setOpen(false);
+                          window.location.hash = item.href;
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
@@ -318,7 +322,11 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
                       <a
                         key={item.name}
                         href={item.href}
-                        onClick={() => setOpen(false)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setOpen(false);
+                          window.location.hash = item.href;
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();

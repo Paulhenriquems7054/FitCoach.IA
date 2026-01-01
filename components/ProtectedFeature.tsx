@@ -22,16 +22,26 @@ export function ProtectedFeature({
   fallback,
   showUpgradePrompt = true,
 }: ProtectedFeatureProps) {
-  const { canAccess, isPremium } = useSubscription();
   const { user } = useUser();
-
+  const { canAccess } = useSubscription();
+  
   // Desenvolvedor sempre tem acesso
   const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
   if (isDeveloper) {
     return <>{children}</>;
   }
 
-  if (canAccess(feature)) {
+  // Verificar acesso com tratamento de erro
+  let hasAccess = true; // Default: permitir acesso (fail open)
+  try {
+    hasAccess = canAccess(feature);
+  } catch (error) {
+    console.warn('Erro ao verificar acesso em ProtectedFeature, permitindo acesso:', error);
+    // Em caso de erro, permitir acesso para não bloquear o usuário
+    hasAccess = true;
+  }
+
+  if (hasAccess) {
     return <>{children}</>;
   }
 

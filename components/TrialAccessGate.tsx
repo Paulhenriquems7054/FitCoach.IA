@@ -23,34 +23,56 @@ export const TrialAccessGate: React.FC<TrialAccessGateProps> = ({
   const { user } = useUser();
   const [accessResult, setAccessResult] = useState<{ allowed: boolean; message?: string } | null>(null);
   const [isChecking, setIsChecking] = useState(true);
+  const [hasError, setHasError] = useState(false);
   
   useEffect(() => {
+    let mounted = true;
+    
     const verifyAccess = async () => {
       if (!user) {
-        setIsChecking(false);
+        if (mounted) {
+          setIsChecking(false);
+        }
         return;
       }
       
       try {
         const result = await checkAccess(user, feature);
-        setAccessResult(result);
+        if (mounted) {
+          setAccessResult(result);
+          setHasError(false);
+        }
       } catch (error) {
         logger.error('Erro ao verificar acesso de trial', 'TrialAccessGate', error);
-        // Em caso de erro, permitir acesso (fail open)
-        setAccessResult({ allowed: true });
+        // Em caso de erro, permitir acesso (fail open) para não bloquear o usuário
+        if (mounted) {
+          setAccessResult({ allowed: true });
+          setHasError(false);
+        }
       } finally {
-        setIsChecking(false);
+        if (mounted) {
+          setIsChecking(false);
+        }
       }
     };
     
     verifyAccess();
+    
+    return () => {
+      mounted = false;
+    };
   }, [user, feature]);
   
   if (isChecking) {
-    return null; // Ou um spinner
+    return null; // Renderizar nada enquanto verifica (evita flash)
   }
   
-  if (!accessResult || !accessResult.allowed) {
+  // Se houve erro ou não tem resultado, permitir acesso (fail open)
+  if (hasError || !accessResult) {
+    return <>{children}</>;
+  }
+  
+  if (!accessResult.allowed) {
     return (
       <TrialExpiredPaywall 
         feature={feature}

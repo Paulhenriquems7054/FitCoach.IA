@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Card } from '../components/ui/Card';
 import { useUser } from '../context/UserContext';
@@ -59,25 +59,37 @@ const AnalysisPage: React.FC = () => {
     } | null>(null);
     const [isLoadingClients, setIsLoadingClients] = useState(false);
 
-    const handleAnalyze = async () => {
+    const handleAnalyze = useCallback(async () => {
         setIsLoading(true);
         setError(null);
         try {
             const result = await analyzeProgress(user);
             setAnalysis(result);
         } catch (err) {
+            console.error('Erro ao analisar progresso:', err);
             setError('Ocorreu um erro ao analisar seu progresso. Tente novamente.');
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [user]);
     
     // Auto-analyze on load if there's enough history (apenas para USER_B2C)
     useEffect(() => {
+        let mounted = true;
         if (accountType !== 'USER_PERSONAL' && user.weightHistory.length > 1) {
-            handleAnalyze();
+            handleAnalyze().catch(err => {
+                console.error('Erro no useEffect ao analisar:', err);
+                if (mounted) {
+                    setError('Ocorreu um erro ao analisar seu progresso.');
+                    setIsLoading(false);
+                }
+            });
         }
-    }, [user.weightHistory, accountType]);
+        return () => {
+            mounted = false;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user.weightHistory.length, accountType]);
 
     // Carregar clientes se for personal trainer
     useEffect(() => {

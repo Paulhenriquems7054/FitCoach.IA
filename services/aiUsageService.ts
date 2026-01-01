@@ -71,6 +71,24 @@ export async function fetchAiUsageSummary(
       };
     }
 
+    // Tratar especificamente erro 503 (Service Unavailable - backend não disponível)
+    if (res.status === 503) {
+      if (import.meta.env.DEV) {
+        console.warn('[AI_USAGE] Backend de uso de IA não disponível (503). Retornando dados vazios. Isso é esperado se o backend não estiver em execução.');
+      }
+      // Retornar estrutura vazia - funcionalidade opcional
+      return {
+        byDay: [],
+        totals: {
+          calls: 0,
+          tokensIn: 0,
+          tokensOut: 0,
+          costUsd: 0,
+        },
+        month: null,
+      };
+    }
+
     if (!res.ok) {
       // Outros erros: logar mas retornar dados vazios
       const text = await res.text().catch(() => 'Erro desconhecido');

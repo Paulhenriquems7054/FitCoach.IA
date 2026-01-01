@@ -47,9 +47,18 @@ const HomePage: React.FC = () => {
   const [showCheckin, setShowCheckin] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+    
     // Apenas carregar dica de coach para usuários B2C/GYM (não para personal trainers)
     if (accountType !== 'USER_PERSONAL') {
-      getAICoachTip(user).then(setCoachTip);
+      getAICoachTip(user)
+        .then(tip => {
+          if (mounted) setCoachTip(tip);
+        })
+        .catch(err => {
+          console.warn('Erro ao carregar dica de coach:', err);
+          // Não definir erro, apenas não mostrar dica
+        });
     }
 
     // Apenas mostrar checkin para usuários B2C/GYM
@@ -58,12 +67,12 @@ const HomePage: React.FC = () => {
         try {
           const lastCheckin = await getAppSetting<string>('lastWeightCheckin');
           const oneWeek = 7 * 24 * 60 * 60 * 1000;
-          if (!lastCheckin || (new Date().getTime() - new Date(lastCheckin).getTime() > oneWeek)) {
+          if (mounted && (!lastCheckin || (new Date().getTime() - new Date(lastCheckin).getTime() > oneWeek))) {
             setShowCheckin(true);
           }
         } catch (error) {
           // Fallback para localStorage
-          if (typeof window !== 'undefined') {
+          if (typeof window !== 'undefined' && mounted) {
             const lastCheckin = localStorage.getItem('lastWeightCheckin');
             const oneWeek = 7 * 24 * 60 * 60 * 1000;
             if (!lastCheckin || (new Date().getTime() - new Date(lastCheckin).getTime() > oneWeek)) {
@@ -75,6 +84,10 @@ const HomePage: React.FC = () => {
 
       checkLastCheckin();
     }
+    
+    return () => {
+      mounted = false;
+    };
   }, [user, accountType]);
 
   const handleCheckinDismiss = async () => {
