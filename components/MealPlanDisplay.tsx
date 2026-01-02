@@ -20,6 +20,7 @@ interface MealPlanDisplayProps {
 const MealPlanDisplay: React.FC<MealPlanDisplayProps> = memo(({ plan, observations }) => {
   const { user } = useUser();
   const { t } = useI18n();
+  const { showSuccess, showError } = useToast();
   const planRef = useRef<HTMLDivElement>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', explanation: '' });
@@ -63,7 +64,7 @@ const MealPlanDisplay: React.FC<MealPlanDisplayProps> = memo(({ plan, observatio
     setIsExplanationLoading(true);
     setModalContent({ title: `${t('meal_plan.explanation.title')} ${meal.refeicao}`, explanation: '' });
     try {
-        const explanation = await explainMeal(meal.refeicao, user);
+        const explanation = await explainMeal(meal, user);
         setModalContent(prev => ({ ...prev, explanation }));
     } catch (error) {
         setModalContent(prev => ({ ...prev, explanation: t('meal_plan.explanation.error') }));

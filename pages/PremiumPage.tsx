@@ -10,7 +10,12 @@ import { ChartBarIcon } from '../components/icons/ChartBarIcon';
 import { BoltIcon } from '../components/icons/BoltIcon';
 import { CheckoutModal } from '../components/CheckoutModal';
 import { CancelSubscriptionModal } from '../components/CancelSubscriptionModal';
+import { B2BCodeModal } from '../components/B2BCodeModal';
+import { SubscriptionSuccessModal } from '../components/SubscriptionSuccessModal';
 import { getSubscriptionPlans, getActiveSubscription } from '../services/supabaseService';
+import { getB2BCodesByBusiness } from '../services/b2bCodeService';
+import { useB2BCodeDetection } from '../hooks/useB2BCodeDetection';
+import { useSubscriptionDetection } from '../hooks/useSubscriptionDetection';
 import { logger } from '../utils/logger';
 
 interface SubscriptionPlan {
@@ -76,6 +81,21 @@ const PremiumPage: React.FC = () => {
         caktoPaymentId?: string;
     } | null>(null);
     
+    // Estados para códigos B2B
+    const [b2bCodes, setB2bCodes] = useState<any[]>([]);
+    const [isLoadingCodes, setIsLoadingCodes] = useState(false);
+    const [pollingEnabled, setPollingEnabled] = useState(false);
+    
+    // Guardar planName do checkout para modal de sucesso B2C
+    const [lastCheckoutPlanName, setLastCheckoutPlanName] = useState<string | null>(null);
+    
+    // Hook para detectar novos códigos (só ativa após checkout B2B)
+    const { newCode, clearNewCode } = useB2BCodeDetection(pollingEnabled);
+    
+    // Hook para detectar atualização de assinatura individual (B2C)
+    const [subscriptionPollingEnabled, setSubscriptionPollingEnabled] = useState(false);
+    const { subscriptionUpdated, clearSubscriptionUpdated } = useSubscriptionDetection(subscriptionPollingEnabled);
+    
     const turboRef = useRef<HTMLDivElement | null>(null);
     const bank100Ref = useRef<HTMLDivElement | null>(null);
     const unlimitedRef = useRef<HTMLDivElement | null>(null);
@@ -84,7 +104,15 @@ const PremiumPage: React.FC = () => {
     useEffect(() => {
         loadPlans();
         loadActiveSubscription();
+        loadB2BCodes();
     }, []);
+
+    // Recarregar códigos quando novo código for detectado
+    useEffect(() => {
+        if (newCode) {
+            loadB2BCodes();
+        }
+    }, [newCode]);
     
     const loadPlans = async () => {
         try {
@@ -222,10 +250,79 @@ const PremiumPage: React.FC = () => {
         });
     };
 
+    const loadB2BCodes = async () => {
+        if (!user?.id) return;
+        
+        setIsLoadingCodes(true);
+        try {
+            const codes = await getB2BCodesByBusiness(user.id);
+            setB2bCodes(codes);
+        } catch (error) {
+            logger.error('Erro ao carregar códigos B2B', 'PremiumPage', error);
+        } finally {
+            setIsLoadingCodes(false);
+        }
+    };
+
     const handleCheckoutSuccess = async () => {
-        showSuccess('Assinatura ativada com sucesso!');
+        showSuccess('Pagamento realizado! Aguardando confirmação...');
+        const planName = checkoutModal?.planName;
+        
+        // Guardar planName antes de fechar modal (para modal de sucesso B2C)
+        if (planName) {
+            setLastCheckoutPlanName(planName);
+        }
+        
+        // Fechar modal de checkout
         setCheckoutModal(null);
         await loadActiveSubscription();
+        
+        // Verificar tipo de plano
+        const isB2BPlan = planName && 
+            ['academy_starter', 'academy_growth', 'academy_pro', 'personal_team_5', 'personal_team_15']
+            .includes(planName);
+        
+        const isB2CPlan = planName && 
+            ['ai_monthly', 'ai_annual_vip', 'monthly', 'annual_vip']
+            .includes(planName);
+        
+        if (isB2BPlan) {
+            // Para planos B2B: ativar polling para detectar código
+            setPollingEnabled(true);
+            setTimeout(() => setPollingEnabled(false), 120000);
+        } else if (isB2CPlan) {
+            // Para planos B2C: ativar polling para detectar atualização de assinatura
+            setSubscriptionPollingEnabled(true);
+            setTimeout(() => {
+                setSubscriptionPollingEnabled(false);
+            }, 120000);
+        }
+    };
+
+    const formatPlanName = (plan: string): string => {
+        const planNames: Record<string, string> = {
+            academy_starter: 'Academy Starter',
+            academy_growth: 'Academy Growth',
+            academy_pro: 'Academy Pro',
+            personal_team_5: 'Personal Team 5',
+            personal_team_15: 'Personal Team 15',
+        };
+        return planNames[plan] || plan;
+    };
+
+    const handleCopyCode = (code: string) => {
+        navigator.clipboard.writeText(code).then(() => {
+            showSuccess('Código copiado para a área de transferência!');
+        }).catch(() => {
+            // Fallback
+            const textArea = document.createElement('textarea');
+            textArea.value = code;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            showSuccess('Código copiado!');
+        });
     };
     
     // Componente para renderizar um plano
@@ -676,6 +773,64 @@ const PremiumPage: React.FC = () => {
                                     Ofereça acesso Premium aos seus alunos sem custo adicional para eles
                                 </p>
                             </div>
+
+                            {/* Seção de Códigos B2B */}
+                            {b2bCodes.length > 0 && (
+                                <Card className="mb-6 border-2 border-primary-300 dark:border-primary-700">
+                                    <div className="p-4 sm:p-6">
+                                        <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                            🔑 Seus Códigos de Ativação
+                                        </h3>
+                                        {isLoadingCodes ? (
+                                            <p className="text-slate-500 text-center py-4">Carregando códigos...</p>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {b2bCodes.filter(code => code.status === 'active').map((codeData) => (
+                                                    <div 
+                                                        key={codeData.id} 
+                                                        className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50 dark:bg-slate-800/50"
+                                                    >
+                                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-3 mb-2">
+                                                                    <p className="text-xl sm:text-2xl font-bold text-primary-600 dark:text-primary-400 font-mono">
+                                                                        {codeData.code}
+                                                                    </p>
+                                                                    {codeData.plan_type && (
+                                                                        <span className="text-xs px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded">
+                                                                            {formatPlanName(codeData.plan_type)}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-4 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                                                                    <span>
+                                                                        📊 {codeData.current_activations} / {codeData.max_activations} ativações
+                                                                    </span>
+                                                                    {codeData.expires_at && (
+                                                                        <span>
+                                                                            ⏰ Expira em {new Date(codeData.expires_at).toLocaleDateString('pt-BR')}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <Button 
+                                                                onClick={() => handleCopyCode(codeData.code)}
+                                                                variant="primary"
+                                                                className="whitespace-nowrap"
+                                                            >
+                                                                📋 Copiar
+                                                            </Button>
+                                                        </div>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-500 mt-3">
+                                                            Compartilhe este código com seus alunos para que eles tenham acesso Premium
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </Card>
+                            )}
                             
                             <HowItWorksSection
                                 title="Como funciona para academias"
@@ -944,6 +1099,33 @@ const PremiumPage: React.FC = () => {
                         setCancelModal(null);
                         loadActiveSubscription(); // Recarregar assinatura
                     }}
+                />
+            )}
+
+            {/* Modal de Novo Código B2B */}
+            {newCode && (
+                <B2BCodeModal
+                    isOpen={!!newCode}
+                    onClose={clearNewCode}
+                    code={newCode.code}
+                    planName={newCode.planType}
+                    maxActivations={newCode.maxActivations}
+                />
+            )}
+
+            {/* Modal de Sucesso de Assinatura Individual (B2C) */}
+            {subscriptionUpdated && lastCheckoutPlanName && (
+                <SubscriptionSuccessModal
+                    isOpen={subscriptionUpdated}
+                    onClose={() => {
+                        clearSubscriptionUpdated();
+                        setLastCheckoutPlanName(null);
+                        // Recarregar página para garantir que tudo foi atualizado
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 500);
+                    }}
+                    planName={lastCheckoutPlanName}
                 />
             )}
         </div>

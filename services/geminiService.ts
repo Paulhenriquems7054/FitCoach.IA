@@ -8,6 +8,7 @@ import type {
   WellnessPlan,
   ProgressAnalysis,
   FoodSubstitution,
+  Meal,
 } from "../types";
 import { Type, GoogleGenAI, Chat } from '@google/genai';
 import {
@@ -947,52 +948,143 @@ export const analyzeProgress = async (user: User): Promise<ProgressAnalysis> => 
 };
 
 // --- EXPLAIN MEAL ---
-export const explainMeal = async (mealName: string, user: User): Promise<string> => {
+// Função auxiliar para gerar explicação básica offline
+const generateBasicMealExplanation = (meal: Meal, user: User): string => {
+    const mealName = meal.refeicao;
+    const proteinas = meal.macros.proteinas_g;
+    const carboidratos = meal.macros.carboidratos_g;
+    const gorduras = meal.macros.gorduras_g;
+    const calorias = meal.calorias;
+
+    let objetivoText = '';
+    if (user.objetivo.includes('perder peso') || user.objetivo.includes('emagrecimento')) {
+        objetivoText = 'Esta refeição é equilibrada para seu objetivo de perda de peso.';
+    } else if (user.objetivo.includes('ganhar massa') || user.objetivo.includes('hipertrofia')) {
+        objetivoText = 'Esta refeição contribui para seu objetivo de ganho de massa muscular.';
+    } else if (user.objetivo.includes('manter')) {
+        objetivoText = 'Esta refeição ajuda a manter seu peso atual de forma saudável.';
+    } else {
+        objetivoText = `Esta refeição está alinhada com seu objetivo de ${user.objetivo}.`;
+    }
+
+    let macroText = '';
+    if (proteinas > 20) {
+        macroText = `Rica em proteínas (${proteinas}g), essencial para a recuperação muscular e manutenção da massa magra.`;
+    } else if (proteinas > 10) {
+        macroText = `Contém uma quantidade adequada de proteínas (${proteinas}g).`;
+    }
+
+    if (carboidratos > 40) {
+        macroText += ` Os carboidratos (${carboidratos}g) fornecem energia para suas atividades do dia.`;
+    } else if (carboidratos > 20) {
+        macroText += ` Os carboidratos moderados (${carboidratos}g) ajudam a manter seus níveis de energia.`;
+    }
+
+    if (gorduras > 10) {
+        macroText += ` As gorduras saudáveis (${gorduras}g) são importantes para a absorção de vitaminas e saciedade.`;
+    }
+
+    return `${objetivoText} ${macroText} Com ${calorias} kcal, esta refeição se encaixa bem em seu plano nutricional diário.`;
+};
+
+export const explainMeal = async (meal: Meal, user: User): Promise<string> => {
+    const mealName = meal.refeicao;
+    const alimentosList = meal.alimentos.join(', ');
+    const calorias = meal.calorias;
+    const proteinas = meal.macros.proteinas_g;
+    const carboidratos = meal.macros.carboidratos_g;
+    const gorduras = meal.macros.gorduras_g;
+
     const prompt = `
-        Explique de forma científica e simples por que a refeição "${mealName}" é uma boa escolha para o usuário, considerando seu objetivo de "${user.objetivo}".
-        Fale sobre os macronutrientes principais da refeição e como eles ajudam a atingir o objetivo.
-        Seja breve (2-3 frases) e educativo.
+        Você é um nutricionista especializado. Explique de forma científica, simples e educativa por que a refeição "${mealName}" é uma boa escolha para este usuário.
+        
+        Informações da refeição:
+        - Alimentos: ${alimentosList}
+        - Calorias: ${calorias} kcal
+        - Proteínas: ${proteinas}g
+        - Carboidratos: ${carboidratos}g
+        - Gorduras: ${gorduras}g
+        
+        Dados do usuário:
+        - Objetivo: ${user.objetivo}
+        - Idade: ${user.idade} anos
+        - Gênero: ${user.genero}
+        - Peso: ${user.peso} kg
+        - Altura: ${user.altura} cm
+        
+        Instruções:
+        - Explique os benefícios nutricionais desta refeição específica
+        - Relacione os macronutrientes com o objetivo do usuário
+        - Seja conciso (2-3 parágrafos) e educativo
+        - Use linguagem acessível e motivadora
     `;
 
-    if (!isOnline()) {
-      throw new Error("Conecte-se à internet para obter a explicação da refeição.");
-    }
+    const systemPrompt = `Você é um nutricionista especializado que explica refeições de forma clara e educativa.`;
 
-    // Verificar se backend está marcado como indisponível
-    if (isBackendUnavailable()) {
-      throw new Error("Backend de IA temporariamente indisponível. Tente novamente em alguns instantes.");
-    }
-
-    const res = await fetch(`${AI_BACKEND_BASE}/ai/text`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: user.id,
-        gymId: user.gymId ?? null,
-        feature: "food_substitution",
-        model: "gemini-1.5-flash",
+    // Tentar IA Local primeiro com fallback para backend (via iaController)
+    const { generateResponse } = await import('./iaController');
+    
+    const explanation = await generateResponse(
         prompt,
-      }),
-    });
+        systemPrompt,
+        async () => {
+            // Fallback para backend de IA (se online)
+            if (!isOnline()) {
+                logger.warn('Backend offline, não é possível obter explicação da refeição', 'geminiService');
+                return null;
+            }
 
-    if (!res.ok) {
-      // Se for 503 (Service Unavailable), marcar backend como indisponível
-      if (res.status === 503) {
-        markBackendUnavailable();
-      }
-      const text = await res.text();
-      // Só logar se não for 503 (para evitar spam no console)
-      if (res.status !== 503) {
-        logger.warn(
-          `Falha no backend de IA em explainMeal: ${res.status} ${text}`,
-          "geminiService",
-        );
-      }
-      throw new Error("Não foi possível obter a explicação da refeição.");
+            // Verificar se backend está marcado como indisponível
+            if (isBackendUnavailable()) {
+                logger.warn('Backend marcado como indisponível', 'geminiService');
+                return null;
+            }
+
+            try {
+                const res = await fetch(`${AI_BACKEND_BASE}/ai/text`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        userId: user.id,
+                        gymId: user.gymId ?? null,
+                        feature: "meal_explanation",
+                        model: "gemini-1.5-flash",
+                        prompt,
+                    }),
+                });
+
+                if (!res.ok) {
+                    // Se for 503 (Service Unavailable), marcar backend como indisponível
+                    if (res.status === 503) {
+                        markBackendUnavailable();
+                    }
+                    const text = await res.text().catch(() => '');
+                    // Só logar se não for 503 (para evitar spam no console)
+                    if (res.status !== 503) {
+                        logger.warn(
+                            `Falha no backend de IA em explainMeal: ${res.status} ${text}`,
+                            "geminiService",
+                        );
+                    }
+                    return null;
+                }
+
+                const data = await res.json();
+                const explanationText: string = data.text || "";
+                return explanationText.trim() || null;
+            } catch (error: any) {
+                logger.error('Erro ao obter explicação da refeição do backend', 'geminiService', error);
+                return null;
+            }
+        }
+    );
+
+    if (!explanation || !explanation.trim()) {
+        // Fallback: gerar explicação básica offline baseada nos dados da refeição
+        logger.info('Gerando explicação básica offline para a refeição', 'geminiService');
+        return generateBasicMealExplanation(meal, user);
     }
 
-    const data = await res.json();
-    const explanation: string = data.text || "";
     return explanation.trim();
 };
 
