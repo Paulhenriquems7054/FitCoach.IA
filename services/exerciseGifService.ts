@@ -1460,15 +1460,14 @@ export function getExerciseGif(exerciseName: string): string | null {
         const rawPath = `/GIFS/${muscleGroup}/${exactMatch}`;
         result = encodeUrlPath(rawPath);
         
-        // Debug para Prancha
-        if (exerciseName.toLowerCase().includes('prancha')) {
-          console.log('✅ [SUCCESS] Caminho gerado:', {
-            rawPath,
-            encoded: result,
-            muscleGroup,
-            exactMatch,
-          });
-        }
+        // Debug temporário para produção
+        console.log('🔍 [getExerciseGif] Caminho gerado:', {
+          exerciseName,
+          rawPath,
+          encoded: result,
+          muscleGroup,
+          exactMatch,
+        });
         
         gifCache.set(cacheKey, result);
         return result;
