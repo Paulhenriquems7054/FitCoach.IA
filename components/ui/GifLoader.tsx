@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface GifLoaderProps {
   src: string;
@@ -24,6 +24,18 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
   const [isLoading, setIsLoading] = useState(!preloaded);
   const [hasError, setHasError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(preloaded);
+  const [currentSrc, setCurrentSrc] = useState(src);
+  const retryCountRef = useRef(0);
+  const maxRetries = 2;
+
+  // Resetar estado quando src mudar
+  useEffect(() => {
+    setCurrentSrc(src);
+    setHasError(false);
+    setIsLoading(!preloaded);
+    setImageLoaded(preloaded);
+    retryCountRef.current = 0;
+  }, [src, preloaded]);
 
   useEffect(() => {
     if (preloaded) {
@@ -38,43 +50,51 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
   };
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    setIsLoading(false);
-    setHasError(true);
-    
-    // Debug: Log do erro em desenvolvimento ou produção (para diagnóstico)
     const imgElement = e.target as HTMLImageElement;
     const errorInfo = {
       src,
-      attemptedPath: src,
+      currentSrc: currentSrc,
+      attemptedPath: currentSrc,
       resolvedSrc: imgElement?.src,
-      currentSrc: imgElement?.currentSrc,
+      actualSrc: imgElement?.currentSrc,
       currentUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
-      // Tentar construir URL absoluta para debug
-      absoluteUrl: typeof window !== 'undefined' && src.startsWith('/') 
-        ? `${window.location.origin}${src}` 
-        : src,
-      // Informações adicionais para diagnóstico no Vercel
+      absoluteUrl: typeof window !== 'undefined' && currentSrc.startsWith('/') 
+        ? `${window.location.origin}${currentSrc}` 
+        : currentSrc,
       isProduction: import.meta.env.PROD,
       environment: import.meta.env.MODE,
+      retryCount: retryCountRef.current,
     };
     
     console.error('GifLoader: Erro ao carregar GIF', errorInfo);
     
-    // Em produção, tentar fazer uma requisição para verificar se o arquivo existe
-    if (import.meta.env.PROD && src.startsWith('/')) {
-      const testUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}${src}` 
-        : src;
-      
-      // Fazer uma requisição HEAD para verificar se o arquivo existe
-      fetch(testUrl, { method: 'HEAD', mode: 'no-cors' })
-        .then(() => {
-          console.log('[GifLoader] Arquivo existe, mas falhou ao carregar como imagem:', testUrl);
-        })
-        .catch((fetchError) => {
-          console.error('[GifLoader] Arquivo não encontrado ou inacessível:', testUrl, fetchError);
-        });
+    // Tentar variações do caminho em produção (Vercel)
+    if (import.meta.env.PROD && currentSrc.startsWith('/') && retryCountRef.current < maxRetries) {
+      try {
+        // Tentar decodificar completamente e recodificar
+        const decoded = decodeURIComponent(currentSrc);
+        // Tentar codificar de forma mais conservadora (apenas o necessário)
+        const alternativePath = decoded.split('/').map((segment, index) => {
+          if (index === 0) return segment; // Manter o primeiro segmento (/GIFS)
+          // Codificar apenas caracteres que realmente precisam ser codificados
+          return encodeURIComponent(segment);
+        }).join('/');
+        
+        if (alternativePath !== currentSrc) {
+          console.log('[GifLoader] Tentando caminho alternativo:', alternativePath);
+          retryCountRef.current += 1;
+          setCurrentSrc(alternativePath);
+          setHasError(false);
+          setIsLoading(true);
+          return; // Tentar novamente com o novo caminho
+        }
+      } catch (decodeError) {
+        console.warn('[GifLoader] Erro ao decodificar caminho:', decodeError);
+      }
     }
+    
+    setIsLoading(false);
+    setHasError(true);
     
     if (onError) {
       onError(e);
@@ -96,7 +116,7 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
       {/* Imagem GIF */}
       {!hasError && (
         <img
-          src={src}
+          src={currentSrc}
           alt={alt}
           className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
           loading={preloaded ? 'eager' : 'lazy'}
