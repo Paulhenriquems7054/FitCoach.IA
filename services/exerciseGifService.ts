@@ -123,11 +123,11 @@ function normalizePathForVercel(path: string): string {
 
 // Mapeamento de grupos musculares para pastas de GIFs
 const muscleGroupFolders: Record<string, string> = {
-  'abd': 'Abdômen (18)-20241202T155424Z-001/Abdômen (18)',
-  'abdomen': 'Abdômen (18)-20241202T155424Z-001/Abdômen (18)',
-  'abdominal': 'Abdômen (18)-20241202T155424Z-001/Abdômen (18)',
-  'core': 'Abdômen (18)-20241202T155424Z-001/Abdômen (18)',
-  'prancha': 'Abdômen (18)-20241202T155424Z-001/Abdômen (18)',
+  'abd': 'abdomen-18-20241202t155424z-001/abdomen-18',
+  'abdomen': 'abdomen-18-20241202t155424z-001/abdomen-18',
+  'abdominal': 'abdomen-18-20241202t155424z-001/abdomen-18',
+  'core': 'abdomen-18-20241202t155424z-001/abdomen-18',
+  'prancha': 'abdomen-18-20241202t155424z-001/abdomen-18',
   
   'antebraço': 'Antebraço (15)-20241202T155453Z-001/Antebraço (15)',
   'antebraco': 'Antebraço (15)-20241202T155453Z-001/Antebraço (15)',
@@ -257,7 +257,7 @@ const muscleGroupFolders: Record<string, string> = {
  * Baseado nos nomes exatos dos arquivos
  */
 const availableGifsByGroup: Record<string, string[]> = {
-  'Abdômen (18)-20241202T155424Z-001/Abdômen (18)': [
+  'abdomen-18-20241202t155424z-001/abdomen-18': [
     'Abd Concentrado Braços estendidos.gif',
     'Abdominais Oblíquos no Chão.gif',
     'Abdominais.gif',
@@ -1438,14 +1438,10 @@ function findSimilarGif(
  */
 function encodeUrlPath(path: string): string {
   try {
-    // Em produção (Vercel), normalizar o caminho primeiro
-    // O Vercel não serve arquivos com acentos, então precisamos normalizar
-    let pathToEncode = path;
-    
-    if (import.meta.env.PROD) {
-      // Normalizar o caminho para Vercel (remover acentos, minúsculas)
-      pathToEncode = normalizeFilePath(path);
-    }
+    // Normalizar o caminho sempre (tanto em dev quanto em produção)
+    // Os arquivos físicos foram renomeados para nomes normalizados
+    // então precisamos normalizar o caminho para corresponder aos arquivos reais
+    let pathToEncode = normalizeFilePath(path);
     
     // Dividir o caminho em segmentos (preservando a estrutura de pastas)
     const segments = pathToEncode.split('/').filter(segment => segment.length > 0);
@@ -1543,10 +1539,13 @@ export function getExerciseGif(exerciseName: string): string | null {
       });
       
       if (exactMatch) {
-        // Construir caminho usando os nomes reais dos arquivos (com acentos e espaços)
-        // O encodeUrlPath vai codificar corretamente para URLs
-        // IMPORTANTE: Usar /GIFS/ (maiúsculas) para corresponder à pasta real
-        const rawPath = `/GIFS/${muscleGroup}/${exactMatch}`;
+        // Normalizar o nome do arquivo para corresponder aos arquivos renomeados
+        const normalizedFileName = normalizeFileName(exactMatch);
+        // Normalizar o grupo muscular também
+        const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
+        // Construir caminho usando nomes normalizados (arquivos foram renomeados)
+        // IMPORTANTE: Usar /gifs/ (minúsculas) porque os arquivos foram renomeados
+        const rawPath = `/gifs/${normalizedMuscleGroup}/${normalizedFileName}`;
         result = encodeUrlPath(rawPath);
         
         // Debug em desenvolvimento e produção (para diagnóstico no Vercel)
@@ -1572,8 +1571,10 @@ export function getExerciseGif(exerciseName: string): string | null {
       });
       
       if (partialMatch) {
-        // Codificar o caminho para lidar com caracteres especiais
-        const rawPath = `/GIFS/${muscleGroup}/${partialMatch}`;
+        // Normalizar o nome do arquivo e grupo muscular
+        const normalizedFileName = normalizeFileName(partialMatch);
+        const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
+        const rawPath = `/gifs/${normalizedMuscleGroup}/${normalizedFileName}`;
         result = encodeUrlPath(rawPath);
         gifCache.set(cacheKey, result);
         return result;
@@ -1591,8 +1592,10 @@ export function getExerciseGif(exerciseName: string): string | null {
         });
         
         if (keywordMatch) {
-          // Codificar o caminho para lidar com caracteres especiais
-          const rawPath = `/GIFS/${muscleGroup}/${keywordMatch}`;
+          // Normalizar o nome do arquivo e grupo muscular
+          const normalizedFileName = normalizeFileName(keywordMatch);
+          const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
+          const rawPath = `/gifs/${normalizedMuscleGroup}/${normalizedFileName}`;
           result = encodeUrlPath(rawPath);
           gifCache.set(cacheKey, result);
           return result;
@@ -1602,8 +1605,10 @@ export function getExerciseGif(exerciseName: string): string | null {
       // 5. QUARTO: Tentar encontrar GIF similar por similaridade de nome
       const similarGif = findSimilarGif(normalized, muscleGroup, 0.3); // Reduzido threshold para 0.3
       if (similarGif) {
-        // Codificar o caminho para lidar com caracteres especiais
-        const rawPath = `/GIFS/${muscleGroup}/${similarGif}`;
+        // Normalizar o nome do arquivo e grupo muscular
+        const normalizedFileName = normalizeFileName(similarGif);
+        const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
+        const rawPath = `/gifs/${normalizedMuscleGroup}/${normalizedFileName}`;
         result = encodeUrlPath(rawPath);
         // Armazenar no cache
         gifCache.set(cacheKey, result);
@@ -1612,7 +1617,9 @@ export function getExerciseGif(exerciseName: string): string | null {
       
       // 6. ÚLTIMO: Se não encontrou similar, tentar retornar um GIF genérico do grupo
       // Retornar o primeiro GIF do grupo como fallback genérico
-      const rawPath = `/GIFS/${muscleGroup}/${availableGifs[0]}`;
+      const normalizedFileName = normalizeFileName(availableGifs[0]);
+      const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
+      const rawPath = `/gifs/${normalizedMuscleGroup}/${normalizedFileName}`;
       result = encodeUrlPath(rawPath);
       gifCache.set(cacheKey, result);
       return result;
@@ -1696,7 +1703,7 @@ export function getAvailableExercisesByGroup(): Record<string, string[]> {
   
   // Mapeamento de pastas para nomes de grupos limpos
   const groupNameMap: Record<string, string> = {
-    'Abdômen (18)-20241202T155424Z-001/Abdômen (18)': 'Abdômen',
+    'abdomen-18-20241202t155424z-001/abdomen-18': 'Abdômen',
     'Antebraço (15)-20241202T155424Z-001/Antebraço (15)': 'Antebraço',
     'Antebraço (15)-20241202T155453Z-001/Antebraço (15)': 'Antebraço',
     'Bíceps (51)-20241202T155424Z-001/Bíceps (51)': 'Bíceps',
