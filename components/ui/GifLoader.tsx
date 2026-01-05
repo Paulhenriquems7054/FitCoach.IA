@@ -72,33 +72,41 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
     if (import.meta.env.PROD && currentSrc.startsWith('/') && retryCountRef.current < maxRetries) {
       try {
         // Tentar diferentes variações do caminho
-        const variations = [
-          // 1. Tentar com /gifs/ (minúsculas) em vez de /GIFS/
-          currentSrc.replace('/GIFS/', '/gifs/'),
-          // 2. Tentar decodificar e recodificar
-          (() => {
-            try {
-              const decoded = decodeURIComponent(currentSrc);
-              return decoded.split('/').map((segment, index) => {
-                if (index === 0) return segment;
-                return encodeURIComponent(segment);
-              }).join('/');
-            } catch {
-              return null;
-            }
-          })(),
-          // 3. Tentar sem codificação (caminho direto)
-          (() => {
-            try {
-              return decodeURIComponent(currentSrc);
-            } catch {
-              return null;
-            }
-          })(),
-        ].filter(Boolean) as string[];
+        const variations: string[] = [];
+        
+        // 1. Tentar decodificar completamente (caminho direto sem codificação)
+        try {
+          const fullyDecoded = decodeURIComponent(currentSrc);
+          variations.push(fullyDecoded);
+        } catch {}
+        
+        // 2. Tentar com /gifs/ (minúsculas) em vez de /GIFS/
+        variations.push(currentSrc.replace('/GIFS/', '/gifs/'));
+        
+        // 3. Tentar decodificar e recodificar segmento por segmento
+        try {
+          const decoded = decodeURIComponent(currentSrc);
+          const recoded = decoded.split('/').map((segment, index) => {
+            if (index === 0) return segment; // Manter /GIFS ou /gifs
+            // Codificar apenas caracteres que realmente precisam
+            return segment.replace(/ /g, '%20')
+                         .replace(/\(/g, '%28')
+                         .replace(/\)/g, '%29');
+          }).join('/');
+          variations.push(recoded);
+        } catch {}
+        
+        // 4. Tentar decodificar e usar caminho direto com /gifs/
+        try {
+          const decoded = decodeURIComponent(currentSrc);
+          variations.push(decoded.replace('/GIFS/', '/gifs/'));
+        } catch {}
+        
+        // Remover duplicatas e nulls
+        const uniqueVariations = [...new Set(variations.filter(Boolean))] as string[];
         
         // Tentar cada variação
-        for (const alternativePath of variations) {
+        for (const alternativePath of uniqueVariations) {
           if (alternativePath && alternativePath !== currentSrc) {
             // Verificar se o arquivo existe antes de tentar carregar
             try {
@@ -106,16 +114,25 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
                 ? `${window.location.origin}${alternativePath}`
                 : alternativePath;
               
-              const response = await fetch(testUrl, { method: 'HEAD' });
+              console.log('[GifLoader] Testando caminho alternativo:', testUrl);
+              
+              const response = await fetch(testUrl, { 
+                method: 'HEAD',
+                cache: 'no-cache'
+              });
+              
               if (response.ok) {
-                console.log('[GifLoader] Caminho alternativo encontrado:', alternativePath);
+                console.log('[GifLoader] ✅ Caminho alternativo encontrado:', alternativePath);
                 retryCountRef.current += 1;
                 setCurrentSrc(alternativePath);
                 setHasError(false);
                 setIsLoading(true);
                 return; // Tentar novamente com o novo caminho
+              } else {
+                console.log('[GifLoader] ❌ Caminho não encontrado:', testUrl, 'Status:', response.status);
               }
             } catch (fetchError) {
+              console.log('[GifLoader] Erro ao testar caminho:', alternativePath, fetchError);
               // Continuar tentando outras variações
               continue;
             }
