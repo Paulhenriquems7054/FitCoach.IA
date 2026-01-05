@@ -1650,7 +1650,10 @@ export function getCacheSize(): number {
  * Gera URL completa para o GIF
  */
 export function getGifUrl(folder: string, filename: string): string {
-  const rawPath = `/GIFS/${folder}/${filename}`;
+  // Normalizar caminhos para corresponder aos arquivos renomeados
+  const normalizedFolder = normalizeFilePath(folder);
+  const normalizedFilename = normalizeFileName(filename);
+  const rawPath = `/gifs/${normalizedFolder}/${normalizedFilename}`;
   return encodeUrlPath(rawPath);
 }
 
