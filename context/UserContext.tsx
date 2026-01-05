@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import type { User } from '../types';
 import { Goal } from '../types';
 import { saveUser, getUser, getCurrentUsername, loginUser, getUserByUsername } from '../services/databaseService';
@@ -209,12 +209,25 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   }, [isLoading]); // Apenas quando terminar de carregar
 
   // Salvar usuário no banco de dados quando houver mudanças
+  // Usar ref para evitar saves desnecessários e loops infinitos
+  const lastSavedUserRef = useRef<string>('');
+  const isSavingRef = useRef(false);
+  
   useEffect(() => {
     if (isLoading) return; // Não salvar durante o carregamento inicial
+    if (isSavingRef.current) return; // Evitar múltiplos saves simultâneos
     
+    // Criar uma string de comparação para verificar se realmente mudou
+    const userString = JSON.stringify(user);
+    if (lastSavedUserRef.current === userString) {
+      return; // Não mudou, não precisa salvar
+    }
+    
+    isSavingRef.current = true;
     const saveUserData = async () => {
       try {
         await saveUser(user);
+        lastSavedUserRef.current = userString;
       } catch (error) {
         // Usar logger se disponível
         if (typeof window !== 'undefined' && (window as any).__logger) {
@@ -222,6 +235,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         } else {
           console.error('Erro ao salvar dados do usuário no banco de dados:', error);
         }
+      } finally {
+        isSavingRef.current = false;
       }
     };
 

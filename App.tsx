@@ -214,75 +214,84 @@ const App: React.FC = () => {
             }
         };
 
-        // Verificar se usuário está realmente logado (apenas uma vez)
-        const checkLogin = async () => {
-            // Evitar múltiplas execuções
-            if (loginCheckRef.current || isInitialized) {
-                return;
-            }
-            
-            loginCheckRef.current = true;
-            
-            try {
-                console.log('[App] Verificando login...');
-                
-                // Verificar se o usuário está explicitamente na rota de login
-                // Se estiver, não fazer login automático mesmo que haja sessão
-                const currentHash = window.location.hash;
-                const currentPath = normalizePath(currentHash);
-                const isOnLoginPage = currentPath === '/login' || currentHash === '#/login';
-                
-                // Adicionar timeout para evitar travamento
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                    setTimeout(() => {
-                        reject(new Error('Timeout ao verificar login (5s)'));
-                    }, 5000);
-                });
-
-                await Promise.race([
-                    (async () => {
-                        // Se estiver na página de login OU hash estiver vazio (raiz), não fazer login automático
-                        // Isso permite que o fluxo de redirecionamento (landing -> presentation -> login) funcione
-                        const isEmptyHash = !currentHash || currentHash === '' || currentHash === '#';
+                // Verificar se usuário está realmente logado (apenas uma vez)
+                const checkLogin = async () => {
+                    // Evitar múltiplas execuções
+                    if (loginCheckRef.current || isInitialized) {
+                        return;
+                    }
+                    
+                    loginCheckRef.current = true;
+                    
+                    try {
+                        console.log('[App] Verificando login...');
                         
-                        if (isOnLoginPage || isEmptyHash) {
-                            console.log('[App] Hash vazio ou na página de login, não fazer login automático');
-                            setIsLoggedIn(false);
-                            setIsInitialized(true);
-                            return;
-                        }
+                        // Verificar se o usuário está explicitamente na rota de login
+                        // Se estiver, não fazer login automático mesmo que haja sessão
+                        const currentHash = window.location.hash;
+                        const currentPath = normalizePath(currentHash);
+                        const isOnLoginPage = currentPath === '/login' || currentHash === '#/login';
                         
-                        // Primeiro tentar verificar no Supabase Auth
-                        const supabaseUser = await authService.getCurrentUserProfile();
-                        if (supabaseUser) {
-                            console.log('[App] Usuário encontrado no Supabase');
-                            
-                            // Atualizar status de trial antes de definir usuário
-                            const { updateTrialStatus } = await import('./services/trialAccessService');
-                            const updatedUser = await updateTrialStatus(supabaseUser);
-                            
-                            setUser(updatedUser);
-                            setIsLoggedIn(true);
-                            setIsInitialized(true);
-                            return;
-                        }
+                        // Adicionar timeout para evitar travamento
+                        const timeoutPromise = new Promise<never>((_, reject) => {
+                            setTimeout(() => {
+                                reject(new Error('Timeout ao verificar login (5s)'));
+                            }, 5000);
+                        });
 
-                        // Fallback para IndexedDB
-                        console.log('[App] Verificando IndexedDB...');
-                        const currentUsername = await getCurrentUsername();
-                        setIsLoggedIn(!!currentUsername && currentUsername.trim() !== '');
-                        console.log('[App] Login verificado:', !!currentUsername);
-                    })(),
-                    timeoutPromise
-                ]);
-            } catch (error) {
-                console.warn('[App] Erro ao verificar login, assumindo não logado:', error);
-                setIsLoggedIn(false);
-            } finally {
-                setIsInitialized(true);
-                console.log('[App] Inicialização concluída');
-            }
-        };
+                        await Promise.race([
+                            (async () => {
+                                // Se estiver na página de login OU hash estiver vazio (raiz), não fazer login automático
+                                // Isso permite que o fluxo de redirecionamento (landing -> presentation -> login) funcione
+                                const isEmptyHash = !currentHash || currentHash === '' || currentHash === '#';
+                                
+                                if (isOnLoginPage || isEmptyHash) {
+                                    console.log('[App] Hash vazio ou na página de login, não fazer login automático');
+                                    setIsLoggedIn(false);
+                                    setIsInitialized(true);
+                                    return;
+                                }
+                                
+                                // Primeiro tentar verificar no Supabase Auth
+                                const supabaseUser = await authService.getCurrentUserProfile();
+                                if (supabaseUser) {
+                                    console.log('[App] Usuário encontrado no Supabase');
+                                    
+                                    // Atualizar status de trial antes de definir usuário
+                                    const { updateTrialStatus } = await import('./services/trialAccessService');
+                                    const updatedUser = await updateTrialStatus(supabaseUser);
+                                    
+                                    // Só atualizar se realmente mudou para evitar loops
+                                    setUser(prevUser => {
+                                        // Comparar apenas campos essenciais para evitar atualizações desnecessárias
+                                        if (prevUser.username === updatedUser.username && 
+                                            prevUser.subscriptionStatus === updatedUser.subscriptionStatus) {
+                                            return prevUser;
+                                        }
+                                        return updatedUser;
+                                    });
+                                    setIsLoggedIn(true);
+                                    setIsInitialized(true);
+                                    return;
+                                }
+
+                                // Fallback para IndexedDB
+                                console.log('[App] Verificando IndexedDB...');
+                                const currentUsername = await getCurrentUsername();
+                                const isLoggedInValue = !!currentUsername && currentUsername.trim() !== '';
+                                setIsLoggedIn(isLoggedInValue);
+                                console.log('[App] Login verificado:', isLoggedInValue);
+                            })(),
+                            timeoutPromise
+                        ]);
+                    } catch (error) {
+                        console.warn('[App] Erro ao verificar login, assumindo não logado:', error);
+                        setIsLoggedIn(false);
+                    } finally {
+                        setIsInitialized(true);
+                        console.log('[App] Inicialização concluída');
+                    }
+                };
         
         checkTokenLogin();
         checkLogin();

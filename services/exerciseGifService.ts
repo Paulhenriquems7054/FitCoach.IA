@@ -1382,19 +1382,27 @@ function findSimilarGif(
 
 /**
  * Codifica um caminho de URL preservando os separadores de caminho (/)
- * Usa encodeURI que preserva caracteres válidos em caminhos mas codifica espaços e caracteres especiais
- * Isso funciona melhor com servidores estáticos que esperam URLs codificadas mas preservam a estrutura
+ * Para o Vercel, precisamos codificar cada segmento individualmente
+ * mas preservar os separadores de caminho
  */
 function encodeUrlPath(path: string): string {
-  // Usar encodeURI que preserva / mas codifica espaços e caracteres especiais
-  // Isso deve funcionar melhor com o Vercel
   try {
-    return encodeURI(path);
-  } catch (e) {
-    // Fallback: codificar segmento por segmento se encodeURI falhar
+    // Dividir o caminho em segmentos
     const segments = path.split('/').filter(segment => segment.length > 0);
     const prefix = path.startsWith('/') ? '/' : '';
-    return prefix + segments.map(segment => encodeURIComponent(segment)).join('/');
+    
+    // Codificar cada segmento individualmente para lidar com caracteres especiais
+    // Isso é necessário porque o Vercel pode ter problemas com espaços e caracteres especiais
+    const encodedSegments = segments.map(segment => {
+      // Codificar o segmento, mas preservar alguns caracteres que são válidos em URLs
+      return encodeURIComponent(segment).replace(/%2F/g, '/'); // Garantir que / não seja codificado dentro do segmento
+    });
+    
+    return prefix + encodedSegments.join('/');
+  } catch (e) {
+    // Fallback: usar encodeURI se a codificação segmentada falhar
+    console.warn('Erro ao codificar caminho, usando fallback:', e);
+    return encodeURI(path);
   }
 }
 

@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "dev:clean": "powershell -ExecutionPolicy Bypass -File ./start-dev.ps1",
+    "dev:force": "vite --force --host 0.0.0.0 --port 3000",
+    "kill:ports": "powershell -ExecutionPolicy Bypass -File ./kill-node-processes.ps1",
+    "clean:cache": "powershell -ExecutionPolicy Bypass -Command \"if (Test-Path 'node_modules/.vite') { Remove-Item -Path 'node_modules/.vite' -Recurse -Force }; if (Test-Path 'dist') { Remove-Item -Path 'dist' -Recurse -Force }; Get-ChildItem -Path '.' -Filter 'vite.config.ts.timestamp-*' | Remove-Item -Force\"",
     "build": "npx vite build",
     "preview": "npx vite preview",
     "test": "jest",

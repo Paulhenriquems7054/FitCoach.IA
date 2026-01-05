@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
-        strictPort: false, // Permite usar porta alternativa se 3000 estiver ocupada
+        strictPort: true, // SEMPRE usar porta 3000 - falhar se estiver ocupada
         // Forçar fechamento limpo de conexões
         force: false,
         open: true, // Abre o navegador automaticamente
@@ -27,21 +27,27 @@ export default defineConfig(({ mode }) => {
             '**/public/GIFS/**', // Ignorar mudanças nos GIFs para evitar reloads
             '**/.vite/**', // Ignorar pasta .vite
             '**/package-lock.json',
-            '**/yarn.lock'
+            '**/yarn.lock',
+            '**/vite.config.ts.timestamp-*', // Ignorar timestamps do Vite
+            '**/.env.local',
+            '**/.env.*.local'
           ],
           // Usar polling apenas se necessário (mais estável)
           usePolling: false,
           // Intervalo de polling se necessário
           interval: 100,
-          // Ignorar mudanças iniciais
-          ignoreInitial: false,
+          // Ignorar mudanças iniciais para evitar restart no início
+          ignoreInitial: true,
           // Ativar atomic para evitar reloads parciais
-          atomic: true
+          atomic: true,
+          // Delay antes de processar mudanças (evita múltiplos restarts)
+          delay: 500
         },
         headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
           'Pragma': 'no-cache',
-          'Expires': '0'
+          'Expires': '0',
+          'Last-Modified': new Date().toUTCString()
         },
         hmr: {
           protocol: 'ws',
@@ -50,19 +56,29 @@ export default defineConfig(({ mode }) => {
           clientPort: 3000,
           // Desabilitar overlay de erro para evitar problemas visuais
           overlay: false,
-          // Configurações para evitar erros 504
+          // Configurações para evitar erros 504 e "server is being restarted"
           client: {
             overlay: false,
             // Tentativas de reconexão
-            reconnect: 3,
+            reconnect: 10,
             // Tempo entre tentativas (ms)
-            timeout: 5000
+            timeout: 10000
           }
         },
         // Configuração para evitar loops de reload
         // Aumentar tempo entre reloads
         optimizeDeps: {
-          exclude: []
+          exclude: [],
+          // Forçar re-otimização quando necessário
+          force: false,
+          // Entradas para otimização
+          entries: [],
+          // Incluir dependências que podem causar problemas
+          include: [
+            'react',
+            'react-dom',
+            'react/jsx-runtime'
+          ]
         },
         // Proxy para redirecionar /api para o backend
         proxy: {
@@ -97,7 +113,7 @@ export default defineConfig(({ mode }) => {
       preview: {
         port: 3000,
         host: '0.0.0.0',
-        strictPort: true
+        strictPort: true // SEMPRE usar porta 3000
       },
       plugins: [
         react(),
@@ -106,11 +122,22 @@ export default defineConfig(({ mode }) => {
           ? [removeConsole({ includes: ['log', 'info', 'debug'] })]
           : []
         ),
-        // Plugin para desabilitar service worker em desenvolvimento
+        // Plugin para desabilitar service worker em desenvolvimento e forçar no-cache
         {
           name: 'disable-service-worker-dev',
           configureServer(server) {
+            // Middleware para forçar no-cache em todos os arquivos em desenvolvimento
             server.middlewares.use((req, res, next) => {
+              // Forçar headers de no-cache para evitar erros 504
+              if (mode === 'development') {
+                res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+                res.setHeader('Pragma', 'no-cache');
+                res.setHeader('Expires', '0');
+                res.setHeader('Last-Modified', new Date().toUTCString());
+                // Adicionar ETag único para forçar revalidação
+                res.setHeader('ETag', `"${Date.now()}-${Math.random()}"`);
+              }
+              
               // In development, return empty service worker
               if (req.url === '/service-worker.js' || req.url?.startsWith('/service-worker.js?')) {
                 res.setHeader('Content-Type', 'application/javascript');
