@@ -3,8 +3,12 @@
  * Remove acentos, converte para minúsculas, substitui espaços por hífens
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function normalizeName(name) {
   // Remover extensão temporariamente
@@ -107,4 +111,3 @@ if (dryRun) {
   console.log('2. Testar build local: npm run build');
   console.log('3. Testar preview: npm run preview');
 }
-
