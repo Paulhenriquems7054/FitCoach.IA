@@ -47,7 +47,13 @@ export default defineConfig(({ mode }) => {
           port: 3000,
           clientPort: 3000,
           // Desabilitar overlay de erro para evitar problemas visuais
-          overlay: false
+          overlay: false,
+          // Configurações para evitar erros 504
+          client: {
+            overlay: false,
+            // Desabilitar reconexão automática muito rápida
+            reconnect: 5
+          }
         },
         // Configuração para evitar loops de reload
         // Aumentar tempo entre reloads
