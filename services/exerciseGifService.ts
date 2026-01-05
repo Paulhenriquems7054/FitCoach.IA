@@ -107,6 +107,20 @@ function normalizeFilePath(path: string): string {
   return prefix + normalizedSegments.join('/');
 }
 
+/**
+ * Normaliza caminho para Vercel (remove acentos, converte para minúsculas)
+ * Esta função é usada em produção para garantir compatibilidade com Vercel
+ */
+function normalizePathForVercel(path: string): string {
+  // Se não estiver em produção, retornar o caminho original
+  if (!import.meta.env.PROD) {
+    return path;
+  }
+  
+  // Em produção (Vercel), normalizar o caminho
+  return normalizeFilePath(path);
+}
+
 // Mapeamento de grupos musculares para pastas de GIFs
 const muscleGroupFolders: Record<string, string> = {
   'abd': 'Abdômen (18)-20241202T155424Z-001/Abdômen (18)',
@@ -1419,19 +1433,23 @@ function findSimilarGif(
 
 /**
  * Codifica um caminho de URL preservando os separadores de caminho (/)
- * Para o Vercel, precisamos codificar cada segmento individualmente
- * mas preservar os separadores de caminho
+ * Para o Vercel, precisamos normalizar os caminhos (remover acentos, minúsculas)
+ * porque o Vercel não serve arquivos com acentos mesmo quando codificados
  */
 function encodeUrlPath(path: string): string {
   try {
-    // SOLUÇÃO DEFINITIVA: Usar os nomes reais dos arquivos e codificar corretamente
-    // O Vercel serve arquivos exatamente como estão no sistema de arquivos
-    // Precisamos codificar cada segmento do caminho usando encodeURIComponent
-    // Isso garante que acentos, espaços e caracteres especiais sejam tratados corretamente
+    // Em produção (Vercel), normalizar o caminho primeiro
+    // O Vercel não serve arquivos com acentos, então precisamos normalizar
+    let pathToEncode = path;
+    
+    if (import.meta.env.PROD) {
+      // Normalizar o caminho para Vercel (remover acentos, minúsculas)
+      pathToEncode = normalizeFilePath(path);
+    }
     
     // Dividir o caminho em segmentos (preservando a estrutura de pastas)
-    const segments = path.split('/').filter(segment => segment.length > 0);
-    const prefix = path.startsWith('/') ? '/' : '';
+    const segments = pathToEncode.split('/').filter(segment => segment.length > 0);
+    const prefix = pathToEncode.startsWith('/') ? '/' : '';
     
     // Codificar cada segmento individualmente
     // encodeURIComponent codifica corretamente:
@@ -1450,11 +1468,13 @@ function encodeUrlPath(path: string): string {
     if (import.meta.env.DEV || import.meta.env.PROD) {
       console.log('[encodeUrlPath]', { 
         original: path,
+        normalized: pathToEncode,
         encoded: encodedPath,
         segments: segments.length,
         firstSegment: segments[0],
         lastSegment: segments[segments.length - 1],
-        environment: import.meta.env.MODE
+        environment: import.meta.env.MODE,
+        isProduction: import.meta.env.PROD
       });
     }
     

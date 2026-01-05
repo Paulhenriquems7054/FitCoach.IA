@@ -1,19 +1,15 @@
-# Script completo para normalizar nomes de GIFs e atualizar o código
-# Este script:
-# 1. Renomeia todas as pastas e arquivos GIF para nomes normalizados
-# 2. Atualiza o exerciseGifService.ts com os novos nomes
+# Script simplificado para normalizar nomes de GIFs
+# Remove acentos, converte para minúsculas, substitui espaços por hífens
 
 param(
-    [switch]$DryRun = $false  # Se true, apenas mostra o que seria feito sem fazer alterações
+    [switch]$DryRun = $false
 )
 
-Write-Host "🔄 Normalizando nomes de GIFs e atualizando código..." -ForegroundColor Yellow
-Write-Host ""
-
+Write-Host "🔄 Normalizando nomes de GIFs..." -ForegroundColor Yellow
 if ($DryRun) {
     Write-Host "⚠️  MODO DRY-RUN: Nenhuma alteração será feita" -ForegroundColor Cyan
-    Write-Host ""
 }
+Write-Host ""
 
 # Função para normalizar nomes
 function Normalize-Name {
@@ -24,15 +20,15 @@ function Normalize-Name {
     $extension = if ($isFile) { $matches[0] } else { '' }
     $nameWithoutExt = if ($isFile) { $name -replace '\.(gif|png|jpg|jpeg)$', '' } else { $name }
     
-    # Normalizar: remover acentos, converter para minúsculas, substituir espaços e caracteres especiais
+    # Normalizar
     $normalized = $nameWithoutExt.ToLower()
     $normalized = $normalized.Normalize('FormD')
-    $normalized = $normalized -replace '[^\x00-\x7F]', ''                  # Remover acentos
-    $normalized = $normalized -replace '\s+', '-'                           # Espaços para hífen
-    $normalized = $normalized -replace '[()]', ''                           # Remover parênteses
-    $normalized = $normalized -replace '[^\w\-]', ''                        # Remover caracteres especiais (manter apenas letras, números e hífen)
-    $normalized = $normalized -replace '-+', '-'                            # Múltiplos hífens para um
-    $normalized = $normalized -replace '^-|-$', ''                          # Remover hífens no início/fim
+    $normalized = $normalized -replace '[^\x00-\x7F]', ''
+    $normalized = $normalized -replace '\s+', '-'
+    $normalized = $normalized -replace '[()]', ''
+    $normalized = $normalized -replace '[^\w\-]', ''
+    $normalized = $normalized -replace '-+', '-'
+    $normalized = $normalized -replace '^-|-$', ''
     
     return $normalized + $extension
 }
@@ -109,7 +105,6 @@ foreach ($folder in $folders) {
         # Renomear pasta principal por último
         if (-not $DryRun) {
             try {
-                $newPath = Join-Path $folder.Parent.FullName $newFolderName
                 Rename-Item -Path $folder.FullName -NewName $newFolderName -ErrorAction Stop
                 Write-Host "    ✓ Pasta renomeada" -ForegroundColor Green
             } catch {
@@ -122,7 +117,9 @@ foreach ($folder in $folders) {
         foreach ($subfolder in $subfolders) {
             $oldSubName = $subfolder.Name
             $newSubName = Normalize-Name $oldSubName
-            $folderMapping["$oldFolderName/$oldSubName"] = "$oldFolderName/$newSubName"
+            if ($oldSubName -ne $newSubName) {
+                $folderMapping["$oldFolderName/$oldSubName"] = "$oldFolderName/$newSubName"
+            }
         }
     }
     
@@ -153,7 +150,7 @@ if ($DryRun) {
 } else {
     Write-Host "⚠️  PRÓXIMOS PASSOS:" -ForegroundColor Yellow
     Write-Host "1. Revisar o mapeamento em gif-normalization-mapping.json" -ForegroundColor White
-    Write-Host "2. Executar script para atualizar exerciseGifService.ts" -ForegroundColor White
+    Write-Host "2. Atualizar exerciseGifService.ts com os novos nomes" -ForegroundColor White
     Write-Host "3. Testar build local: npm run build" -ForegroundColor White
     Write-Host "4. Testar preview: npm run preview" -ForegroundColor White
 }
