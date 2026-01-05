@@ -1446,13 +1446,15 @@ function encodeUrlPath(path: string): string {
     const encodedPath = prefix + encodedSegments.join('/');
     
     // Log para debug (tanto em dev quanto em produção para diagnóstico)
-    if (import.meta.env.DEV) {
+    // IMPORTANTE: Logs em produção ajudam a diagnosticar problemas no Vercel
+    if (import.meta.env.DEV || import.meta.env.PROD) {
       console.log('[encodeUrlPath]', { 
         original: path,
         encoded: encodedPath,
         segments: segments.length,
         firstSegment: segments[0],
-        lastSegment: segments[segments.length - 1]
+        lastSegment: segments[segments.length - 1],
+        environment: import.meta.env.MODE
       });
     }
     

@@ -11,6 +11,7 @@
       "destination": "/index.html"
     }
   ],
+  "cleanUrls": false,
   "headers": [
     {
       "source": "/GIFS/(.*)",

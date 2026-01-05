@@ -49,7 +49,7 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
     setImageLoaded(true);
   };
 
-  const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+  const handleError = async (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const imgElement = e.target as HTMLImageElement;
     const errorInfo = {
       src,
@@ -71,25 +71,58 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
     // Tentar variações do caminho em produção (Vercel)
     if (import.meta.env.PROD && currentSrc.startsWith('/') && retryCountRef.current < maxRetries) {
       try {
-        // Tentar decodificar completamente e recodificar
-        const decoded = decodeURIComponent(currentSrc);
-        // Tentar codificar de forma mais conservadora (apenas o necessário)
-        const alternativePath = decoded.split('/').map((segment, index) => {
-          if (index === 0) return segment; // Manter o primeiro segmento (/GIFS)
-          // Codificar apenas caracteres que realmente precisam ser codificados
-          return encodeURIComponent(segment);
-        }).join('/');
+        // Tentar diferentes variações do caminho
+        const variations = [
+          // 1. Tentar com /gifs/ (minúsculas) em vez de /GIFS/
+          currentSrc.replace('/GIFS/', '/gifs/'),
+          // 2. Tentar decodificar e recodificar
+          (() => {
+            try {
+              const decoded = decodeURIComponent(currentSrc);
+              return decoded.split('/').map((segment, index) => {
+                if (index === 0) return segment;
+                return encodeURIComponent(segment);
+              }).join('/');
+            } catch {
+              return null;
+            }
+          })(),
+          // 3. Tentar sem codificação (caminho direto)
+          (() => {
+            try {
+              return decodeURIComponent(currentSrc);
+            } catch {
+              return null;
+            }
+          })(),
+        ].filter(Boolean) as string[];
         
-        if (alternativePath !== currentSrc) {
-          console.log('[GifLoader] Tentando caminho alternativo:', alternativePath);
-          retryCountRef.current += 1;
-          setCurrentSrc(alternativePath);
-          setHasError(false);
-          setIsLoading(true);
-          return; // Tentar novamente com o novo caminho
+        // Tentar cada variação
+        for (const alternativePath of variations) {
+          if (alternativePath && alternativePath !== currentSrc) {
+            // Verificar se o arquivo existe antes de tentar carregar
+            try {
+              const testUrl = alternativePath.startsWith('/')
+                ? `${window.location.origin}${alternativePath}`
+                : alternativePath;
+              
+              const response = await fetch(testUrl, { method: 'HEAD' });
+              if (response.ok) {
+                console.log('[GifLoader] Caminho alternativo encontrado:', alternativePath);
+                retryCountRef.current += 1;
+                setCurrentSrc(alternativePath);
+                setHasError(false);
+                setIsLoading(true);
+                return; // Tentar novamente com o novo caminho
+              }
+            } catch (fetchError) {
+              // Continuar tentando outras variações
+              continue;
+            }
+          }
         }
-      } catch (decodeError) {
-        console.warn('[GifLoader] Erro ao decodificar caminho:', decodeError);
+      } catch (error) {
+        console.warn('[GifLoader] Erro ao tentar variações:', error);
       }
     }
     
