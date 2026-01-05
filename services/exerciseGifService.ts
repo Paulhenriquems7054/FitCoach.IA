@@ -70,6 +70,43 @@ function normalizeText(text: string): string {
     .trim();
 }
 
+/**
+ * Normaliza nome de arquivo/pasta para formato compatível com Vercel
+ * Remove acentos, converte para minúsculas, substitui espaços por hífens
+ * Remove parênteses e caracteres especiais
+ */
+function normalizeFileName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/\s+/g, '-') // Espaços para hífen
+    .replace(/[()]/g, '') // Remove parênteses
+    .replace(/[^\w\-.]/g, '') // Remove caracteres especiais (manter letras, números, hífen e ponto)
+    .replace(/-+/g, '-') // Múltiplos hífens para um
+    .replace(/^-|-$/g, ''); // Remove hífens no início/fim
+}
+
+/**
+ * Normaliza caminho completo para formato compatível com Vercel
+ * Aplica normalizeFileName em cada segmento do caminho
+ */
+function normalizeFilePath(path: string): string {
+  const segments = path.split('/').filter(s => s.length > 0);
+  const prefix = path.startsWith('/') ? '/' : '';
+  const normalizedSegments = segments.map(segment => {
+    // Se tiver extensão, preservar
+    if (segment.includes('.')) {
+      const parts = segment.split('.');
+      const name = parts.slice(0, -1).join('.');
+      const ext = parts[parts.length - 1];
+      return normalizeFileName(name) + '.' + ext.toLowerCase();
+    }
+    return normalizeFileName(segment);
+  });
+  return prefix + normalizedSegments.join('/');
+}
+
 // Mapeamento de grupos musculares para pastas de GIFs
 const muscleGroupFolders: Record<string, string> = {
   'abd': 'Abdômen (18)-20241202T155424Z-001/Abdômen (18)',
@@ -1387,19 +1424,22 @@ function findSimilarGif(
  */
 function encodeUrlPath(path: string): string {
   try {
-    // IMPORTANTE: No Vercel, os arquivos são servidos exatamente como estão no sistema de arquivos
-    // A codificação deve corresponder aos nomes reais dos arquivos
-    // No Vercel, precisamos codificar cada segmento individualmente usando encodeURIComponent
+    // SOLUÇÃO DEFINITIVA: Usar os nomes reais dos arquivos e codificar corretamente
+    // O Vercel serve arquivos exatamente como estão no sistema de arquivos
+    // Precisamos codificar cada segmento do caminho usando encodeURIComponent
+    // Isso garante que acentos, espaços e caracteres especiais sejam tratados corretamente
     
-    // Dividir o caminho em segmentos
+    // Dividir o caminho em segmentos (preservando a estrutura de pastas)
     const segments = path.split('/').filter(segment => segment.length > 0);
     const prefix = path.startsWith('/') ? '/' : '';
     
-    // Codificar cada segmento usando encodeURIComponent
-    // Isso garante que caracteres especiais, acentos e espaços sejam tratados corretamente
-    // encodeURIComponent codifica: espaços como %20, acentos como %C3%A1, parênteses como %28/%29
+    // Codificar cada segmento individualmente
+    // encodeURIComponent codifica corretamente:
+    // - Espaços como %20
+    // - Acentos como %C3%A1 (á), %C3%A9 (é), etc.
+    // - Parênteses como %28 e %29
+    // - Outros caracteres especiais
     const encodedSegments = segments.map(segment => {
-      // encodeURIComponent codifica tudo corretamente para URLs
       return encodeURIComponent(segment);
     });
     
@@ -1408,7 +1448,7 @@ function encodeUrlPath(path: string): string {
     // Log para debug (tanto em dev quanto em produção para diagnóstico)
     if (import.meta.env.DEV) {
       console.log('[encodeUrlPath]', { 
-        original: path, 
+        original: path,
         encoded: encodedPath,
         segments: segments.length,
         firstSegment: segments[0],
@@ -1481,8 +1521,9 @@ export function getExerciseGif(exerciseName: string): string | null {
       });
       
       if (exactMatch) {
-        // Construir caminho - o navegador e servidor devem lidar com caracteres especiais automaticamente
-        // Mas vamos codificar apenas os segmentos do caminho para garantir compatibilidade
+        // Construir caminho usando os nomes reais dos arquivos (com acentos e espaços)
+        // O encodeUrlPath vai codificar corretamente para URLs
+        // IMPORTANTE: Usar /GIFS/ (maiúsculas) para corresponder à pasta real
         const rawPath = `/GIFS/${muscleGroup}/${exactMatch}`;
         result = encodeUrlPath(rawPath);
         

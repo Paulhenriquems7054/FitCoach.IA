@@ -7,13 +7,30 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/((?!GIFS|assets|icons|manifest\\.json|service-worker\\.js|favicon\\.ico|.*\\.gif|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.svg|.*\\.webp|.*\\.ico).*)",
+      "source": "/((?!GIFS|gifs|assets|icons|manifest\\.json|service-worker\\.js|favicon\\.ico|.*\\.gif|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.svg|.*\\.webp|.*\\.ico).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
       "source": "/GIFS/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        },
+        {
+          "key": "Content-Type",
+          "value": "image/gif"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "source": "/gifs/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
