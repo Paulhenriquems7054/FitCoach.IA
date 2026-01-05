@@ -43,7 +43,7 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
     
     // Debug: Log do erro em desenvolvimento ou produção (para diagnóstico)
     const imgElement = e.target as HTMLImageElement;
-    console.error('GifLoader: Erro ao carregar GIF', {
+    const errorInfo = {
       src,
       attemptedPath: src,
       resolvedSrc: imgElement?.src,
@@ -53,7 +53,28 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
       absoluteUrl: typeof window !== 'undefined' && src.startsWith('/') 
         ? `${window.location.origin}${src}` 
         : src,
-    });
+      // Informações adicionais para diagnóstico no Vercel
+      isProduction: import.meta.env.PROD,
+      environment: import.meta.env.MODE,
+    };
+    
+    console.error('GifLoader: Erro ao carregar GIF', errorInfo);
+    
+    // Em produção, tentar fazer uma requisição para verificar se o arquivo existe
+    if (import.meta.env.PROD && src.startsWith('/')) {
+      const testUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}${src}` 
+        : src;
+      
+      // Fazer uma requisição HEAD para verificar se o arquivo existe
+      fetch(testUrl, { method: 'HEAD', mode: 'no-cors' })
+        .then(() => {
+          console.log('[GifLoader] Arquivo existe, mas falhou ao carregar como imagem:', testUrl);
+        })
+        .catch((fetchError) => {
+          console.error('[GifLoader] Arquivo não encontrado ou inacessível:', testUrl, fetchError);
+        });
+    }
     
     if (onError) {
       onError(e);

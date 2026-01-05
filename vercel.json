@@ -7,7 +7,7 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/((?!GIFS|assets|icons|manifest\\.json|service-worker\\.js|favicon\\.ico).*)",
+      "source": "/((?!GIFS|assets|icons|manifest\\.json|service-worker\\.js|favicon\\.ico|.*\\.gif|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.svg).*)",
       "destination": "/index.html"
     }
   ],
@@ -22,6 +22,10 @@
         {
           "key": "Content-Type",
           "value": "image/gif"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
         }
       ]
     },

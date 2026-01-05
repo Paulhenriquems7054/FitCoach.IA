@@ -1387,12 +1387,34 @@ function findSimilarGif(
  */
 function encodeUrlPath(path: string): string {
   try {
+    // Em produção (Vercel), usar codificação mais simples que funciona melhor
+    if (import.meta.env.PROD) {
+      // Para produção, codificar apenas espaços e caracteres problemáticos
+      // mas manter a estrutura de pastas intacta
+      const segments = path.split('/').filter(segment => segment.length > 0);
+      const prefix = path.startsWith('/') ? '/' : '';
+      
+      const encodedSegments = segments.map(segment => {
+        // Codificar o segmento completo, mas o navegador vai decodificar automaticamente
+        return encodeURIComponent(segment);
+      });
+      
+      const encodedPath = prefix + encodedSegments.join('/');
+      
+      // Debug em produção (apenas se necessário)
+      if (import.meta.env.DEV) {
+        console.log('[encodeUrlPath] Path encoded:', { original: path, encoded: encodedPath });
+      }
+      
+      return encodedPath;
+    }
+    
+    // Em desenvolvimento, usar codificação normal
     // Dividir o caminho em segmentos
     const segments = path.split('/').filter(segment => segment.length > 0);
     const prefix = path.startsWith('/') ? '/' : '';
     
     // Codificar cada segmento individualmente para lidar com caracteres especiais
-    // Isso é necessário porque o Vercel pode ter problemas com espaços e caracteres especiais
     const encodedSegments = segments.map(segment => {
       // Codificar o segmento, mas preservar alguns caracteres que são válidos em URLs
       return encodeURIComponent(segment).replace(/%2F/g, '/'); // Garantir que / não seja codificado dentro do segmento
