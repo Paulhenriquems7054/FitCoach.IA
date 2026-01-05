@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
         strictPort: false, // Permite usar porta alternativa se 3000 estiver ocupada
+        // Forçar fechamento limpo de conexões
+        force: false,
         open: true, // Abre o navegador automaticamente
         watch: {
           // Ignorar mudanças em arquivos que podem causar loops
@@ -51,8 +53,10 @@ export default defineConfig(({ mode }) => {
           // Configurações para evitar erros 504
           client: {
             overlay: false,
-            // Desabilitar reconexão automática muito rápida
-            reconnect: 5
+            // Tentativas de reconexão
+            reconnect: 3,
+            // Tempo entre tentativas (ms)
+            timeout: 5000
           }
         },
         // Configuração para evitar loops de reload
