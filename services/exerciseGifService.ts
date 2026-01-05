@@ -1439,9 +1439,9 @@ function findSimilarGif(
 function encodeUrlPath(path: string): string {
   try {
     // O caminho já vem normalizado de getExerciseGif, então apenas codificar
-    // Se o caminho já estiver normalizado (começa com /gifs/), não normalizar novamente
+    // Se o caminho já estiver normalizado (começa com /GIFS/), não normalizar novamente
     let pathToEncode = path;
-    if (!path.startsWith('/gifs/')) {
+    if (!path.startsWith('/GIFS/')) {
       // Se ainda não está normalizado, normalizar (fallback)
       pathToEncode = normalizeFilePath(path);
     }
@@ -1545,7 +1545,7 @@ export function getExerciseGif(exerciseName: string): string | null {
         // Normalizar sempre (arquivos foram renomeados tanto em dev quanto em produção)
         const normalizedFileName = normalizeFileName(exactMatch);
         const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
-        const rawPath = `/gifs/${normalizedMuscleGroup}/${normalizedFileName}`;
+        const rawPath = `/GIFS/${normalizedMuscleGroup}/${normalizedFileName}`;
         result = encodeUrlPath(rawPath);
         
         // Debug em desenvolvimento e produção (para diagnóstico no Vercel)
@@ -1574,7 +1574,7 @@ export function getExerciseGif(exerciseName: string): string | null {
         // Normalizar sempre (arquivos foram renomeados)
         const normalizedFileName = normalizeFileName(partialMatch);
         const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
-        const rawPath = `/gifs/${normalizedMuscleGroup}/${normalizedFileName}`;
+        const rawPath = `/GIFS/${normalizedMuscleGroup}/${normalizedFileName}`;
         result = encodeUrlPath(rawPath);
         gifCache.set(cacheKey, result);
         return result;
@@ -1595,7 +1595,7 @@ export function getExerciseGif(exerciseName: string): string | null {
           // Normalizar sempre (arquivos foram renomeados)
           const normalizedFileName = normalizeFileName(keywordMatch);
           const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
-          const rawPath = `/gifs/${normalizedMuscleGroup}/${normalizedFileName}`;
+          const rawPath = `/GIFS/${normalizedMuscleGroup}/${normalizedFileName}`;
           result = encodeUrlPath(rawPath);
           gifCache.set(cacheKey, result);
           return result;
@@ -1608,7 +1608,7 @@ export function getExerciseGif(exerciseName: string): string | null {
         // Normalizar sempre (arquivos foram renomeados)
         const normalizedFileName = normalizeFileName(similarGif);
         const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
-        const rawPath = `/gifs/${normalizedMuscleGroup}/${normalizedFileName}`;
+        const rawPath = `/GIFS/${normalizedMuscleGroup}/${normalizedFileName}`;
         result = encodeUrlPath(rawPath);
         // Armazenar no cache
         gifCache.set(cacheKey, result);
@@ -1653,7 +1653,7 @@ export function getGifUrl(folder: string, filename: string): string {
   // Normalizar sempre (arquivos foram renomeados)
   const normalizedFolder = normalizeFilePath(folder);
   const normalizedFilename = normalizeFileName(filename);
-  const rawPath = `/gifs/${normalizedFolder}/${normalizedFilename}`;
+  const rawPath = `/GIFS/${normalizedFolder}/${normalizedFilename}`;
   return encodeUrlPath(rawPath);
 }
 
