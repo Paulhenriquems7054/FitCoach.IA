@@ -22,12 +22,19 @@ export default defineConfig(({ mode }) => {
             '**/.git/**', 
             '**/dist/**', 
             '**/build/**',
-            '**/public/GIFS/**' // Ignorar mudanças nos GIFs para evitar reloads
+            '**/public/GIFS/**', // Ignorar mudanças nos GIFs para evitar reloads
+            '**/.vite/**', // Ignorar pasta .vite
+            '**/package-lock.json',
+            '**/yarn.lock'
           ],
           // Usar polling apenas se necessário (mais estável)
           usePolling: false,
           // Intervalo de polling se necessário
-          interval: 100
+          interval: 100,
+          // Ignorar mudanças iniciais
+          ignoreInitial: false,
+          // Ativar atomic para evitar reloads parciais
+          atomic: true
         },
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -41,6 +48,11 @@ export default defineConfig(({ mode }) => {
           clientPort: 3000,
           // Desabilitar overlay de erro para evitar problemas visuais
           overlay: false
+        },
+        // Configuração para evitar loops de reload
+        // Aumentar tempo entre reloads
+        optimizeDeps: {
+          exclude: []
         },
         // Proxy para redirecionar /api para o backend
         proxy: {
