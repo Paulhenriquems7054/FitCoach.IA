@@ -41,14 +41,16 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
     setIsLoading(false);
     setHasError(true);
     
-    // Debug: Log do erro sempre (temporário para debug em produção)
-    console.error('GifLoader: Erro ao carregar GIF', {
-      src,
-      attemptedPath: src,
-      currentUrl: window.location.href,
-      targetSrc: (e.target as HTMLImageElement)?.src,
-      targetCurrentSrc: (e.target as HTMLImageElement)?.currentSrc,
-    });
+    // Debug: Log do erro em desenvolvimento
+    if (import.meta.env.DEV) {
+      console.error('GifLoader: Erro ao carregar GIF', {
+        src,
+        attemptedPath: src,
+        currentUrl: window.location.href,
+        targetSrc: (e.target as HTMLImageElement)?.src,
+        targetCurrentSrc: (e.target as HTMLImageElement)?.currentSrc,
+      });
+    }
     
     if (onError) {
       onError(e);

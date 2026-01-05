@@ -1460,14 +1460,16 @@ export function getExerciseGif(exerciseName: string): string | null {
         const rawPath = `/GIFS/${muscleGroup}/${exactMatch}`;
         result = encodeUrlPath(rawPath);
         
-        // Debug temporário para produção
-        console.log('🔍 [getExerciseGif] Caminho gerado:', {
-          exerciseName,
-          rawPath,
-          encoded: result,
-          muscleGroup,
-          exactMatch,
-        });
+        // Debug apenas em desenvolvimento
+        if (import.meta.env.DEV) {
+          console.log('🔍 [getExerciseGif] Caminho gerado:', {
+            exerciseName,
+            rawPath,
+            encoded: result,
+            muscleGroup,
+            exactMatch,
+          });
+        }
         
         gifCache.set(cacheKey, result);
         return result;

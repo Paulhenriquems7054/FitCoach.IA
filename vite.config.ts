@@ -17,7 +17,13 @@ export default defineConfig(({ mode }) => {
         open: true, // Abre o navegador automaticamente
         watch: {
           // Ignorar mudanças em arquivos que podem causar loops
-          ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**'],
+          ignored: [
+            '**/node_modules/**', 
+            '**/.git/**', 
+            '**/dist/**', 
+            '**/build/**',
+            '**/public/GIFS/**' // Ignorar mudanças nos GIFs para evitar reloads
+          ],
           // Usar polling apenas se necessário (mais estável)
           usePolling: false,
           // Intervalo de polling se necessário
