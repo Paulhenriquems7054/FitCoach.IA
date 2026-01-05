@@ -77,6 +77,8 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
           onLoad={handleLoad}
           onError={handleError}
           decoding="async"
+          // Forçar o navegador a tratar como URL absoluta
+          referrerPolicy="no-referrer"
           // Otimizações de performance para animação suave
           style={{
             imageRendering: 'auto',
