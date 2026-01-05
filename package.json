@@ -18,7 +18,9 @@
     "generate-favicon": "node scripts/generate-favicon.js",
     "generate-app-icons": "node scripts/generate-app-icons.js",
     "check-config": "node scripts/check-config.js",
-    "server": "node server/gym-server.js"
+    "server": "node server/gym-server.js",
+    "normalize:gifs": "node scripts/normalize-gifs.js",
+    "normalize:gifs:dry": "node scripts/normalize-gifs.js --dry-run"
   },
   "dependencies": {
     "@google/genai": "^1.28.0",
