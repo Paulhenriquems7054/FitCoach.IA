@@ -1437,48 +1437,10 @@ function findSimilarGif(
  * porque o Vercel não serve arquivos com acentos mesmo quando codificados
  */
 function encodeUrlPath(path: string): string {
-  try {
-    // O caminho já vem normalizado de getExerciseGif, então apenas codificar
-    // Não normalizar novamente (já está normalizado)
-    let pathToEncode = path;
-    
-    // Dividir o caminho em segmentos (preservando a estrutura de pastas)
-    const segments = pathToEncode.split('/').filter(segment => segment.length > 0);
-    const prefix = pathToEncode.startsWith('/') ? '/' : '';
-    
-    // Codificar cada segmento individualmente
-    // encodeURIComponent codifica corretamente:
-    // - Espaços como %20
-    // - Acentos como %C3%A1 (á), %C3%A9 (é), etc.
-    // - Parênteses como %28 e %29
-    // - Outros caracteres especiais
-    const encodedSegments = segments.map(segment => {
-      return encodeURIComponent(segment);
-    });
-    
-    const encodedPath = prefix + encodedSegments.join('/');
-    
-    // Log para debug (tanto em dev quanto em produção para diagnóstico)
-    // IMPORTANTE: Logs em produção ajudam a diagnosticar problemas no Vercel
-    if (import.meta.env.DEV || import.meta.env.PROD) {
-      console.log('[encodeUrlPath]', { 
-        original: path,
-        normalized: pathToEncode,
-        encoded: encodedPath,
-        segments: segments.length,
-        firstSegment: segments[0],
-        lastSegment: segments[segments.length - 1],
-        environment: import.meta.env.MODE,
-        isProduction: import.meta.env.PROD
-      });
-    }
-    
-    return encodedPath;
-  } catch (e) {
-    // Fallback: usar encodeURI se a codificação segmentada falhar
-    console.warn('Erro ao codificar caminho, usando fallback:', e);
-    return encodeURI(path);
-  }
+  // Caminhos já estão normalizados (sem espaços, sem acentos, apenas letras, números e hífens)
+  // Não precisa codificar - apenas retornar o caminho como está
+  // Isso funciona porque os arquivos foram renomeados para formato URL-safe
+  return path;
 }
 
 /**
