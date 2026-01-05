@@ -1382,20 +1382,15 @@ function findSimilarGif(
 
 /**
  * Codifica um caminho de URL preservando os separadores de caminho (/)
- * Para arquivos estáticos servidos pelo Vite/Vercel, precisamos codificar
- * apenas os caracteres que realmente precisam ser codificados em URLs
- * Espaços devem ser codificados como %20, mas outros caracteres comuns podem ser preservados
+ * Para arquivos estáticos servidos pelo Vite/Vercel, vamos usar o caminho literal
+ * e deixar o navegador fazer a codificação automática quando necessário.
+ * Isso funciona melhor com servidores estáticos que esperam nomes de arquivo literais.
  */
 function encodeUrlPath(path: string): string {
-  // Dividir o caminho em segmentos (preservando as barras)
-  const segments = path.split('/').filter(segment => segment.length > 0);
-  // Se o caminho original começava com /, preservar isso
-  const prefix = path.startsWith('/') ? '/' : '';
-  
-  // Codificar cada segmento usando encodeURIComponent
-  // Isso garante que espaços, parênteses, acentos, etc. sejam codificados corretamente
-  // O navegador e o servidor (Vercel) devem lidar com isso corretamente
-  return prefix + segments.map(segment => encodeURIComponent(segment)).join('/');
+  // Para arquivos estáticos, usar o caminho literal sem codificação
+  // O navegador moderno e o servidor (Vercel) lidam com caracteres especiais automaticamente
+  // quando servidos como arquivos estáticos da pasta public/
+  return path;
 }
 
 /**
