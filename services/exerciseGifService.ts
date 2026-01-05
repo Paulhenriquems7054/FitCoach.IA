@@ -1641,9 +1641,14 @@ export function getExerciseGif(exerciseName: string): string | null {
       
       // 6. ÚLTIMO: Se não encontrou similar, tentar retornar um GIF genérico do grupo
       // Retornar o primeiro GIF do grupo como fallback genérico
-      const normalizedFileName = normalizeFileName(availableGifs[0]);
-      const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
-      const rawPath = `/gifs/${normalizedMuscleGroup}/${normalizedFileName}`;
+      let rawPath: string;
+      if (import.meta.env.PROD) {
+        const normalizedFileName = normalizeFileName(availableGifs[0]);
+        const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
+        rawPath = `/GIFS/${normalizedMuscleGroup}/${normalizedFileName}`;
+      } else {
+        rawPath = `/GIFS/${muscleGroup}/${availableGifs[0]}`;
+      }
       result = encodeUrlPath(rawPath);
       gifCache.set(cacheKey, result);
       return result;
