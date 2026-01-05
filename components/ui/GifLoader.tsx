@@ -66,7 +66,18 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
       retryCount: retryCountRef.current,
     };
     
-    console.error('GifLoader: Erro ao carregar GIF', errorInfo);
+    // Log detalhado do erro
+    console.error('GifLoader: Erro ao carregar GIF', {
+      ...errorInfo,
+      // Adicionar informações adicionais para diagnóstico
+      decodedPath: (() => {
+        try {
+          return decodeURIComponent(currentSrc);
+        } catch {
+          return 'N/A';
+        }
+      })(),
+    });
     
     // Tentar variações do caminho em produção (Vercel)
     if (import.meta.env.PROD && currentSrc.startsWith('/') && retryCountRef.current < maxRetries) {
@@ -74,33 +85,42 @@ export const GifLoader: React.FC<GifLoaderProps> = ({
         // Tentar diferentes variações do caminho
         const variations: string[] = [];
         
-        // 1. Tentar decodificar completamente (caminho direto sem codificação)
-        try {
-          const fullyDecoded = decodeURIComponent(currentSrc);
-          variations.push(fullyDecoded);
-        } catch {}
-        
-        // 2. Tentar com /gifs/ (minúsculas) em vez de /GIFS/
-        variations.push(currentSrc.replace('/GIFS/', '/gifs/'));
-        
-        // 3. Tentar decodificar e recodificar segmento por segmento
+        // Gerar todas as variações possíveis do caminho
         try {
           const decoded = decodeURIComponent(currentSrc);
-          const recoded = decoded.split('/').map((segment, index) => {
+          
+          // 1. Caminho completamente decodificado com /GIFS/
+          variations.push(decoded);
+          
+          // 2. Caminho completamente decodificado com /gifs/
+          variations.push(decoded.replace('/GIFS/', '/gifs/'));
+          
+          // 3. Caminho original codificado com /gifs/
+          variations.push(currentSrc.replace('/GIFS/', '/gifs/'));
+          
+          // 4. Recodificar segmento por segmento (apenas espaços e parênteses)
+          const recodedMinimal = decoded.split('/').map((segment, index) => {
             if (index === 0) return segment; // Manter /GIFS ou /gifs
-            // Codificar apenas caracteres que realmente precisam
             return segment.replace(/ /g, '%20')
                          .replace(/\(/g, '%28')
                          .replace(/\)/g, '%29');
           }).join('/');
-          variations.push(recoded);
-        } catch {}
-        
-        // 4. Tentar decodificar e usar caminho direto com /gifs/
-        try {
-          const decoded = decodeURIComponent(currentSrc);
-          variations.push(decoded.replace('/GIFS/', '/gifs/'));
-        } catch {}
+          variations.push(recodedMinimal);
+          variations.push(recodedMinimal.replace('/GIFS/', '/gifs/'));
+          
+          // 5. Recodificar completamente (encodeURIComponent em cada segmento)
+          const fullyRecoded = decoded.split('/').map((segment, index) => {
+            if (index === 0) return segment;
+            return encodeURIComponent(segment);
+          }).join('/');
+          variations.push(fullyRecoded);
+          variations.push(fullyRecoded.replace('/GIFS/', '/gifs/'));
+          
+        } catch (decodeError) {
+          console.warn('[GifLoader] Erro ao decodificar caminho:', decodeError);
+          // Se não conseguir decodificar, tentar apenas variações básicas
+          variations.push(currentSrc.replace('/GIFS/', '/gifs/'));
+        }
         
         // Remover duplicatas e nulls
         const uniqueVariations = [...new Set(variations.filter(Boolean))] as string[];
