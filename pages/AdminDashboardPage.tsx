@@ -295,7 +295,12 @@ const AdminDashboardPage: React.FC = () => {
           aiTokensMonth: tokens,
           aiCostUsdMonth: usage?.totals.costUsd || 0,
         });
-      } catch (e) {
+      } catch (e: any) {
+        // Erro 503 é esperado quando backend não está rodando - não logar como erro
+        if (e?.message?.includes('503') || e?.status === 503) {
+          // Silenciar erro 503 - é esperado quando backend não está disponível
+          return;
+        }
         console.warn('Erro ao carregar uso de IA para dashboard:', e);
       }
     };

@@ -39,6 +39,14 @@ Sistema completo de gestão nutricional com inteligência artificial para criar 
    ```
    
    📖 **Guia completo:** Veja `docs/CONFIGURAR_SUPABASE.md`
+   
+   **Configuração do CDN para GIFs (opcional, mas recomendado para Vercel):**
+   - Se você estiver usando Vercel e os GIFs não estiverem carregando (erro 404)
+   - Configure um CDN externo para os GIFs (Cloudflare R2, AWS S3, etc.)
+   ```bash
+   VITE_GIF_CDN_URL=https://seu-cdn.com
+   ```
+   📖 **Guia completo:** Veja `docs/CONFIGURAR_CDN_GIFS.md`
 
 3. **Inicie o servidor de desenvolvimento:**
    ```bash

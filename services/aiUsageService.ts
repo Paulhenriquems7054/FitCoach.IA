@@ -49,16 +49,34 @@ export async function fetchAiUsageSummary(
       params.toString() ? `?${params.toString()}` : ''
     }`;
 
-    const res = await fetch(url, {
-      method: 'GET',
-    });
+    // Usar fetch com tratamento silencioso de erros
+    // O erro 503 é esperado quando o backend não está rodando
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'GET',
+        // Não lançar erro para 503 - é esperado quando backend não está rodando
+        signal: AbortSignal.timeout(5000), // Timeout de 5s
+      });
+    } catch (error: any) {
+      // Se for erro de rede ou timeout, retornar dados vazios silenciosamente
+      // Não logar nada - o middleware do Vite já intercepta em desenvolvimento
+      return {
+        byDay: [],
+        totals: {
+          calls: 0,
+          tokensIn: 0,
+          tokensOut: 0,
+          costUsd: 0,
+        },
+        month: null,
+      };
+    }
 
     // Tratar especificamente erro 404 (endpoint não configurado)
     if (res.status === 404) {
-      if (import.meta.env.DEV) {
-        console.warn('[AI_USAGE] Endpoint /ai/usage não configurado (404). Retornando dados vazios.');
-      }
       // Retornar estrutura vazia ao invés de lançar erro
+      // Não logar nada - funcionalidade opcional
       return {
         byDay: [],
         totals: {
@@ -72,10 +90,9 @@ export async function fetchAiUsageSummary(
     }
 
     // Tratar especificamente erro 503 (Service Unavailable - backend não disponível)
+    // Este erro é ESPERADO e NORMAL quando o backend não está rodando
     if (res.status === 503) {
-      if (import.meta.env.DEV) {
-        console.warn('[AI_USAGE] Backend de uso de IA não disponível (503). Retornando dados vazios. Isso é esperado se o backend não estiver em execução.');
-      }
+      // Não logar nada - o middleware do Vite já intercepta em desenvolvimento
       // Retornar estrutura vazia - funcionalidade opcional
       return {
         byDay: [],
@@ -90,11 +107,9 @@ export async function fetchAiUsageSummary(
     }
 
     if (!res.ok) {
-      // Outros erros: logar mas retornar dados vazios
-      const text = await res.text().catch(() => 'Erro desconhecido');
-      if (import.meta.env.DEV) {
-        console.warn(`[AI_USAGE] Erro ao buscar uso de IA: ${res.status} ${res.statusText} - ${text}`);
-      }
+      // Outros erros: retornar dados vazios silenciosamente
+      // Não logar - funcionalidade opcional que não deve quebrar a aplicação
+      await res.text().catch(() => ''); // Consumir resposta para evitar warning
       return {
         byDay: [],
         totals: {
@@ -111,9 +126,7 @@ export async function fetchAiUsageSummary(
     const contentType = res.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       // Resposta não é JSON (provavelmente HTML de erro)
-      if (import.meta.env.DEV) {
-        console.warn('[AI_USAGE] Resposta não é JSON. Content-Type:', contentType);
-      }
+      // Retornar dados vazios silenciosamente
       return {
         byDay: [],
         totals: {
@@ -128,10 +141,8 @@ export async function fetchAiUsageSummary(
 
     return (await res.json()) as AiUsageSummary;
   } catch (error: any) {
-    // Qualquer erro de rede, parsing, etc: retornar dados vazios
-    if (import.meta.env.DEV) {
-      console.warn('[AI_USAGE] Erro ao buscar uso de IA:', error);
-    }
+    // Qualquer erro de rede, parsing, etc: retornar dados vazios silenciosamente
+    // Não logar - funcionalidade opcional que não deve quebrar a aplicação
     return {
       byDay: [],
       totals: {

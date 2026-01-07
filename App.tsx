@@ -223,6 +223,15 @@ const App: React.FC = () => {
                     
                     loginCheckRef.current = true;
                     
+                    // Timeout de segurança - garantir que sempre inicialize após 3 segundos
+                    const safetyTimeout = setTimeout(() => {
+                        if (!isInitialized) {
+                            console.warn('[App] Timeout de segurança: forçando inicialização após 3s');
+                            setIsLoggedIn(false);
+                            setIsInitialized(true);
+                        }
+                    }, 3000);
+                    
                     try {
                         console.log('[App] Verificando login...');
                         
@@ -249,38 +258,55 @@ const App: React.FC = () => {
                                     console.log('[App] Hash vazio ou na página de login, não fazer login automático');
                                     setIsLoggedIn(false);
                                     setIsInitialized(true);
+                                    clearTimeout(safetyTimeout);
                                     return;
                                 }
                                 
-                                // Primeiro tentar verificar no Supabase Auth
-                                const supabaseUser = await authService.getCurrentUserProfile();
-                                if (supabaseUser) {
-                                    console.log('[App] Usuário encontrado no Supabase');
-                                    
-                                    // Atualizar status de trial antes de definir usuário
-                                    const { updateTrialStatus } = await import('./services/trialAccessService');
-                                    const updatedUser = await updateTrialStatus(supabaseUser);
-                                    
-                                    // Só atualizar se realmente mudou para evitar loops
-                                    setUser(prevUser => {
-                                        // Comparar apenas campos essenciais para evitar atualizações desnecessárias
-                                        if (prevUser.username === updatedUser.username && 
-                                            prevUser.subscriptionStatus === updatedUser.subscriptionStatus) {
-                                            return prevUser;
-                                        }
-                                        return updatedUser;
+                                // Primeiro tentar verificar no Supabase Auth (com timeout curto)
+                                try {
+                                    const supabasePromise = authService.getCurrentUserProfile();
+                                    const supabaseTimeout = new Promise<null>((resolve) => {
+                                        setTimeout(() => resolve(null), 2000); // Timeout de 2s para Supabase
                                     });
-                                    setIsLoggedIn(true);
-                                    setIsInitialized(true);
-                                    return;
+                                    
+                                    const supabaseUser = await Promise.race([supabasePromise, supabaseTimeout]);
+                                    
+                                    if (supabaseUser) {
+                                        console.log('[App] Usuário encontrado no Supabase');
+                                        
+                                        // Atualizar status de trial antes de definir usuário
+                                        const { updateTrialStatus } = await import('./services/trialAccessService');
+                                        const updatedUser = await updateTrialStatus(supabaseUser);
+                                        
+                                        // Só atualizar se realmente mudou para evitar loops
+                                        setUser(prevUser => {
+                                            // Comparar apenas campos essenciais para evitar atualizações desnecessárias
+                                            if (prevUser.username === updatedUser.username && 
+                                                prevUser.subscriptionStatus === updatedUser.subscriptionStatus) {
+                                                return prevUser;
+                                            }
+                                            return updatedUser;
+                                        });
+                                        setIsLoggedIn(true);
+                                        setIsInitialized(true);
+                                        clearTimeout(safetyTimeout);
+                                        return;
+                                    }
+                                } catch (supabaseError) {
+                                    console.warn('[App] Erro ao verificar Supabase, continuando...', supabaseError);
                                 }
 
                                 // Fallback para IndexedDB
                                 console.log('[App] Verificando IndexedDB...');
-                                const currentUsername = await getCurrentUsername();
-                                const isLoggedInValue = !!currentUsername && currentUsername.trim() !== '';
-                                setIsLoggedIn(isLoggedInValue);
-                                console.log('[App] Login verificado:', isLoggedInValue);
+                                try {
+                                    const currentUsername = await getCurrentUsername();
+                                    const isLoggedInValue = !!currentUsername && currentUsername.trim() !== '';
+                                    setIsLoggedIn(isLoggedInValue);
+                                    console.log('[App] Login verificado:', isLoggedInValue);
+                                } catch (dbError) {
+                                    console.warn('[App] Erro ao verificar IndexedDB:', dbError);
+                                    setIsLoggedIn(false);
+                                }
                             })(),
                             timeoutPromise
                         ]);
@@ -288,6 +314,7 @@ const App: React.FC = () => {
                         console.warn('[App] Erro ao verificar login, assumindo não logado:', error);
                         setIsLoggedIn(false);
                     } finally {
+                        clearTimeout(safetyTimeout);
                         setIsInitialized(true);
                         console.log('[App] Inicialização concluída');
                     }
@@ -766,21 +793,21 @@ const App: React.FC = () => {
         }
     }
 
-    // Debug: Se chegou até aqui, deve renderizar
-    console.log('[App] ✅ Todas as verificações passadas, renderizando página...', { 
-        normalizedPath, 
-        isLoggedIn, 
-        isStudent, 
-        isAdmin, 
-        isDeveloper,
-        userRole: user?.gymRole,
-        tenantRole: user?.tenantRole,
-        accountType: user?.accountType,
-        academyId: user?.academyId,
-        username: user?.username,
-        subscriptionStatus: user?.subscriptionStatus,
-        trialEndDate: user?.trialEndDate
-    });
+    // Debug desabilitado para reduzir logs excessivos
+    // console.log('[App] ✅ Todas as verificações passadas, renderizando página...', { 
+    //     normalizedPath, 
+    //     isLoggedIn, 
+    //     isStudent, 
+    //     isAdmin, 
+    //     isDeveloper,
+    //     userRole: user?.gymRole,
+    //     tenantRole: user?.tenantRole,
+    //     accountType: user?.accountType,
+    //     academyId: user?.academyId,
+    //     username: user?.username,
+    //     subscriptionStatus: user?.subscriptionStatus,
+    //     trialEndDate: user?.trialEndDate
+    // });
 
     const renderPage = () => {
         // Usar normalizedPath que já foi definido acima
@@ -873,12 +900,12 @@ const App: React.FC = () => {
         );
     }
 
-    // Debug final antes de renderizar
-    console.log('[App] Renderizando página principal...', { 
-        path, 
-        isLoggedIn, 
-        willRender: renderPage() !== null 
-    });
+    // Debug desabilitado para reduzir logs excessivos
+    // console.log('[App] Renderizando página principal...', { 
+    //     path, 
+    //     isLoggedIn, 
+    //     willRender: renderPage() !== null 
+    // });
 
     return (
         <GymBrandingProvider>

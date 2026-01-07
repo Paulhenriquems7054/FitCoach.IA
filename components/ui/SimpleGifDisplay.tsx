@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getGifUrls } from '../../services/gifUrlService';
 
 interface SimpleGifDisplayProps {
   src: string;
@@ -7,8 +8,8 @@ interface SimpleGifDisplayProps {
 }
 
 /**
- * Componente simples para exibir GIFs sem verificações complexas
- * Usa apenas a tag <img> padrão do HTML
+ * Componente para exibir GIFs com fallback automático para CDN externo
+ * Tenta primeiro carregar do servidor local/Vercel, e se falhar, tenta CDN externo
  */
 export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
   src,
@@ -18,21 +19,30 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [actualSrc, setActualSrc] = useState<string>('');
+  const [triedCdn, setTriedCdn] = useState(false);
   const imgRef = React.useRef<HTMLImageElement>(null);
 
-  // Garantir que o caminho comece com /
-  const normalizedSrc = src.startsWith('/') ? src : `/${src}`;
+  // Obter URLs (local e CDN se disponível)
+  const gifUrls = React.useMemo(() => getGifUrls(src), [src]);
 
-  // Usar o caminho diretamente - o navegador fará a codificação automática quando necessário
+  // Inicializar com URL local primeiro
   React.useEffect(() => {
     // Log para debug
     if (import.meta.env.DEV) {
-      console.log('[SimpleGifDisplay] 📍 Caminho recebido:', src, '→ Normalizado:', normalizedSrc);
+      console.log('[SimpleGifDisplay] 📍 Caminho recebido:', src);
+      console.log('[SimpleGifDisplay] 🔗 URLs disponíveis:', {
+        local: gifUrls.local,
+        cdn: gifUrls.cdn,
+        primary: gifUrls.primary,
+      });
     }
-    // Não fazer verificação prévia - apenas usar o caminho diretamente
-    // O navegador fará a codificação automática de espaços e acentos quando colocar no src
-    setActualSrc(normalizedSrc);
-  }, [normalizedSrc, src]);
+    
+    // Começar com URL local
+    setActualSrc(gifUrls.primary);
+    setTriedCdn(false);
+    setHasError(false);
+    setIsLoading(true);
+  }, [src, gifUrls]);
 
   // Verificar se a imagem já está carregada (cache do navegador)
   React.useEffect(() => {
@@ -67,24 +77,39 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
   const handleLoad = () => {
     setIsLoading(false);
     setHasError(false);
-    console.log('[SimpleGifDisplay] ✅ GIF carregado com sucesso:', normalizedSrc);
+    console.log('[SimpleGifDisplay] ✅ GIF carregado com sucesso:', actualSrc || gifUrls.primary);
   };
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    setIsLoading(false);
-    setHasError(true);
     const img = e.target as HTMLImageElement;
-    const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${actualSrc || normalizedSrc}` : (actualSrc || normalizedSrc);
+    const attemptedUrl = actualSrc || gifUrls.primary;
+    const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${attemptedUrl}` : attemptedUrl;
     
-    // Log detalhado sempre (também em produção para debug no Vercel)
+    // Log detalhado
     console.error('[SimpleGifDisplay] ❌ Erro ao carregar GIF:', {
-      src: actualSrc || normalizedSrc,
+      src: attemptedUrl,
       attemptedUrl: img?.src,
       currentSrc: img?.currentSrc,
       origin: typeof window !== 'undefined' ? window.location.origin : 'N/A',
       fullUrl,
       environment: import.meta.env.MODE,
+      triedCdn,
+      cdnAvailable: !!gifUrls.cdn,
     });
+    
+    // Se ainda não tentou CDN e CDN está disponível, tentar CDN
+    if (!triedCdn && gifUrls.cdn) {
+      console.log('[SimpleGifDisplay] 🔄 Tentando CDN externo:', gifUrls.cdn);
+      setActualSrc(gifUrls.cdn);
+      setTriedCdn(true);
+      setIsLoading(true);
+      setHasError(false);
+      return; // Não marcar como erro ainda, vamos tentar CDN
+    }
+    
+    // Se já tentou CDN ou não há CDN disponível, marcar como erro
+    setIsLoading(false);
+    setHasError(true);
   };
 
   if (hasError) {
