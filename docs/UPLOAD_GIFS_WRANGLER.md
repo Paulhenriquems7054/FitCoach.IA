@@ -51,39 +51,23 @@ fitcoach-gifs
 
 ⚠️ **IMPORTANTE:** Mantenha a estrutura de pastas `GIFS/...` ao fazer upload!
 
-#### Opção A: Upload de uma pasta específica
+⚠️ **IMPORTANTE:** O Wrangler CLI **não suporta** upload recursivo de pastas com `--recursive`. Você precisa fazer upload arquivo por arquivo ou usar o script automatizado abaixo.
 
-Para fazer upload de uma pasta específica (ex: `GIFS/Abdomen/`):
+#### Opção A: Upload manual de um arquivo
 
-```bash
-# Navegue até a pasta do projeto
-cd D:\FitCoach.IA
-
-# Upload de uma pasta específica
-wrangler r2 object put fitcoach-gifs/GIFS/Abdomen/ --file public/GIFS/Abdomen/ --recursive
-```
-
-#### Opção B: Upload de toda a pasta GIFS (Recomendado)
-
-Para fazer upload de toda a pasta `GIFS/` de uma vez:
+Para fazer upload de um arquivo específico:
 
 ```bash
 # Navegue até a pasta do projeto
 cd D:\FitCoach.IA
 
-# Upload recursivo de toda a pasta GIFS
-wrangler r2 object put fitcoach-gifs/GIFS --file public/GIFS --recursive
+# Upload de um arquivo específico
+wrangler r2 object put fitcoach-gifs/GIFS/Abdomen/Abdominais.gif --file public/GIFS/Abdomen/Abdominais.gif
 ```
 
-**Nota:** O comando acima pode variar dependendo da versão do Wrangler. Se não funcionar, tente:
+#### Opção B: Usar o script automatizado (Recomendado)
 
-```bash
-# Alternativa 1: Usando caminho completo
-wrangler r2 object put fitcoach-gifs/GIFS/ --file "D:\FitCoach.IA\public\GIFS" --recursive
-
-# Alternativa 2: Upload arquivo por arquivo (mais lento, mas funciona)
-# Veja o script abaixo para automatizar
-```
+O script PowerShell faz upload de todos os arquivos automaticamente. Veja a seção "Script Automatizado" abaixo.
 
 ### Passo 5: Script Automatizado (Recomendado)
 
@@ -289,15 +273,19 @@ wrangler r2 bucket list
 
 ### Problema: "Estrutura de pastas incorreta"
 **Solução:**
-- Certifique-se de usar `--recursive` no comando
+- O script automatizado mantém a estrutura automaticamente
 - Verifique se a estrutura local está correta: `public/GIFS/Abdomen/`, etc.
+- Cada arquivo é enviado com o caminho completo: `GIFS/Abdomen/arquivo.gif`
 
 ## 📊 Monitoramento do Progresso
 
-O Wrangler CLI mostra o progresso durante o upload. Você verá:
-- Nome dos arquivos sendo enviados
-- Progresso em tempo real
-- Mensagens de erro se houver problemas
+O script mostra o progresso durante o upload. Você verá:
+- Nome dos arquivos sendo enviados (com ✅ ou ❌)
+- Progresso por grupo muscular
+- Resumo final com estatísticas
+- Tempo total de execução
+
+**Nota:** O upload pode levar 10-30 minutos dependendo da quantidade de arquivos e velocidade da conexão.
 
 ## ✅ Checklist
 

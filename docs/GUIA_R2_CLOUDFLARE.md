@@ -106,17 +106,23 @@ Se quiser testar com poucos arquivos:
    - Isso abrirá o navegador para autenticar
 
 3. **Fazer upload:**
-   ```bash
-   # Navegue até a pasta do projeto
-   cd D:\FitCoach.IA
    
-   # Faça upload da pasta GIFS mantendo a estrutura
-   wrangler r2 object put fitcoach-gifs/GIFS --file public/GIFS --recursive
+   ⚠️ **IMPORTANTE:** O Wrangler não suporta upload recursivo. Use o script automatizado:
+   
+   ```powershell
+   # Dar permissão (apenas na primeira vez)
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   
+   # Executar o script
+   .\upload-gifs-to-r2.ps1
    ```
    
-   **Ou use o script automatizado:**
-   - Veja `docs/UPLOAD_GIFS_WRANGLER.md` para scripts PowerShell/Node.js prontos
-   - Os scripts fazem upload de todos os grupos musculares automaticamente
+   O script faz upload de todos os arquivos automaticamente, mantendo a estrutura de pastas.
+   
+   **Ou faça upload manual de um arquivo:**
+   ```bash
+   wrangler r2 object put fitcoach-gifs/GIFS/Abdomen/Abdominais.gif --file public/GIFS/Abdomen/Abdominais.gif
+   ```
 
 ### Passo 5: Verificar Estrutura dos Arquivos
 

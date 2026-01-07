@@ -46,26 +46,44 @@ foreach ($group in $muscleGroups) {
     $groupName = $group.Name
     $groupPath = $group.FullName
     $r2Path = "GIFS/$groupName"
-    $fileCount = (Get-ChildItem -Path $groupPath -Filter "*.gif").Count
+    $gifFiles = Get-ChildItem -Path $groupPath -Filter "*.gif"
+    $fileCount = $gifFiles.Count
     
     Write-Host "📤 Fazendo upload de $groupName ($fileCount arquivos)..." -ForegroundColor Cyan
     
-    # Fazer upload da pasta usando wrangler
-    try {
-        # Usar wrangler para fazer upload recursivo
-        $output = wrangler r2 object put "$bucketName/$r2Path/" --file "$groupPath" --recursive 2>&1
+    $groupUploaded = 0
+    $groupFailed = 0
+    
+    # Fazer upload de cada arquivo individualmente
+    foreach ($gifFile in $gifFiles) {
+        $fileName = $gifFile.Name
+        $filePath = $gifFile.FullName
+        $objectPath = "$r2Path/$fileName"
         
-        if ($LASTEXITCODE -eq 0) {
-            $uploaded++
-            Write-Host "✅ $groupName concluído!" -ForegroundColor Green
-        } else {
-            $failed++
-            Write-Host "❌ Erro ao fazer upload de $groupName" -ForegroundColor Red
-            Write-Host $output -ForegroundColor Red
+        try {
+            # Fazer upload de um arquivo por vez
+            $output = wrangler r2 object put "$bucketName/$objectPath" --file "$filePath" 2>&1
+            
+            if ($LASTEXITCODE -eq 0) {
+                $groupUploaded++
+                Write-Host "   ✅ $fileName" -ForegroundColor Gray
+            } else {
+                $groupFailed++
+                Write-Host "   ❌ Erro: $fileName" -ForegroundColor Red
+                Write-Host "      $output" -ForegroundColor DarkRed
+            }
+        } catch {
+            $groupFailed++
+            Write-Host "   ❌ Erro ao fazer upload de $fileName : $_" -ForegroundColor Red
         }
-    } catch {
+    }
+    
+    if ($groupFailed -eq 0) {
+        $uploaded++
+        Write-Host "✅ $groupName concluído! ($groupUploaded arquivos)" -ForegroundColor Green
+    } else {
         $failed++
-        Write-Host "❌ Erro ao fazer upload de $groupName: $_" -ForegroundColor Red
+        Write-Host "⚠️  $groupName: $groupUploaded sucesso, $groupFailed falhas" -ForegroundColor Yellow
     }
     
     Write-Host ""
