@@ -16,28 +16,18 @@ Implementamos um sistema de fallback automático que:
 
 ## Como Configurar
 
+> 📖 **Guia passo a passo completo:** Veja [GUIA_R2_CLOUDFLARE.md](./GUIA_R2_CLOUDFLARE.md) para instruções detalhadas do zero ao deploy.
+
 ### Opção 1: Cloudflare R2 (Recomendado - Gratuito)
 
-1. **Criar bucket no Cloudflare R2:**
-   - Acesse: https://dash.cloudflare.com/
-   - Vá em **R2** → **Create bucket**
-   - Nome do bucket: `fitcoach-gifs` (ou outro nome de sua escolha)
-
-2. **Fazer upload dos GIFs:**
-   - Use o painel do Cloudflare ou a CLI
-   - Mantenha a mesma estrutura de pastas: `GIFS/Abdomen/`, `GIFS/Biceps/`, etc.
-
-3. **Configurar domínio público:**
-   - No bucket, vá em **Settings** → **Public Access**
-   - Crie um domínio público (ex: `gifs.fitcoach.ia` ou use o domínio padrão do R2)
-
-4. **Configurar variável de ambiente no Vercel:**
-   ```bash
-   VITE_GIF_CDN_URL=https://seu-dominio-r2.com
-   ```
-   Ou no painel do Vercel:
-   - Settings → Environment Variables
-   - Adicione: `VITE_GIF_CDN_URL` = `https://seu-dominio-r2.com`
+1. **Siga o guia completo:** [GUIA_R2_CLOUDFLARE.md](./GUIA_R2_CLOUDFLARE.md)
+   
+   **Resumo rápido:**
+   - Ativar R2 no Cloudflare (gratuito até 10 GB)
+   - Criar bucket `fitcoach-gifs`
+   - Configurar domínio público (ex: `https://pub-xxxxx.r2.dev`)
+   - Fazer upload dos GIFs mantendo estrutura `GIFS/...`
+   - Configurar `VITE_GIF_CDN_URL` no Vercel com a URL do R2
 
 ### Opção 2: AWS S3 + CloudFront
 
