@@ -10,6 +10,8 @@
  * - Cache em memória para melhor performance
  */
 
+import type { ExerciseInfo } from '../types/exercise';
+
 // Cache em memória para resultados de busca
 const gifCache = new Map<string, string | null>();
 
@@ -116,187 +118,155 @@ function normalizePathForVercel(path: string): string {
   if (!import.meta.env.PROD) {
     return path;
   }
-  
+
   // Em produção (Vercel), normalizar o caminho
   return normalizeFilePath(path);
 }
 
 // Mapeamento de grupos musculares para pastas de GIFs
+// ATUALIZADO: Nova estrutura simplificada (pastas diretas sem subpastas)
 const muscleGroupFolders: Record<string, string> = {
-  'abd': 'abdomen-18-20241202t155424z-001/abdomen-18',
-  'abdomen': 'abdomen-18-20241202t155424z-001/abdomen-18',
-  'abdominal': 'abdomen-18-20241202t155424z-001/abdomen-18',
-  'core': 'abdomen-18-20241202t155424z-001/abdomen-18',
-  'prancha': 'abdomen-18-20241202t155424z-001/abdomen-18',
-  
-  'antebraço': 'antebraco-15-20241202t155453z-001/antebraco-15',
-  'antebraco': 'antebraco-15-20241202t155453z-001/antebraco-15',
-  'pulso': 'antebraco-15-20241202t155453z-001/antebraco-15',
-  'punho': 'antebraco-15-20241202t155453z-001/antebraco-15',
-  
-  'bíceps': 'biceps-51-20241202t155806z-001/biceps-51',
-  'biceps': 'biceps-51-20241202t155806z-001/biceps-51',
-  'rosca': 'biceps-51-20241202t155806z-001/biceps-51',
-  
-  'cardio': 'cardio-academia-11-20241202t161427z-001/cardio-academia-11',
-  'cárdio': 'cardio-academia-11-20241202t161427z-001/cardio-academia-11',
-  'esteira': 'cardio-academia-11-20241202t161427z-001/cardio-academia-11',
-  'bicicleta': 'cardio-academia-11-20241202t161427z-001/cardio-academia-11',
-  'bike': 'cardio-academia-11-20241202t161427z-001/cardio-academia-11',
-  'elíptico': 'cardio-academia-11-20241202t161427z-001/cardio-academia-11',
-  'eliptico': 'cardio-academia-11-20241202t161427z-001/cardio-academia-11',
-  
-  'costas': 'costas-60-20241202t162754z-001/costas-60',
-  'remo': 'costas-60-20241202t162754z-001/costas-60',
-  'remada': 'costas-60-20241202t162754z-001/costas-60',
-  'puxada': 'costas-60-20241202t162754z-001/costas-60',
-  'barra fixa': 'costas-60-20241202t162754z-001/costas-60',
-  'pullover': 'costas-60-20241202t162754z-001/costas-60',
-  'levantamento terra': 'costas-60-20241202t162754z-001/costas-60',
-  
-  'eretor': 'eretores-da-espinha-8-20241202t164933z-001/eretores-da-espinha-8',
-  'lombar': 'eretores-da-espinha-8-20241202t164933z-001/eretores-da-espinha-8',
-  'hiperextensão': 'eretores-da-espinha-8-20241202t164933z-001/eretores-da-espinha-8',
-  'hiperextensao': 'eretores-da-espinha-8-20241202t164933z-001/eretores-da-espinha-8',
-  
-  'glúteo': 'gluteo-31-20241202t165017z-001/gluteo-31',
-  'gluteo': 'gluteo-31-20241202t165017z-001/gluteo-31',
-  'glúteos': 'gluteo-31-20241202t165017z-001/gluteo-31',
-  'elevação pélvica': 'gluteo-31-20241202t165017z-001/gluteo-31',
-  'elevacao pelvica': 'gluteo-31-20241202t165017z-001/gluteo-31',
-  'ponte': 'gluteo-31-20241202t165017z-001/gluteo-31',
-  'stiff': 'gluteo-31-20241202t165017z-001/gluteo-31',
-  
-  'ombro': 'ombro-73-20241202t165511z-001/ombro-73',
-  'ombros': 'ombro-73-20241202t165511z-001/ombro-73',
-  'desenvolvimento': 'ombro-73-20241202t165511z-001/ombro-73',
-  'elevação': 'ombro-73-20241202t165511z-001/ombro-73',
-  'elevacao': 'ombro-73-20241202t165511z-001/ombro-73',
-  'deltoide': 'ombro-73-20241202t165511z-001/ombro-73',
-  
-  'panturrilha': 'panturrilha-20-20241202t173337z-001/panturrilha-20',
-  'panturrinha': 'panturrilha-20-20241202t173337z-001/panturrilha-20',
-  'gêmeos': 'panturrilha-20-20241202t173337z-001/panturrilha-20',
-  'gemeos': 'panturrilha-20-20241202t173337z-001/panturrilha-20',
-  'flexão plantar': 'panturrilha-20-20241202t173337z-001/panturrilha-20',
-  'flexao plantar': 'panturrilha-20-20241202t173337z-001/panturrilha-20',
-  'elevação de panturrilha': 'panturrilha-20-20241202t173337z-001/panturrilha-20',
-  'elevacao de panturrilha': 'panturrilha-20-20241202t173337z-001/panturrilha-20',
-  'levantamento de panturrilha': 'panturrilha-20-20241202t173337z-001/panturrilha-20',
-  
-  'peitoral': 'peitoral-67-20241202t175211z-001/peitoral-67',
-  'peito': 'peitoral-67-20241202t175211z-001/peitoral-67',
-  'supino': 'peitoral-67-20241202t175211z-001/peitoral-67',
-  'crucifixo': 'peitoral-67-20241202t175211z-001/peitoral-67',
-  'voador': 'peitoral-67-20241202t175211z-001/peitoral-67',
-  'flexão': 'peitoral-67-20241202t175211z-001/peitoral-67',
-  'flexao': 'peitoral-67-20241202t175211z-001/peitoral-67',
-  'paralelas': 'peitoral-67-20241202t175211z-001/peitoral-67',
-  
-  'pernas': 'pernas-70-20241202t181042z-001/pernas-70',
-  'perna': 'pernas-70-20241202t181042z-001/pernas-70',
-  'agachamento': 'pernas-70-20241202t181042z-001/pernas-70',
-  'leg press': 'pernas-70-20241202t181042z-001/pernas-70',
-  'afundo': 'pernas-70-20241202t181042z-001/pernas-70',
-  'lunges': 'pernas-70-20241202t181042z-001/pernas-70',
-  'passada': 'pernas-70-20241202t181042z-001/pernas-70',
-  'cadeira extensora': 'pernas-70-20241202t181042z-001/pernas-70',
-  'cadeira flexora': 'pernas-70-20241202t181042z-001/pernas-70',
-  
-  'trapézio': 'trapezio-9-20241202t183753z-001/trapezio-9',
-  'trapezio': 'trapezio-9-20241202t183753z-001/trapezio-9',
-  'encolhimento': 'trapezio-9-20241202t183753z-001/trapezio-9',
-  
-  'tríceps': 'triceps-47-20241202t183816z-001/triceps-47',
-  'triceps': 'triceps-47-20241202t183816z-001/triceps-47',
-  'tricep': 'triceps-47-20241202t183816z-001/triceps-47',
-  'mergulho': 'triceps-47-20241202t183816z-001/triceps-47',
-  
-  // Novos grupos adicionados
-  'calistenia': 'GIFS CALISTENIA-20241202T155424Z-001/GIFS CALISTENIA',
-  'calistênia': 'GIFS CALISTENIA-20241202T155424Z-001/GIFS CALISTENIA',
-  'muscle up': 'GIFS CALISTENIA-20241202T155424Z-001/GIFS CALISTENIA',
-  'planche': 'GIFS CALISTENIA-20241202T155424Z-001/GIFS CALISTENIA',
-  
-  'crossfit': 'GIFS CROSSFIT-20241202T155424Z-001/GIFS CROSSFIT',
-  'burpee': 'GIFS CROSSFIT-20241202T155424Z-001/GIFS CROSSFIT',
-  'kettlebell': 'GIFS CROSSFIT-20241202T155424Z-001/GIFS CROSSFIT',
-  'arranco': 'GIFS CROSSFIT-20241202T155424Z-001/GIFS CROSSFIT',
-  'arremesso': 'GIFS CROSSFIT-20241202T155424Z-001/GIFS CROSSFIT',
-  'snatch': 'GIFS CROSSFIT-20241202T155424Z-001/GIFS CROSSFIT',
-  'clean': 'GIFS CROSSFIT-20241202T155424Z-001/GIFS CROSSFIT',
-  
-  'mobilidade': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'alongamento': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'liberação': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'liberacao': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'rolo': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'espuma': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'flexibilidade': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'rotação': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'rotacao': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'postura': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'piriforme': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'isquiotibiais': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'quadríceps': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'quadriceps': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'adutores': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  'flexores': 'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO',
-  
-  'funcional': 'GIFS TREINAMENTO FUNCIONAL-20241202T155424Z-001/GIFS TREINAMENTO FUNCIONAL',
-  'treinamento funcional': 'GIFS TREINAMENTO FUNCIONAL-20241202T155424Z-001/GIFS TREINAMENTO FUNCIONAL',
-  'faixa': 'GIFS TREINAMENTO FUNCIONAL-20241202T155424Z-001/GIFS TREINAMENTO FUNCIONAL',
-  'elástico': 'GIFS TREINAMENTO FUNCIONAL-20241202T155424Z-001/GIFS TREINAMENTO FUNCIONAL',
-  'elastico': 'GIFS TREINAMENTO FUNCIONAL-20241202T155424Z-001/GIFS TREINAMENTO FUNCIONAL',
-  'banda': 'GIFS TREINAMENTO FUNCIONAL-20241202T155424Z-001/GIFS TREINAMENTO FUNCIONAL',
-  'gymstick': 'GIFS TREINAMENTO FUNCIONAL-20241202T155424Z-001/GIFS TREINAMENTO FUNCIONAL',
+  // Abdômen
+  'abd': 'Abdomen',
+  'abdomen': 'Abdomen',
+  'abdominal': 'Abdomen',
+  'core': 'Abdomen',
+  'prancha': 'Abdomen',
+
+  // Antebraço
+  'antebraço': 'Antebraco',
+  'antebraco': 'Antebraco',
+  'pulso': 'Antebraco',
+  'punho': 'Antebraco',
+
+  // Bíceps
+  'bíceps': 'Biceps',
+  'biceps': 'Biceps',
+  'rosca': 'Biceps',
+
+  // Cárdio
+  'cardio': 'Cardio',
+  'cárdio': 'Cardio',
+  'esteira': 'Cardio',
+  'bicicleta': 'Cardio',
+  'bike': 'Cardio',
+  'elíptico': 'Cardio',
+  'eliptico': 'Cardio',
+
+  // Costas
+  'costas': 'Costas',
+  'remo': 'Costas',
+  'remada': 'Costas',
+  'puxada': 'Costas',
+  'barra fixa': 'Costas',
+  'pullover': 'Costas',
+  'levantamento terra': 'Costas',
+
+  // Glúteo (note: pasta é "GluteoS" com S maiúsculo)
+  'glúteo': 'GluteoS',
+  'gluteo': 'GluteoS',
+  'glúteos': 'GluteoS',
+  'gluteos': 'GluteoS',
+  'elevação pélvica': 'GluteoS',
+  'elevacao pelvica': 'GluteoS',
+  'ponte': 'GluteoS',
+  'stiff': 'GluteoS',
+
+  // Ombro
+  'ombro': 'Ombro',
+  'ombros': 'Ombro',
+  'desenvolvimento': 'Ombro',
+  'elevação': 'Ombro',
+  'elevacao': 'Ombro',
+  'deltoide': 'Ombro',
+
+  // Panturrilha
+  'panturrilha': 'Panturrilha',
+  'panturrinha': 'Panturrilha',
+  'gêmeos': 'Panturrilha',
+  'gemeos': 'Panturrilha',
+  'flexão plantar': 'Panturrilha',
+  'flexao plantar': 'Panturrilha',
+  'elevação de panturrilha': 'Panturrilha',
+  'elevacao de panturrilha': 'Panturrilha',
+  'levantamento de panturrilha': 'Panturrilha',
+
+  // Peitoral
+  'peitoral': 'Peitoral',
+  'peito': 'Peitoral',
+  'supino': 'Peitoral',
+  'crucifixo': 'Peitoral',
+  'voador': 'Peitoral',
+  'flexão': 'Peitoral',
+  'flexao': 'Peitoral',
+  'paralelas': 'Peitoral',
+
+  // Pernas
+  'pernas': 'Pernas',
+  'perna': 'Pernas',
+  'agachamento': 'Pernas',
+  'leg press': 'Pernas',
+  'afundo': 'Pernas',
+  'lunges': 'Pernas',
+  'passada': 'Pernas',
+  'cadeira extensora': 'Pernas',
+  'cadeira flexora': 'Pernas',
+
+  // Trapézio
+  'trapézio': 'Trapezio',
+  'trapezio': 'Trapezio',
+  'encolhimento': 'Trapezio',
+
+  // Tríceps
+  'tríceps': 'Triceps',
+  'triceps': 'Triceps',
+  'tricep': 'Triceps',
+  'mergulho': 'Triceps',
 };
 
 /**
+ * Função auxiliar para normalizar nome de pasta para busca
+ * Converte nomes como "Abdomen" para formato usado no sistema de arquivos
+ */
+function normalizeFolderName(folderName: string): string {
+  // IMPORTANTE: NÃO normalizar os nomes das pastas - usar exatamente como estão no sistema de arquivos
+  // As pastas reais são: Abdomen, Antebraco, Biceps, Cardio, Costas, GluteoS, Ombro, Panturrilha, Peitoral, Pernas, Trapezio, Triceps
+  // Não remover acentos, não alterar espaços - usar o nome exato
+  return folderName;
+}
+
+/**
  * Lista completa de todos os GIFs disponíveis por grupo muscular
- * Baseado nos nomes exatos dos arquivos
+ * ATUALIZADO: Nomes exatos dos arquivos conforme estão no sistema de arquivos
+ * Gerado automaticamente a partir dos arquivos reais nas pastas
  */
 const availableGifsByGroup: Record<string, string[]> = {
-  'abdomen-18-20241202t155424z-001/abdomen-18': [
-    'Abd Concentrado Braços estendidos.gif',
+  'Abdomen': [
     'Abdominais Oblíquos no Chão.gif',
     'Abdominais.gif',
     'Abdominal Bicicleta com Gymstick.gif',
     'Abdominal Bicicleta.gif',
-    'Abdominal canivete no banco.gif',
     'Abdominal com Bola Medicinal.gif',
     'Abdominal com Braços Estendidos.gif',
-    'Abdominal com Carga.gif',
     'Abdominal com Elevação de Pernas.gif',
-    'Abdominal com Fitball.gif',
     'Abdominal com Giro de Bicicleta.gif',
     'Abdominal com joelhos dobrados com mãos na nuca.gif',
     'Abdominal com joelhos dobrados.gif',
     'Abdominal com Peso.gif',
     'Abdominal com Rolo Abdominal.gif',
     'Abdominal com sobrecarga.gif',
-    'Abdominal Completo (1).gif',
-    'Abdominal Concentrado.gif',
     'Abdominal Cruzado.gif',
     'Abdominal de Rã com Bola de Exercícios.gif',
     'Abdominal Declinado.gif',
-    'Abdominal Encolhimento no Banco.gif',
     'Abdominal infra no solo com flexão de joelho.gif',
-    'Abdominal Infra Suspenso.gif',
-    'Abdominal Infra.gif',
     'Abdominal lateral no banco inclinado.gif',
     'Abdominal na Alavanca.gif',
     'Abdominal Nadador.gif',
     'Abdominal no Chão.gif',
-    'Abdominal Obliquo com Bola.gif',
-    'Abdominal Oblíquo Deitada.gif',
-    'Abdominal Obliquo no Chão.gif',
     'Abdominal Oblíquo.gif',
     'Abdominal Rã.gif',
-    'Abdominal Russian Twist.gif',
     'Abdominal Suspenso com Extensão.gif',
     'Abdominal tipo jack knife com elástico.gif',
-    'abdominal.gif',
     'Abdominal-obliquo-2.gif',
     'Abdução de quadril no apoio lateral.gif',
     'Alpinista.gif',
@@ -349,17 +319,13 @@ const availableGifsByGroup: Record<string, string[]> = {
     'Pés à Barra.gif',
     'Posição de Canoinha.gif',
     'Posição do Barco.gif',
-    'Prancha Alta com Rotação de Tronco.gif',
     'Prancha com Abertura de Pernas - Perna Estendida.gif',
     'Prancha com Elevação de Braço e Perna.gif',
     'Prancha com Movimento de Aranha.gif',
     'Prancha de frente para a prancha lateral.gif',
-    'Prancha Frontal Alta (1).gif',
     'Prancha Frontal com Elevação de Braço e Perna.gif',
     'Prancha Frontal com Elevação de Braço.gif',
-    'Prancha Frontal com elevação de joelhos.gif',
     'Prancha Frontal com Peso.gif',
-    'Prancha Frontal com Rotação de Tronco.gif',
     'Prancha Invertida.gif',
     'Prancha joelho ao cotovelo.gif',
     'Prancha Lateral com Abdominal Oblíquo.gif',
@@ -387,956 +353,484 @@ const availableGifsByGroup: Record<string, string[]> = {
     'V-Up com Bola de Estabilidade.gif',
     'V-Up.gif',
   ],
-  'peitoral-67-20241202t175211z-001/peitoral-67': [
-    'Cross over polia Alta.gif',
-    'Supino Reto na Máquina.gif',
-    'Supino pegada martelo.gif',
-    'Supino no smith com o triângulo.gif',
-    'Supino no banco inclinado 30 graus com pegada invertida.gif',
-    'Supino na máquina.gif',
-    'Supino na máquina Smith.gif',
-    'Supino na Máquina para Miolo do Peitoral.gif',
-    'Supino invertido com pegada aberta.gif',
-    'Supino inclinado na máquina.gif',
-    'Supino Inclinado na Máquina com Pegada Martelo.gif',
-    'Supino Inclinado na Alavanca.gif',
-    'Supino inclinado com pegada fechada.gif',
-    'Supino Inclinado com Halteres.gif',
-    'Supino Inclinado com Halteres em Martelo.gif',
-    'Supino Inclinado com Halteres e Pegada Invertida.gif',
-    'Supino inclinado com halteres e pegada fechada.gif',
-    'Supino inclinado com cabo.gif',
-    'Supino inclinado com barra.gif',
-    'Supino Declinado Unilateral Pegada Martelo com Haltere.gif',
-    'Voador unilateral no Solo com Barra.gif',
-    'Voador no pec deck.gif',
-    'Voador na Máquina.gif',
-    'Voador com Halteres para Cima.gif',
-    'Supino.gif',
-    'Supino Unilateral no Cabo.gif',
-    'Supino Unilateral com Halteres com Pegada Reversa.gif',
-    'Supino unilateral com Alavanca.gif',
-    'Supino declinado pegada martelo.gif',
-    'Supino declinado na máquina Smith.gif',
-    'Supino Declinado com Halteres.gif',
-    'Supino declinada na máquina.gif',
-    'Supino declinada com alavanca.gif',
-    'Supino com pegada fechada.gif',
-    'Supino com Pegada Fechada Sentado com Cabo.gif',
-    'Supino com pegada aberta.gif',
-    'Supino com kettlebell no chão.gif',
-    'Supino com barra declinado.gif',
-    'Supino com banco inclinado no Smith.gif',
-    'Supino com Alavanca.gif',
-    'Supino com kettlebell de um braço.gif',
-    'Supino com Halteres.gif',
-    'Supino com haltere pegada fechada.gif',
-    'Supino com cabo sentado.gif',
-    'Supino com Halteres Pegada Invertida.gif',
-    'Supino com barra no chão.gif',
-    'Supino com halteres com pegada fechada.gif',
-    'Supino Alternado com Halteres.gif',
-    'Pullover de braço reto com halteres (joelhos a 90 graus).gif',
-    'Pullover com Halteres na Bola de Estabilidade.gif',
-    'Pullover com haltere.gif',
-    'Paralelas.gif',
-    'Máquina de voador de peito inclinado.gif',
-    'Mergulho de peito assistido.gif',
-    'Crucifixo Unilateral em Declinado com Cabo.gif',
-    'Crucifixo Deitado com Cabo.gif',
-    'Crucifixo com halteres.gif',
-    'Crucifixo com Halteres Inclinado.gif',
-    'Crucifixo com Halteres Declinado.gif',
-    'Crucifixo com Cabo Declinado.gif',
-    'Crossover Unilateral com Cabo.gif',
-    'Crossover na Alavanca.gif',
-    'Cross over polia baixa.gif',
-    'Crossover de Cabo Alto.gif',
-    'Crossover de peitoral superior com cabo.gif',
-    'Crossover com Cabos.gif',
-    'Anilha Press.gif',
+  'Peitoral': [
+    'anilha-press.gif',
+    'cross-over-polia-alta.gif',
+    'cross-over-polia-baixa.gif',
+    'crossover-com-cabos.gif',
+    'crossover-de-cabo-alto.gif',
+    'crossover-de-peitoral-superior-com-cabo.gif',
+    'crossover-na-alavanca.gif',
+    'crossover-unilateral-com-cabo.gif',
+    'crucifixo-com-cabo-declinado.gif',
+    'crucifixo-com-halteres-declinado.gif',
+    'crucifixo-com-halteres-inclinado.gif',
+    'crucifixo-com-halteres.gif',
+    'crucifixo-deitado-com-cabo.gif',
+    'crucifixo-unilateral-em-declinado-com-cabo.gif',
+    'maquina-de-voador-de-peito-inclinado.gif',
+    'mergulho-de-peito-assistido.gif',
+    'paralelas.gif',
+    'pullover-com-haltere.gif',
+    'pullover-com-halteres-na-bola-de-estabilidade.gif',
+    'pullover-de-braco-reto-com-halteres-joelhos-a-90-graus.gif',
+    'supino-alternado-com-halteres.gif',
+    'supino-com-alavanca.gif',
+    'supino-com-banco-inclinado-no-smith.gif',
+    'supino-com-barra-declinado.gif',
+    'supino-com-barra-no-chao.gif',
+    'supino-com-cabo-sentado.gif',
+    'supino-com-haltere-pegada-fechada.gif',
+    'supino-com-halteres-com-pegada-fechada.gif',
+    'supino-com-halteres-pegada-invertida.gif',
+    'supino-com-halteres.gif',
+    'supino-com-kettlebell-de-um-braco.gif',
+    'supino-com-kettlebell-no-chao.gif',
+    'supino-com-pegada-aberta.gif',
+    'supino-com-pegada-fechada-sentado-com-cabo.gif',
+    'supino-com-pegada-fechada.gif',
+    'supino-declinada-com-alavanca.gif',
+    'supino-declinada-na-maquina.gif',
+    'supino-declinado-com-halteres.gif',
+    'supino-declinado-na-maquina-smith.gif',
+    'supino-declinado-pegada-martelo.gif',
+    'supino-declinado-unilateral-pegada-martelo-com-haltere.gif',
+    'supino-inclinado-com-barra.gif',
+    'supino-inclinado-com-cabo.gif',
+    'supino-inclinado-com-halteres-e-pegada-fechada.gif',
+    'supino-inclinado-com-halteres-e-pegada-invertida.gif',
+    'supino-inclinado-com-halteres-em-martelo.gif',
+    'supino-inclinado-com-halteres.gif',
+    'supino-inclinado-com-pegada-fechada.gif',
+    'supino-inclinado-na-alavanca.gif',
+    'supino-inclinado-na-maquina-com-pegada-martelo.gif',
+    'supino-inclinado-na-maquina.gif',
+    'supino-invertido-com-pegada-aberta.gif',
+    'supino-na-maquina-para-miolo-do-peitoral.gif',
+    'supino-na-maquina-smith.gif',
+    'supino-na-maquina.gif',
+    'supino-no-banco-inclinado-30-graus-com-pegada-invertida.gif',
+    'supino-no-smith-com-o-triangulo.gif',
+    'supino-pegada-martelo.gif',
+    'supino-reto-na-maquina.gif',
+    'supino-unilateral-com-alavanca.gif',
+    'supino-unilateral-com-halteres-com-pegada-reversa.gif',
+    'supino-unilateral-no-cabo.gif',
+    'supino.gif',
+    'voador-com-halteres-para-cima.gif',
+    'voador-na-maquina.gif',
+    'voador-no-pec-deck.gif',
+    'voador-unilateral-no-solo-com-barra.gif',
   ],
-  'costas-60-20241202t162754z-001/costas-60': [
-    'Serrote.gif',
-    'Remada Unilateral com Cabo.gif',
-    'Remada Unilateral com Barra.gif',
-    'Remada unilateral com barra landmine.gif',
-    'Remada T invertida com alavanca.gif',
-    'Remada T com Landmine.gif',
-    'Remada T com alavanca.gif',
-    'Remada sentado com cabo pegada fechada.gif',
-    'Remada Sentada na Máquina.gif',
-    'Remada Sentada com Corda na Polia.gif',
-    'Remada Sentada com Carga de Anilhas.gif',
-    'Remada Sentada com Cabo.gif',
-    'Remada Sentada com Anilhas.gif',
-    'Remada Renegada com Halteres.gif',
-    'Remada Invertida.gif',
-    'Remada Inclinada no banco com Cabo.gif',
-    'Remada Inclinada com Pegada Reversa com Halteres.gif',
-    'Remada Inclinada com Pegada Neutra com Halteres.gif',
-    'Remada Inclinada com Cabo.gif',
-    'Remada frontal com alavanca.gif',
-    'Remada de espingarda.gif',
-    'Remada Curvada no Smith.gif',
-    'Remada Curvada Inclinada com Barra.gif',
-    'Remada Curvada em T.gif',
-    'Remada Curvada com Pegada Invertida na Barra.gif',
-    'Remada curvada com kettlebell.gif',
-    'Remada com Cabo Sentada Unilateral com Torção.gif',
-    'Remada curvada com halteres.gif',
-    'Remada cruzada no cross.gif',
-    'Remada com Halteres em Posição Prancha.gif',
-    'Remada curvada com barra de pegada alternada ampla com adução de escapula.gif',
-    'Remada Curvada com Barra.gif',
-    'Remada curvada com halteres com pegada invertida.gif',
-    'Puxada na Polia Alta com Pegada Fechada.gif',
-    'Puxada em Pé com Torção no Cabo.gif',
-    'Puxada com Um Braço com Peso Adicional.gif',
-    'Puxada com Um Braço com Cabo.gif',
-    'Puxada Alta.gif',
-    'Puxada alta unilateral alta ajoelhada.gif',
-    'Puxada Alta Neutra com Cabos Duplos no Chão.gif',
-    'Puxada alta na polia nuca.gif',
-    'Puxada alta na Máquina Nuca.gif',
-    'Puxada Alta Invertida.gif',
-    'Puxada Alta com Um Joelho Apoiado.gif',
-    'Puxada Alta com Triângulo.gif',
-    'Puxada Alta com Alavanca.gif',
-    'Pullover na Máquina de Alavanca.gif',
-    'Pullover com Cabo.gif',
-    'Pullover com cabo sentado.gif',
-    'Pullover com Barra.gif',
-    'Pulldown Unilateral no Cabo.gif',
-    'Pulldown inclinado com corda.gif',
-    'Pulldown com corda.gif',
-    'Pullover com Barra W Pegada invertida.gif',
-    'Pullover com barra no banco declinado.gif',
-    'Máquina de remo.gif',
-    'Levantamento Terra.gif',
-    'Levantamento Terra Romeno.gif',
-    'Barra fixa.gif',
-    'Barra Fixa Assistida.gif',
+  'Costas': [
+    'barra-fixa-assistida.gif',
+    'barra-fixa.gif',
+    'levantamento-terra-romeno.gif',
+    'levantamento-terra.gif',
+    'maquina-de-remo.gif',
+    'pulldown-com-corda.gif',
+    'pulldown-inclinado-com-corda.gif',
+    'pulldown-unilateral-no-cabo.gif',
+    'pullover-com-barra-no-banco-declinado.gif',
+    'pullover-com-barra-w-pegada-invertida.gif',
+    'pullover-com-barra.gif',
+    'pullover-com-cabo-sentado.gif',
+    'pullover-com-cabo.gif',
+    'pullover-na-maquina-de-alavanca.gif',
+    'puxada-alta-com-alavanca.gif',
+    'puxada-alta-com-triangulo.gif',
+    'puxada-alta-com-um-joelho-apoiado.gif',
+    'puxada-alta-invertida.gif',
+    'puxada-alta-na-maquina-nuca.gif',
+    'puxada-alta-na-polia-nuca.gif',
+    'puxada-alta-neutra-com-cabos-duplos-no-chao.gif',
+    'puxada-alta-unilateral-alta-ajoelhada.gif',
+    'puxada-alta.gif',
+    'puxada-com-um-braco-com-cabo.gif',
+    'puxada-com-um-braco-com-peso-adicional.gif',
+    'puxada-em-pe-com-torcao-no-cabo.gif',
+    'puxada-na-polia-alta-com-pegada-fechada.gif',
+    'remada-com-cabo-sentada-unilateral-com-torcao.gif',
+    'remada-com-halteres-em-posicao-prancha.gif',
+    'remada-cruzada-no-cross.gif',
+    'remada-curvada-com-barra-de-pegada-alternada-ampla-com-aducao-de-escapula.gif',
+    'remada-curvada-com-barra.gif',
+    'remada-curvada-com-halteres-com-pegada-invertida.gif',
+    'remada-curvada-com-halteres.gif',
+    'remada-curvada-com-kettlebell.gif',
+    'remada-curvada-com-pegada-invertida-na-barra.gif',
+    'remada-curvada-em-t.gif',
+    'remada-curvada-inclinada-com-barra.gif',
+    'remada-curvada-no-smith.gif',
+    'remada-de-espingarda.gif',
+    'remada-frontal-com-alavanca.gif',
+    'remada-inclinada-com-cabo.gif',
+    'remada-inclinada-com-pegada-neutra-com-halteres.gif',
+    'remada-inclinada-com-pegada-reversa-com-halteres.gif',
+    'remada-inclinada-no-banco-com-cabo.gif',
+    'remada-invertida.gif',
+    'remada-renegada-com-halteres.gif',
+    'remada-sentada-com-anilhas.gif',
+    'remada-sentada-com-cabo.gif',
+    'remada-sentada-com-carga-de-anilhas.gif',
+    'remada-sentada-com-corda-na-polia.gif',
+    'remada-sentada-na-maquina.gif',
+    'remada-sentado-com-cabo-pegada-fechada.gif',
+    'remada-t-com-alavanca.gif',
+    'remada-t-com-landmine.gif',
+    'remada-t-invertida-com-alavanca.gif',
+    'remada-unilateral-com-barra-landmine.gif',
+    'remada-unilateral-com-barra.gif',
+    'remada-unilateral-com-cabo.gif',
+    'serrote.gif',
   ],
-  'pernas-70-20241202t181042z-001/pernas-70': [
-    'Agachamento Sumô com Halteres.gif',
-    'Agachamento no Smith.gif',
-    'Agachamento Sumô com Barra.gif',
-    'Agachamento Skater.gif',
-    'Agachamento Sissy.gif',
-    'Agachamento no Landmine.gif',
-    'Agachamento na Parede com Bola de Exercício.gif',
-    'Agachamento na Máquina Hack.gif',
-    'Agachamento Jefferson.gif',
-    'Agachamento Hack Invertido.gif',
-    'Agachamento Goblet com Haltere.gif',
-    'Agachamento hack com barra.gif',
-    'Agachamento Frontal.gif',
-    'Agachamento Frontal com Kettlebell.gif',
-    'Agachamento Frontal com Cabo.gif',
-    'Agachamento Frontal com Barra no Smith.gif',
-    'Agachamento Frontal com Barra no Banco.gif',
-    'Agachamento com Trava.gif',
-    'Agachamento com Salto usando Barra Hexagonal.gif',
-    'Agachamento com salto e halteres.gif',
-    'Agachamento com kettlebell.gif',
-    'Agachamento com Halteres no Banco.gif',
-    'Agachamento com Cinto.gif',
-    'Agachamento Unil.gif',
-    'Agachamento Frontal com haltere.gif',
-    'Agachamento búlgaro com salto.gif',
-    'Agachamento Búlgaro com Halteres.gif',
-    'Agachamento Búlgaro com Barra.gif',
-    'Afundo na Máquina Smith.gif',
-    'Agachamento Cossack com Barra.gif',
-    'Afundo com Barra.gif',
-    'Afundo no banco com halteres.gif',
-    'Adução do Quadril Lateral com Alavanca.gif',
-    'Afundo com landmine.gif',
-    'Adução do Quadril com Cabo.gif',
-    'Agachamento em plié com halteres.gif',
-    'Cadeira Abdutora.gif',
-    'Agachamento livre com barra.gif',
-    'agachamento na maquina.gif',
-    'agachamento no cross.gif',
-    'levantamento tarra com halteres.gif',
-    'leg press pés afastados.gif',
-    'passada a frente com halteres.gif',
-    'passada a frente com barra.gif',
-    'Agachamento com halteres com uma perna.gif',
-    'agachamento bulgaro.gif',
-    'agachamento no banco.gif',
-    'cadeira flex.gif',
-    'mesa flex unilateral.gif',
-    'mesa flex.gif',
-    'passada com halteres.gif',
-    'Aduçã de Quadril na Polia .gif',
-    'máquina adutora.gif',
-    'agachamento livre pés juntos.gif',
-    'Flexão Plantar com peso corporal.gif',
-    'cadeira adutora.gif',
-    'Agachamento Sumo Peso Corporal.gif',
-    'Retrocesso com halteres.gif',
-    'agachamento pés afastados.gif',
-    'agachamento sumo com halteres.gif',
-    'agachamento sumo livre.gif',
-    'agachamento barra.gif',
-    'Agachamento terra com halteres do lado.gif',
-    'cadeira extensora.gif',
-    'afundo livre.gif',
-    'leg press.gif',
-    'Retrocesso com Barra.gif',
+  'Pernas': [
+    'aduca-de-quadril-na-polia.gif',
+    'aducao-do-quadril-com-cabo.gif',
+    'aducao-do-quadril-lateral-com-alavanca.gif',
+    'afundo-com-barra.gif',
+    'afundo-com-landmine.gif',
+    'afundo-livre.gif',
+    'afundo-na-maquina-smith.gif',
+    'afundo-no-banco-com-halteres.gif',
+    'agachamento-barra.gif',
+    'agachamento-bulgaro-com-barra.gif',
+    'agachamento-bulgaro-com-halteres.gif',
+    'agachamento-bulgaro-com-salto.gif',
+    'agachamento-bulgaro.gif',
+    'agachamento-com-cinto.gif',
+    'agachamento-com-halteres-com-uma-perna.gif',
+    'agachamento-com-halteres-no-banco.gif',
+    'agachamento-com-kettlebell.gif',
+    'agachamento-com-salto-e-halteres.gif',
+    'agachamento-com-salto-usando-barra-hexagonal.gif',
+    'agachamento-com-trava.gif',
+    'agachamento-cossack-com-barra.gif',
+    'agachamento-em-plie-com-halteres.gif',
+    'agachamento-frontal-com-barra-no-banco.gif',
+    'agachamento-frontal-com-barra-no-smith.gif',
+    'agachamento-frontal-com-cabo.gif',
+    'agachamento-frontal-com-haltere.gif',
+    'agachamento-frontal-com-kettlebell.gif',
+    'agachamento-frontal.gif',
+    'agachamento-goblet-com-haltere.gif',
+    'agachamento-hack-com-barra.gif',
+    'agachamento-hack-invertido.gif',
+    'agachamento-jefferson.gif',
+    'agachamento-livre-com-barra.gif',
+    'agachamento-livre-pes-juntos.gif',
+    'agachamento-na-maquina-hack.gif',
+    'agachamento-na-maquina.gif',
+    'agachamento-na-parede-com-bola-de-exercicio.gif',
+    'agachamento-no-banco.gif',
+    'agachamento-no-cross.gif',
+    'agachamento-no-landmine.gif',
+    'agachamento-no-smith.gif',
+    'agachamento-pes-afastados.gif',
+    'agachamento-sissy.gif',
+    'agachamento-skater.gif',
+    'agachamento-sumo-com-barra.gif',
+    'agachamento-sumo-com-halteres.gif',
+    'agachamento-sumo-livre.gif',
+    'agachamento-sumo-peso-corporal.gif',
+    'agachamento-terra-com-halteres-do-lado.gif',
+    'agachamento-unil.gif',
+    'cadeira-abdutora.gif',
+    'cadeira-adutora.gif',
+    'cadeira-extensora.gif',
+    'cadeira-flex.gif',
+    'flexao-plantar-com-peso-corporal.gif',
+    'flexao-plantar-maquina.gif',
+    'flexao-plantar-no-smith.gif',
+    'leg-press-pes-afastados.gif',
+    'leg-press.gif',
+    'levantamento-tarra-com-halteres.gif',
+    'maquina-adutora.gif',
+    'mesa-flex-unilateral.gif',
+    'mesa-flex.gif',
+    'panturrinha-no-leg-press.gif',
+    'passada-a-frente-com-barra.gif',
+    'passada-a-frente-com-halteres.gif',
+    'passada-com-halteres.gif',
+    'retrocesso-com-barra.gif',
+    'retrocesso-com-halteres.gif',
   ],
-  'ombro-73-20241202t165511z-001/ombro-73': [
-    'Voador para deltoides posterior com cabo.gif',
-    'Voador invertido.gif',
-    'Remada lateral com halteres sentado.gif',
-    'Remada inversa com cabos deitado.gif',
-    'Remada inclinada a 45 graus.gif',
-    'Remada de deltoide posterior sentado com haltere.gif',
-    'Remada com halteres para a posterior de ombros.gif',
-    'Máquina de elevação lateral.gif',
-    'Levantamento frontal unilateral com cabo.gif',
-    'Levantamento frontal de cabo com dois braços.gif',
-    'Levantamento frontal com barra.gif',
-    'Levantamento frontal com anilha.gif',
-    'Levantamento frontal alternado com haltere sentado.gif',
-    'Levantamento de halteres de 3 maneiras.gif',
-    'Elevações frontais com halteres apoiadas no peito.gif',
-    'Elevação Posterior unilateral com halteres em Decúbito Prono.gif',
-    'Elevação lateral deitado.gif',
-    'Elevação lateral unilateral com halteres.gif',
-    'Elevação lateral de halteres inclinada.gif',
-    'Elevação lateral unilateral com haltere inclinado.gif',
-    'Elevação lateral de braços com halteres.gif',
-    'Elevação lateral unilateral com cabo.gif',
-    'Elevação lateral e frontal com halteres.gif',
-    'Elevação lateral na máquina.gif',
-    'Elevação lateral com tronco inclinado.gif',
-    'Elevação lateral com halteres sentado.gif',
-    'Elevação lateral com halteres para deltoides posteriores deitado.gif',
-    'Elevação lateral com halteres com apoio no peito.gif',
-    'Elevação lateral com braço flexionado.gif',
-    'Elevação lateral com barra no chão.gif',
-    'Elevação lateral de braços com cabo.gif',
-    'Elevação lateral cruzada no crossover.gif',
-    'Elevação lateral alternada com halteres.gif',
-    'Elevação frontal com halteres.gif',
-    'Elevação frontal com halteres sentado.gif',
-    'Elevação frontal com dois braços com halteres.gif',
-    'elevação frontal com cabo duplo no cross.gif',
-    'Elevação frontal com barra w inclinada.gif',
-    'Elevação frontal com barra girando.gif',
-    'Elevação Frontal Alternada Com Halteres.gif',
-    'Desenvolvimento militar de uma mão com kettlebell.gif',
-    'Desenvolvimento militar inclinado com barra presa no chão.gif',
-    'Desenvolvimento militar em pé na máquina Smith.gif',
-    'Desenvolvimento militar com pegada fechada.gif',
-    'Desenvolvimento militar com barra.gif',
-    'Desenvolvimento militar com barra no chão ajoelhado.gif',
-    'Desenvolvimento de ombros na máquina.gif',
-    'Desenvolvimento de ombros na máquina Smith.gif',
-    'Desenvolvimento de Ombros com Rotação Alternada com Halteres.gif',
-    'Desenvolvimento de ombros com halteres em pé com pegada neutra.gif',
-    'Desenvolvimento de ombros com barra W com pegada invertida.gif',
-    'Desenvolvimento de ombros atrás do pescoço sentado.gif',
-    'Desenvolvimento de ombro unilateral com halter.gif',
-    'Desenvolvimento de ombro reversa na máquina.gif',
-    'Desenvolvimento de Ombro no Banco com Halteres.gif',
-    'Desenvolvimento de ombro na máquina.gif',
-    'Desenvolvimento de ombro na máquina (pegada martelo).gif',
-    'Desenvolvimento de ombro deitado.gif',
-    'Desenvolvimento de ombro com halteres em Z.gif',
-    'Desenvolvimento de ombro com halteres em forma de W.gif',
-    'Círculos de Braço com Pesos.gif',
-    'Crucifixo inverso unilateral com cabo.gif',
-    'Desenvolvimento arnold com um braço.gif',
-    'Desenvolvimento Arnold (metade).gif',
-    'Desenvolvimento de ombro com cabo.gif',
-    'Desenvolvimento de ombro com cabo ajoelhado.gif',
-    'Desenvolvimento de ombro com barra sentado.gif',
-    'Desenvolvimento de Ombro Alternada em Pé com Halteres.gif',
-    'Desenvolvimento cubano sentado com halteres.gif',
-    'Desenvolvimento Cubano com Halteres.gif',
-    'Desenvolvimento Arnold.gif',
-    'Levantamento de halteres de 4 maneiras (2).gif',
-    'Desenvolvimento de ombros atrás da cabeça na máquina Smith.gif',
+  'Ombro': [
+    'circulos-de-braco-com-pesos.gif',
+    'crucifixo-inverso-unilateral-com-cabo.gif',
+    'desenvolvimento-arnold-com-um-braco.gif',
+    'desenvolvimento-arnold-metade.gif',
+    'desenvolvimento-arnold.gif',
+    'desenvolvimento-cubano-com-halteres.gif',
+    'desenvolvimento-cubano-sentado-com-halteres.gif',
+    'desenvolvimento-de-ombro-alternada-em-pe-com-halteres.gif',
+    'desenvolvimento-de-ombro-com-barra-sentado.gif',
+    'desenvolvimento-de-ombro-com-cabo-ajoelhado.gif',
+    'desenvolvimento-de-ombro-com-cabo.gif',
+    'desenvolvimento-de-ombro-com-halteres-em-forma-de-w.gif',
+    'desenvolvimento-de-ombro-com-halteres-em-z.gif',
+    'desenvolvimento-de-ombro-deitado.gif',
+    'desenvolvimento-de-ombro-na-maquina-pegada-martelo.gif',
+    'desenvolvimento-de-ombro-na-maquina.gif',
+    'desenvolvimento-de-ombro-no-banco-com-halteres.gif',
+    'desenvolvimento-de-ombro-reversa-na-maquina.gif',
+    'desenvolvimento-de-ombro-unilateral-com-halter.gif',
+    'desenvolvimento-de-ombros-atras-da-cabeca-na-maquina-smith.gif',
+    'desenvolvimento-de-ombros-atras-do-pescoco-sentado.gif',
+    'desenvolvimento-de-ombros-com-barra-w-com-pegada-invertida.gif',
+    'desenvolvimento-de-ombros-com-halteres-em-pe-com-pegada-neutra.gif',
+    'desenvolvimento-de-ombros-com-rotacao-alternada-com-halteres.gif',
+    'desenvolvimento-de-ombros-na-maquina-smith.gif',
+    'desenvolvimento-de-ombros-na-maquina.gif',
+    'desenvolvimento-militar-com-barra-no-chao-ajoelhado.gif',
+    'desenvolvimento-militar-com-barra.gif',
+    'desenvolvimento-militar-com-pegada-fechada.gif',
+    'desenvolvimento-militar-de-uma-mao-com-kettlebell.gif',
+    'desenvolvimento-militar-em-pe-na-maquina-smith.gif',
+    'desenvolvimento-militar-inclinado-com-barra-presa-no-chao.gif',
+    'elevacao-frontal-alternada-com-halteres.gif',
+    'elevacao-frontal-com-barra-girando.gif',
+    'elevacao-frontal-com-barra-w-inclinada.gif',
+    'elevacao-frontal-com-cabo-duplo-no-cross.gif',
+    'elevacao-frontal-com-dois-bracos-com-halteres.gif',
+    'elevacao-frontal-com-halteres-sentado.gif',
+    'elevacao-frontal-com-halteres.gif',
+    'elevacao-lateral-alternada-com-halteres.gif',
+    'elevacao-lateral-com-barra-no-chao.gif',
+    'elevacao-lateral-com-braco-flexionado.gif',
+    'elevacao-lateral-com-halteres-com-apoio-no-peito.gif',
+    'elevacao-lateral-com-halteres-para-deltoides-posteriores-deitado.gif',
+    'elevacao-lateral-com-halteres-sentado.gif',
+    'elevacao-lateral-com-tronco-inclinado.gif',
+    'elevacao-lateral-cruzada-no-crossover.gif',
+    'elevacao-lateral-de-bracos-com-cabo.gif',
+    'elevacao-lateral-de-bracos-com-halteres.gif',
+    'elevacao-lateral-de-halteres-inclinada.gif',
+    'elevacao-lateral-deitado.gif',
+    'elevacao-lateral-e-frontal-com-halteres.gif',
+    'elevacao-lateral-na-maquina.gif',
+    'elevacao-lateral-unilateral-com-cabo.gif',
+    'elevacao-lateral-unilateral-com-haltere-inclinado.gif',
+    'elevacao-lateral-unilateral-com-halteres.gif',
+    'elevacao-posterior-unilateral-com-halteres-em-decubito-prono.gif',
+    'elevacoes-frontais-com-halteres-apoiadas-no-peito.gif',
+    'levantamento-de-halteres-de-3-maneiras.gif',
+    'levantamento-de-halteres-de-4-maneiras-2.gif',
+    'levantamento-frontal-alternado-com-haltere-sentado.gif',
+    'levantamento-frontal-com-anilha.gif',
+    'levantamento-frontal-com-barra.gif',
+    'levantamento-frontal-de-cabo-com-dois-bracos.gif',
+    'levantamento-frontal-unilateral-com-cabo.gif',
+    'maquina-de-elevacao-lateral.gif',
+    'remada-com-halteres-para-a-posterior-de-ombros.gif',
+    'remada-de-deltoide-posterior-sentado-com-haltere.gif',
+    'remada-inclinada-a-45-graus.gif',
+    'remada-inversa-com-cabos-deitado.gif',
+    'remada-lateral-com-halteres-sentado.gif',
+    'voador-invertido.gif',
+    'voador-para-deltoides-posterior-com-cabo.gif',
   ],
-  'biceps-51-20241202t155806z-001/biceps-51': [
-    'Rosca concentrada com cabo.gif',
-    'Rosca com cabo de um braço.gif',
-    'Rosca com barra.gif',
-    'Rosca bíceps unilateral.gif',
-    'Rosca bíceps unilateral no cabo alto.gif',
-    'Rosca bíceps unilateral com pegada invertida em cabo.gif',
-    'Rosca Bilateral com Cabo em Banco Inclinado.gif',
-    'Rosca com halteres.gif',
-    'Rosca com Polia Alta.gif',
-    'Rosca com halteres no colete scott.gif',
-    'Rosca bíceps com pegada fechada na barra W.gif',
-    'Rosca bíceps sentado.gif',
-    'Rosca bíceps inclinada com halteres sentado.gif',
-    'Rosca bíceps inclinada com cabos.gif',
-    'Rosca bíceps com halteres.gif',
-    'Rosca bíceps com cabo ajoelhado.gif',
-    'Rosca bíceps alta com halteres.gif',
-    'Rosca alternada com halteres sentado.gif',
-    'Rosca alternada com barra.gif',
-    'Máquina de rosca direta.gif',
-    'Rosca Direta com Barra.gif',
-    'Rosca martelo com halter no colete scott.gif',
-    'Rosca martelo com corda.gif',
-    'Rosca no Cabo.gif',
-    'Rosca inversa com barra W.gif',
-    'Rosca Inversa com Halteres.gif',
-    'Rosca Direta com Cabo deitado.gif',
-    'Rosca martelo.gif',
-    'Rosca martelo com halteres no banco scott.gif',
-    'Rosca martelo sentada.gif',
-    'Rosca direta com barra w.gif',
-    'Rosca Direta com Barra no colete scott.gif',
-    'Rosca Direta com Barra em Pegada Fechada.gif',
-    'Rosca Direta com Barra deitado em Banco Alto.gif',
-    'Rosca concentrada unilateral com cabo.gif',
-    'Rosca de Bíceps com Puxada de Cabo.gif',
-    'Rosca Concentrada com Pegada Fechada Sentado.gif',
-    'Rosca de Bíceps com Halteres no Banco Scott.gif',
-    'Rosca de bíceps com alavanca.gif',
-    'Rosca concentrada.gif',
-    'Rosca Zottman.gif',
-    'Rosca Unilateral com Cabo.gif',
-    'Rosca spider unilateral.gif',
-    'Rosca spider com único haltere.gif',
-    'Rosca scott unilateral com halteres.gif',
-    'Rosca scott com halteres.gif',
-    'Rosca Scott com Halteres Martelo no Banco.gif',
-    'Rosca Scott com Barra W.gif',
-    'Rosca Scott com Alavanca.gif',
-    'Rosca scott alternados com halteres.gif',
-    'Rosca pronada no banco inclinado.gif',
+  'Biceps': [
+    'maquina-de-rosca-direta.gif',
+    'rosca-alternada-com-barra.gif',
+    'rosca-alternada-com-halteres-sentado.gif',
+    'rosca-biceps-alta-com-halteres.gif',
+    'rosca-biceps-com-cabo-ajoelhado.gif',
+    'rosca-biceps-com-halteres.gif',
+    'rosca-biceps-com-pegada-fechada-na-barra-w.gif',
+    'rosca-biceps-inclinada-com-cabos.gif',
+    'rosca-biceps-inclinada-com-halteres-sentado.gif',
+    'rosca-biceps-sentado.gif',
+    'rosca-biceps-unilateral-com-pegada-invertida-em-cabo.gif',
+    'rosca-biceps-unilateral-no-cabo-alto.gif',
+    'rosca-biceps-unilateral.gif',
+    'rosca-bilateral-com-cabo-em-banco-inclinado.gif',
+    'rosca-com-barra.gif',
+    'rosca-com-cabo-de-um-braco.gif',
+    'rosca-com-halteres-no-colete-scott.gif',
+    'rosca-com-halteres.gif',
+    'rosca-com-polia-alta.gif',
+    'rosca-concentrada-com-cabo.gif',
+    'rosca-concentrada-com-pegada-fechada-sentado.gif',
+    'rosca-concentrada-unilateral-com-cabo.gif',
+    'rosca-concentrada.gif',
+    'rosca-de-biceps-com-alavanca.gif',
+    'rosca-de-biceps-com-halteres-no-banco-scott.gif',
+    'rosca-de-biceps-com-puxada-de-cabo.gif',
+    'rosca-direta-com-barra-deitado-em-banco-alto.gif',
+    'rosca-direta-com-barra-em-pegada-fechada.gif',
+    'rosca-direta-com-barra-no-colete-scott.gif',
+    'rosca-direta-com-barra-w.gif',
+    'rosca-direta-com-barra.gif',
+    'rosca-direta-com-cabo-deitado.gif',
+    'rosca-inversa-com-barra-w.gif',
+    'rosca-inversa-com-halteres.gif',
+    'rosca-martelo-com-corda.gif',
+    'rosca-martelo-com-halter-no-colete-scott.gif',
+    'rosca-martelo-com-halteres-no-banco-scott.gif',
+    'rosca-martelo-sentada.gif',
+    'rosca-martelo.gif',
+    'rosca-no-cabo.gif',
+    'rosca-pronada-no-banco-inclinado.gif',
+    'rosca-scott-alternados-com-halteres.gif',
+    'rosca-scott-com-alavanca.gif',
+    'rosca-scott-com-barra-w.gif',
+    'rosca-scott-com-halteres-martelo-no-banco.gif',
+    'rosca-scott-com-halteres.gif',
+    'rosca-scott-unilateral-com-halteres.gif',
+    'rosca-spider-com-unico-haltere.gif',
+    'rosca-spider-unilateral.gif',
+    'rosca-unilateral-com-cabo.gif',
+    'rosca-zottman.gif',
   ],
-  'triceps-47-20241202t183816z-001/triceps-47': [
-    'Tríceps testa pegada neutra com halteres.gif',
-    'Tríceps testa com barra.gif',
-    'Tríceps Testa com Barra Pegada Invertida.gif',
-    'Tríceps Testa com Banco Declinado com Halteres.gif',
-    'Tríceps pulley pegada invertida.gif',
-    'Tríceps no Banco.gif',
-    'Tríceps pulley corda.gif',
-    'Tríceps pulley barra.gif',
-    'Tríceps Pulley barra V.gif',
-    'Tríceps francês no banco inclinado com halter.gif',
-    'Tríceps francês na polia com corda.gif',
-    'Tríceps Francês com Halteres.gif',
-    'Tríceps Coice com Cabo.gif',
-    'Tríceps Francês com Halter Bilateral.gif',
-    'Tríceps Francês Alternada com Halteres no Banco Inclinado.gif',
-    'Tríceps Coice com Halteres.gif',
-    'Supino declinado pegada fechada.gif',
-    'Supino Reto pegada fechada.gif',
-    'Tríceps Mergulho Máquina.gif',
-    'Triceps frances barra W.gif',
-    'triceps Pulley  unilateral.gif',
-    'Tríceps Unil pegada supinada.gif',
-    'Triceps Francês Na Polia Baixagif.gif',
-    'Tríceps Francês Unil na Polia Baixa.gif',
-    'Apoio de Frente Diamante.gif',
-    'Tríceps Coice Unil com Halter.gif',
-    'Tríceps Coice na Polia Média.gif',
-    'Tríceps Coice  inclinado no cross bilateral.gif',
-    'Tríceps Coice pegada pronada Unil na Polia Baixa.gif',
-    'Tríceps Coice em Pé.gif',
-    'Tríceps Coice Unil Inclinado com Halter.gif',
-    'Tríceps Coice unil no Banco.gif',
-    'Tríceps Mergulho no banco.gif',
-    'Supino Reto fechado com halteres.gif',
-    'Tríceps Testa Deitado com Halter.gif',
-    'Triceps frances Unilateral Deitado no banco.gif',
-    'Tríceps com Halter no Banco.gif',
-    'Tríceps na Polia deitado no banco reto.gif',
-    'Tríceps no aparelho scort.gif',
-    'Tríceps Paralela.gif',
-    'Tríceps Unilateral 90g Deitado no Banco Reto.gif',
-    'Tríceps Mergulho no Banco M.gif',
-    'triceps apoaiado na pareda.gif',
-    'Tríceps Testa Unil deitado no banco.gif',
-    'Apoio de Frente Pegada Fechada.gif',
-    'Tríceps Testa com Halter Deitada no Chão.gif',
-    'Apoio de frente pegada fechada parede.gif',
+  'Triceps': [
+    'apoio-de-frente-diamante.gif',
+    'apoio-de-frente-pegada-fechada-parede.gif',
+    'apoio-de-frente-pegada-fechada.gif',
+    'supino-declinado-pegada-fechada.gif',
+    'supino-reto-fechado-com-halteres.gif',
+    'supino-reto-pegada-fechada.gif',
+    'triceps-apoaiado-na-pareda.gif',
+    'triceps-coice-com-cabo.gif',
+    'triceps-coice-com-halteres.gif',
+    'triceps-coice-em-pe.gif',
+    'triceps-coice-inclinado-no-cross-bilateral.gif',
+    'triceps-coice-na-polia-media.gif',
+    'triceps-coice-pegada-pronada-unil-na-polia-baixa.gif',
+    'triceps-coice-unil-com-halter.gif',
+    'triceps-coice-unil-inclinado-com-halter.gif',
+    'triceps-coice-unil-no-banco.gif',
+    'triceps-com-halter-no-banco.gif',
+    'triceps-frances-alternada-com-halteres-no-banco-inclinado.gif',
+    'triceps-frances-barra-w.gif',
+    'triceps-frances-com-halter-bilateral.gif',
+    'triceps-frances-com-halteres.gif',
+    'triceps-frances-na-polia-baixagif.gif',
+    'triceps-frances-na-polia-com-corda.gif',
+    'triceps-frances-no-banco-inclinado-com-halter.gif',
+    'triceps-frances-unil-na-polia-baixa.gif',
+    'triceps-frances-unilateral-deitado-no-banco.gif',
+    'triceps-mergulho-maquina.gif',
+    'triceps-mergulho-no-banco-m.gif',
+    'triceps-mergulho-no-banco.gif',
+    'triceps-na-polia-deitado-no-banco-reto.gif',
+    'triceps-no-aparelho-scort.gif',
+    'triceps-no-banco.gif',
+    'triceps-paralela.gif',
+    'triceps-pulley-barra-v.gif',
+    'triceps-pulley-barra.gif',
+    'triceps-pulley-corda.gif',
+    'triceps-pulley-pegada-invertida.gif',
+    'triceps-pulley-unilateral.gif',
+    'triceps-testa-com-banco-declinado-com-halteres.gif',
+    'triceps-testa-com-barra-pegada-invertida.gif',
+    'triceps-testa-com-barra.gif',
+    'triceps-testa-com-halter-deitada-no-chao.gif',
+    'triceps-testa-deitado-com-halter.gif',
+    'triceps-testa-pegada-neutra-com-halteres.gif',
+    'triceps-testa-unil-deitado-no-banco.gif',
+    'triceps-unil-pegada-supinada.gif',
+    'triceps-unilateral-90g-deitado-no-banco-reto.gif',
   ],
-  'gluteo-31-20241202t165017z-001/gluteo-31': [
-    'Abdução Lateral do Quadril com Alavanca.gif',
-    'Extensão de Quadril com Cabo.gif',
-    'Abdução de quadril com cabo.gif',
-    'Puxada De Cabo Ajoelhada.gif',
-    'Ponte com Halteres.gif',
-    'Máquina de Abdução de Quadril.gif',
-    'Gluteos Coice nilateral Polia Baixa.gif',
-    'Glúteo Coice No Smith.gif',
-    'Glúteo Coice Na Alavanca.gif',
-    'Glúteo Coice Na Máquina.gif',
-    'Extensão de Quadril em Pé com Alavanca.gif',
-    'Glúteo Coice Na Máquina De Extensão De Pernas.gif',
-    'Elevação Pélvica Unilateral Com Barra.gif',
-    'Elevação Pélvica Na Máquina.gif',
-    'Elevação Pélvica na Máquina Smith.gif',
-    'Extensão de Perna na Máquina Smith Reversa.gif',
-    'Elevação Pélvica na Máquina de Extensão de Pernas.gif',
-    'Elevação Pélvica Com Barra.gif',
-    'Elevação Pélvica Com Barra Declinado.gif',
-    'Abdução de Quadril com Ponte.gif',
-    'Elevação Pélvica com Banda de Resistência.gif',
-    'Agachamento na Máquina Abdutora.gif',
-    'Stiff unil com medball.gif',
-    'levantamento terra com barra.gif',
-    'stiff unilateral com kettibel.gif',
-    'stiff no smth unilateral.gif',
-    'stiff no smth.gif',
-    'stiff unilateral.gif',
-    'stiff com barra.gif',
-    'Stiff com Halteres.gif',
+  'GluteoS': [
+    'abducao-de-quadril-com-cabo.gif',
+    'abducao-de-quadril-com-ponte.gif',
+    'abducao-lateral-do-quadril-com-alavanca.gif',
+    'agachamento-na-maquina-abdutora.gif',
+    'elevacao-pelvica-com-banda-de-resistencia.gif',
+    'elevacao-pelvica-com-barra-declinado.gif',
+    'elevacao-pelvica-com-barra.gif',
+    'elevacao-pelvica-na-maquina-de-extensao-de-pernas.gif',
+    'elevacao-pelvica-na-maquina-smith.gif',
+    'elevacao-pelvica-na-maquina.gif',
+    'elevacao-pelvica-unilateral-com-barra.gif',
+    'extensao-de-perna-na-maquina-smith-reversa.gif',
+    'extensao-de-quadril-com-cabo.gif',
+    'extensao-de-quadril-em-pe-com-alavanca.gif',
+    'gluteo-coice-na-alavanca.gif',
+    'gluteo-coice-na-maquina-de-extensao-de-pernas.gif',
+    'gluteo-coice-na-maquina.gif',
+    'gluteo-coice-no-smith.gif',
+    'gluteos-coice-nilateral-polia-baixa.gif',
+    'levantamento-terra-com-barra.gif',
+    'maquina-de-abducao-de-quadril.gif',
+    'ponte-com-halteres.gif',
+    'puxada-de-cabo-ajoelhada.gif',
+    'stiff-com-barra.gif',
+    'stiff-com-halteres.gif',
+    'stiff-no-smth-unilateral.gif',
+    'stiff-no-smth.gif',
+    'stiff-unil-com-medball.gif',
+    'stiff-unilateral-com-kettibel.gif',
+    'stiff-unilateral.gif',
     'stiff.gif',
   ],
-  'panturrilha-20-20241202t173337z-001/panturrilha-20': [
-    'Levantamento de panturrilha com apoio e sobrecarga.gif',
-    'Levantamento de panturrilha com apoio de uma perna.gif',
-    'Levantamento de panturrilha com apoio de banco.gif',
-    'Levantamento de panturrilha com alavanca.gif',
-    'Elevação de Panturrilhas.gif',
-    'Elevação de Panturrilhas no Hack.gif',
-    'Elevação Unilateral de Panturrilha no Leg Press.gif',
-    'Elevação de Panturrilha Sentado com Alavanca.gif',
-    'Elevação de Panturrilha no Leg Press.gif',
-    'Elevação de Panturrilha no Leg Press horizontal.gif',
-    'Elevação de Panturrilha Sentado com Peso.gif',
-    'Elevação de Panturrilha em Máquina em pé.gif',
-    'Elevação de Panturrilha Sentado com Barra.gif',
-    'Elevação de Panturrilha com Uma Perna na Máquina Hack.gif',
-    'Agachamento com Sustentação e Elevação de Panturrilhas.gif',
-    'Elevação de Panturrilha com Barra em Pé.gif',
-    'Flexão Plantar no Smith.gif',
-    'Flexão Plantar Máquina.gif',
-    'panturrinha no leg press.gif',
-    'Flexão Plantar com peso corporal.gif',
+  'Panturrilha': [
+    'agachamento-com-sustentacao-e-elevacao-de-panturrilhas.gif',
+    'elevacao-de-panturrilha-com-barra-em-pe.gif',
+    'elevacao-de-panturrilha-com-uma-perna-na-maquina-hack.gif',
+    'elevacao-de-panturrilha-em-maquina-em-pe.gif',
+    'elevacao-de-panturrilha-no-leg-press-horizontal.gif',
+    'elevacao-de-panturrilha-no-leg-press.gif',
+    'elevacao-de-panturrilha-sentado-com-alavanca.gif',
+    'elevacao-de-panturrilha-sentado-com-barra.gif',
+    'elevacao-de-panturrilha-sentado-com-peso.gif',
+    'elevacao-de-panturrilhas-no-hack.gif',
+    'elevacao-de-panturrilhas.gif',
+    'elevacao-unilateral-de-panturrilha-no-leg-press.gif',
+    'flexao-plantar-com-peso-corporal.gif',
+    'flexao-plantar-maquina.gif',
+    'flexao-plantar-no-smith.gif',
+    'levantamento-de-panturrilha-com-alavanca.gif',
+    'levantamento-de-panturrilha-com-apoio-de-banco.gif',
+    'levantamento-de-panturrilha-com-apoio-de-uma-perna.gif',
+    'levantamento-de-panturrilha-com-apoio-e-sobrecarga.gif',
+    'panturrinha-no-leg-press.gif',
   ],
-  'trapezio-9-20241202t183753z-001/trapezio-9': [
-    'remada alta pegada abeta com barra.gif',
-    'remada alta com halteres.gif',
-    'encolhimento pegada fechada barra no cross.gif',
-    'encolhimento maquina.gif',
-    'encolhimento no smith.gif',
-    'encolhimento sentado no banco inlinado com halteres.gif',
-    'encolhimento sentado no banco com halteres.gif',
-    'encolhimento livre com halteres.gif',
-    'encolhimento na barra livre.gif',
+  'Trapezio': [
+    'encolhimento-livre-com-halteres.gif',
+    'encolhimento-maquina.gif',
+    'encolhimento-na-barra-livre.gif',
+    'encolhimento-no-smith.gif',
+    'encolhimento-pegada-fechada-barra-no-cross.gif',
+    'encolhimento-sentado-no-banco-com-halteres.gif',
+    'encolhimento-sentado-no-banco-inlinado-com-halteres.gif',
+    'remada-alta-com-halteres.gif',
+    'remada-alta-pegada-abeta-com-barra.gif',
   ],
-  'antebraco-15-20241202t155453z-001/antebraco-15': [
-    'Flexão de Pulso Neutra Sentado com Halteres.gif',
-    'Rosca Inversa com Barra.gif',
-    'Rosca de Punho Reversa com Barra.gif',
-    'Rosca de Punho Pegada Neutra com Anilhas.gif',
-    'Rosca de punho com barra.gif',
-    'Rosca de Punho com Barra Atrás das Costas.gif',
-    'Rosca de Dedos com Halteres.gif',
-    'Rosca de dedo com barra.gif',
-    'Rolinho de antebraço.gif',
-    'Hand Grip.gif',
-    'Flexão de Punho Reversa com Barra Sobre um Banco.gif',
-    'Flexão de Punho com Halteres.gif',
-    'Flexão de Punho com Cabo em um Braço no Chão.gif',
-    'Flexão de Punho Reversa com Anilha.gif',
-    'Antebraços.gif',
+  'Antebraco': [
+    'antebracos.gif',
+    'flexao-de-pulso-neutra-sentado-com-halteres.gif',
+    'flexao-de-punho-com-cabo-em-um-braco-no-chao.gif',
+    'flexao-de-punho-com-halteres.gif',
+    'flexao-de-punho-reversa-com-anilha.gif',
+    'flexao-de-punho-reversa-com-barra-sobre-um-banco.gif',
+    'hand-grip.gif',
+    'rolinho-de-antebraco.gif',
+    'rosca-de-dedo-com-barra.gif',
+    'rosca-de-dedos-com-halteres.gif',
+    'rosca-de-punho-com-barra-atras-das-costas.gif',
+    'rosca-de-punho-com-barra.gif',
+    'rosca-de-punho-pegada-neutra-com-anilhas.gif',
+    'rosca-de-punho-reversa-com-barra.gif',
+    'rosca-inversa-com-barra.gif',
   ],
-  'eretores-da-espinha-8-20241202t164933z-001/eretores-da-espinha-8': [
-    'Superman.gif',
-    'Hiperextensão.gif',
-    'Hiperextensão no Chão.gif',
-    'Hiperextensão de Lombar no Banco Plano.gif',
-    'Hiperextensão Invertida de Sapo.gif',
-    'Extensão lombar sentada.gif',
-    'Extensão Lombar com Peso.gif',
-    'Hiperextensão com Torção.gif',
+  'Cardio': [
+    'airbike.gif',
+    'bicicleta-ergometrica-reclinada.gif',
+    'bike.gif',
+    'caminhada-rapida-corrida-leve.gif',
+    'corrida-na-bicicleta-ergometrica.gif',
+    'esteira-com-inclinacao.gif',
+    'esteira-ergometrica.gif',
+    'hands-bike.gif',
+    'maquina-de-caminhada-ondulatorio.gif',
+    'maquina-eliptica.gif',
+    'maquina-simulador-escada.gif',
+    'plataforma-vibratoria.gif',
   ],
-  'cardio-academia-11-20241202t161427z-001/cardio-academia-11': [
-    'Plataforma Vibratória.gif',
-    'Máquina Simulador Escada.gif',
-    'Máquina Elíptica.gif',
-    'Máquina de Caminhada Ondulatório.gif',
-    'Hands Bike.gif',
-    'Esteira Ergométrica.gif',
-    'Esteira com Inclinação.gif',
-    'Corrida na Bicicleta Ergométrica.gif',
-    'Bicicleta Ergométrica Reclinada.gif',
-    'Bike.gif',
-    'Airbike.gif',
-    'Caminhada Rápida Corrida Leve.gif',
-  ],
-  // Novos grupos adicionados
-  'GIFS CALISTENIA-20241202T155424Z-001/GIFS CALISTENIA': [
-    'Flexão de joelhos.gif',
-    'Flexão de pivô com banco.gif',
-    'Flexão de Punho Fechado.gif',
-    'Flexão de Queda.gif',
-    'Flexão de um braço com apoio.gif',
-    'Flexão de um braço com bola medicinal.gif',
-    'Flexão Declinada.gif',
-    'Flexão diamante.gif',
-    'Flexão em pivô.gif',
-    'Flexão inclinada.gif',
-    'Flexão Invertida.gif',
-    'Flexão na parede.gif',
-    'Flexão plus.gif',
-    'Flexão reversa com cotovelos.gif',
-    'Flexão.gif',
-    'Flexões de apoio de mão na parede.gif',
-    'Flexões hindu.gif',
-    'Impossible Dips.gif',
-    'Levantamento de panturrilha com apoio e sobrecarga.gif',
-    'Levantamento Terra Unilateral.gif',
-    'Mergulho Coreano.gif',
-    'Mergulho de tríceps.gif',
-    'Mergulhos para tríceps no chão.gif',
-    'Muscle up.gif',
-    'Paralela.gif',
-    'Paralelas entre Cadeiras.gif',
-    'Paralelas na Argola.gif',
-    'Paralelas na Barra.gif',
-    'Planche com Flexão de Braço.gif',
-    'Planche.gif',
-    'Ponte em Unilateral.gif',
-    'Pulo de impulso de quadril de uma perna.gif',
-    'Puxada escapular na barra fixa.gif',
-    'Puxada Front Lever.gif',
-    'Puxada isométrica.gif',
-    'Remada com o Peso do Corpo na Porta.gif',
-    'Remada Invertida Com Argolas.gif',
-    'Remada Invertida na Mesa.gif',
-    'Rosca concentrada com perna.gif',
-    'Salto em Caixa com uma Perna.gif',
-    'Salto em Distância.gif',
-    'Salto na Caixa para Agachamento Pistola.gif',
-    'Salto para Caixa 2 para 1.gif',
-    'Suspensão Passiva.gif',
-    'Swing 360.gif',
-  ],
-  'GIFS CROSSFIT-20241202T155424Z-001/GIFS CROSSFIT': [
-    'Agachamento com barra e salto.gif',
-    'Agachamento com barra no chão seguido de levantamento militar.gif',
-    'Agachamento com Barra Sobre a Cabeça.gif',
-    'Agachamento com salto ajoelhado.gif',
-    'Agachamento com Salto usando Barra Hexagonal.gif',
-    'Agachamento e press com kettlebell.gif',
-    'Agachamento Pistol com TRX.gif',
-    'Agachamento Pistola Apoiado.gif',
-    'Agachamento Pistola com Apoio em Caixa.gif',
-    'Agachamento Pistola com Halteres.gif',
-    'Agachamento Pistola na Caixa.gif',
-    'Andar de Pato.gif',
-    'Arranco com Barra.gif',
-    'Arranco com kettlebell de um braço.gif',
-    'Arranco com kettlebell em afundo.gif',
-    'Arranco de Potência.gif',
-    'Arranco e Levantamento com Kettlebell.gif',
-    'Arranque e Arremesso com Kettlebell.gif',
-    'Arremesso com Barra.gif',
-    'Arremesso com haltere de um braço.gif',
-    'Arremesso de Medicina Bola com Levantamento de Tronco.gif',
-    'Arremesso e Pressão com Barra.gif',
-    'Balanços com Kettlebell.gif',
-    'Barbell Hang Clean.gif',
-    'Bola medicinal lançada para cima e para baixo.gif',
-    'Bola na parede.gif',
-    'Burpee Jack.gif',
-    'Burpees.gif',
-    'Caminhada com Halteres.gif',
-    'Caminhada na Parada de Mão.gif',
-    'Caminhada na Parede.gif',
-    'Carregamento Zercher.gif',
-    'Corda de batalha.gif',
-    'Cruz de ferro com halteres.gif',
-    'Desenvolvimento Arnold com kettlebell.gif',
-    'Desenvolvimento de ombro com kettlebell.gif',
-    'Desenvolvimentos com kettlebell unilateral de joelhos.gif',
-    'Dumbbell Devil Press.gif',
-    'Dumbbell Power Clean.gif',
-    'Elevação de Perna Única com Equilíbrio e Rosca de Bíceps.gif',
-    'Flexão com kettlebell profunda.gif',
-    'Flexão com parada de mãos.gif',
-    'Flexão de braço com as mãos entre bancos.gif',
-    'Flexão de Braço com Bola de Estabilidade.gif',
-    'Flexão de Braço com Bola Medicinal em Um Braço.gif',
-    'Flexão de Braço Declinada com Bola de Estabilidade.gif',
-    'Flexão de braço em posição de parada de mão com balanço.gif',
-    'Flexões de apoio de mão na parede.gif',
-    'Heaving Snatch Balance.gif',
-    'Impulso com barra.gif',
-    'Kettlebell em Forma de Oito.gif',
-    'Kettlebell Hang Clean.gif',
-    'Levantamento lateral com kettlebell.gif',
-    'Levantamento Turco.gif',
-    'Moinho com Kettlebell.gif',
-    'Moinho de vento com haltere.gif',
-    'Muscle Snatch.gif',
-    'Muscle up.gif',
-    'Power Clean.gif',
-    'Pular Corda.gif',
-    'Puxada com Halteres entre as Pernas.gif',
-    'Remada com barra curvada para trás.gif',
-    'Salto na Caixa para Agachamento Pistola.gif',
-    'Salto na Caixa.gif',
-    'Salto para Caixa 2 para 1.gif',
-    'Subida na Corda sem Pernas.gif',
-    'Swing de kettlebell de um braço.gif',
-    'Swing de kettlebell.gif',
-    'Virar Pneu.gif',
-  ],
-  'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO': [
-    // Lista completa de 135 arquivos - adicionar conforme necessário
-    'Abraços nos Joelhos em Pé.gif',
-    'adução de pernas (alongamento do adutor maior).gif',
-    'Adução de quadril deitado de lado.gif',
-    'Alongamento Abraço com Tapinhas nas Costas.gif',
-    'Alongamento assistido reverso (peitoral e ombro).gif',
-    'Alongamento Borboleta.gif',
-    'Alongamento com PVC na Posição Frontal de Rack.gif',
-    'Alongamento da Esfinge.gif',
-    'Alongamento da panturrilha agachado.gif',
-    'Alongamento da panturrilha com descida do calcanhar.gif',
-    'Alongamento da parte superior das costas.gif',
-    'Alongamento das Costas com Rolo de Espuma.gif',
-    'Alongamento de Adutores com Pernas Afastadas em Pé.gif',
-    'Alongamento de Glúteos Deitado.gif',
-    'Alongamento de Isquiotibiais deitado.gif',
-    'Alongamento de Isquiotibiais em Pé.gif',
-    'Alongamento de ombro com o braço cruzado.gif',
-    'Alongamento de ombro reverso em pé.gif',
-    'Alongamento de Panturrilha com Corda.gif',
-    'Alongamento de panturrilha com uma perna esticada.gif',
-    'Alongamento de panturrilha com uma perna.gif',
-    'Alongamento de panturrilha em passo largo.gif',
-    'Alongamento de panturrilha em posição estática.gif',
-    'Alongamento de panturrilha na parede.gif',
-    'Alongamento de Pernas Duplo.gif',
-    'Alongamento de Punho.gif',
-    'Alongamento de Quadríceps ajoelhado.gif',
-    'Alongamento de Quadríceps em Quatro Apoios.gif',
-    'Alongamento de quadril 90-90.gif',
-    'Alongamento de rotação da coluna em pé.gif',
-    'Alongamento de tríceps em pé.gif',
-    'Alongamento Dinâmico do Peitoral.gif',
-    'Alongamento do desviador ulnar e extensor do punho.gif',
-    'Alongamento do Gastrocnêmio com Joelho Flexionado.gif',
-    'Alongamento do manguito rotador.gif',
-    'Alongamento do ombro com toalha.gif',
-    'Alongamento do Peito Acima da Cabeça.gif',
-    'Alongamento do peito com rolo de espuma.gif',
-    'Alongamento do Peito e Parte Frontal dos Ombros.gif',
-    'Alongamento do Peitoral até as Costas.gif',
-    'Alongamento do Peitoral com um Braço em Pé.gif',
-    'Alongamento do peitoral e do ombro na porta.gif',
-    'Alongamento do peitoral reverso.gif',
-    'Alongamento do Piriforme Sentado.gif',
-    'Alongamento do tendão de Aquiles em pé.gif',
-    'Alongamento do tibial posterior.gif',
-    'Alongamento do trato iliotibial com rolo de espuma.gif',
-    'Alongamento dos Adutores com a Perna Estendida ajoelhado.gif',
-    'Alongamento dos Adutores com Pernas Abertas em Pé.gif',
-    'Alongamento dos adutores da coxa com rolo de espuma.gif',
-    'Alongamento dos Adutores em Posição Sentada com Pernas Abertas.gif',
-    'Alongamento dos adutores sentado.gif',
-    'Alongamento dos Extensores dos Dedos dos Pés.gif',
-    'Alongamento dos flexores de quadril ajoelhado.gif',
-    'Alongamento dos flexores do quadril em posição de joelho.gif',
-    'Alongamento dos flexores dos dedos dos pés em pé.gif',
-    'Alongamento dos isquiotibiais em pé com a perna cruzada.gif',
-    'Alongamento dos isquiotibiais em pé.gif',
-    'Alongamento dos Isquiotibiais Sentado.gif',
-    'Alongamento dos latíssimos dorsais com rolo de espuma.gif',
-    'Alongamento dos ombros por trás das costas.gif',
-    'Alongamento em Círculos nos Punhos.gif',
-    'Alongamento em Pé dos Quadríceps.gif',
-    'Alongamento Inclinado Lateral em Pé.gif',
-    'Alongamento Lateral da Parte Interna da Coxa.gif',
-    'Alongamento na parede do canto.gif',
-    'Alongamento Piriforme.gif',
-    'Alongamento reverso assistido (peito e ombro).gif',
-    'Alongamento Reverso de Pulso.gif',
-    'Alongamento Sentado para a Panturrilha com Perna Esticada.gif',
-    'Alongamentos de pés e tornozelos.gif',
-    'Arremesso de Bola de Reação.gif',
-    'Catavento corporal.gif',
-    'Contração abdominal.gif',
-    'Círculos com os braços.gif',
-    'Círculos com um braço.gif',
-    'Deslize de parede do serrátil com rolo de espuma.gif',
-    'Dorsiflexão plantar.gif',
-    'Elevação lateral de deltóide posterior com halteres.gif',
-    'Exercício de bailarina sentada.gif',
-    'Exercício de retração escapular sentada.gif',
-    'Flexão alternada de ombro.gif',
-    'Inclinação Lateral em Pé.gif',
-    'Inclinação Lateral.gif',
-    'Joelho Alternado no Peito.gif',
-    'Levantamento de braço apoiado na parede.gif',
-    'Postura da Cobra - Alongamento Abdominal.gif',
-    'Postura da Virilha Sentada.gif',
-    'Postura de meio sapo.gif',
-    'Postura de peixe.gif',
-    'Postura do Arco Oscilante.gif',
-    'Postura do Arco.gif',
-    'Postura do Bebê Feliz.gif',
-    'Postura do sapo.gif',
-    'Protração e retração da escápula.gif',
-    'Puxada escapular na barra fixa.gif',
-    'Pêndulo de ombro.gif',
-    'Quadrúpede com elevação de braço e perna contralateral.gif',
-    'Rolagem de espuma para isquiotibiais.gif',
-    'Rolamento de espuma nas costas.gif',
-    'Rolamento de espuma nos quadríceps.gif',
-    'Rolamento de espuma nos romboides.gif',
-    'Rolamento de Espuma para Panturrilhas.gif',
-    'Rolando como uma Bola.gif',
-    'Rolo de espuma ombro posterior.gif',
-    'Rolo de espuma para fascite plantar.gif',
-    'Rolo de espuma para ombro e peito frontal.gif',
-    'Rolo de Espuma para os Glúteos.gif',
-    'Rotação da coluna torácica de joelhos.gif',
-    'Rotação de Pé e Tornozelo.gif',
-    'Rotação do corpo superior deitado.gif',
-    'Rotação em Pé.gif',
-    'Rotação espinhal deitado.gif',
-    'Rotação externa com cabo a 90 graus.gif',
-    'Rotação externa com cabo em posição de joelhos.gif',
-    'Rotação externa de halteres apoiada no banco.gif',
-    'Rotação Externa de Ombro com Cabo.gif',
-    'Rotação externa de ombro com faixa elástica.gif',
-    'Rotação Externa De Quadril Com Faixa Elástica.gif',
-    'Rotação Externa de Quadril Sentado com Faixa Elástica.gif',
-    'Rotação externa do ombro deitado com haltere.gif',
-    'Rotação externa do ombro.gif',
-    'Rotação Externa do Pé com Faixa Elástica.gif',
-    'Rotação interna de cabo a 90 graus.gif',
-    'Rotação interna de ombro com cabo.gif',
-    'Rotação interna do ombro sentada com cabo.gif',
-    'Rotação interna do ombro.gif',
-    'Rotação Interna do Quadril Sentado com Faixa Elástica.gif',
-    'Rotação para trás de joelhos.gif',
-    'Superman.gif',
-    'Toque Lateral dos Dedos dos Pés em Pé.gif',
-    'Toque nos Dedos dos Pés em Pé.gif',
-    'Toque nos Dedos dos Pés Sentado.gif',
-    'Toques de Dedos em Pé.gif',
-    'Torção Oblíqua Sentada.gif',
-  ],
-  'GIFS TREINAMENTO FUNCIONAL-20241202T155424Z-001/GIFS TREINAMENTO FUNCIONAL': [
-    // Lista completa de 206 arquivos - adicionar conforme necessário
-    'Abdução de Quadril com Faixa.gif',
-    'Abdução de Quadril em Decúbito Lateral.gif',
-    'Abdução de Quadril em Pé.gif',
-    'Abdução de Quadril Lateral.gif',
-    'Abdução de Quadril Sentado com Faixa Elástica.gif',
-    'Adução de Ombro com Faixa Elástica.gif',
-    'Afundo Alternado com Salto.gif',
-    'Afundo com Gymstick.gif',
-    'Afundo Lateral.gif',
-    'Afundo no banco.gif',
-    'Afundo.gif',
-    'Agachamento Búlgaro com Peso Corporal.gif',
-    'Agachamento búlgaro com salto.gif',
-    'Agachamento Camarão.gif',
-    'Agachamento com Chute Lateral e Toque no Calcanhar.gif',
-    'Agachamento com Elevação dos Joelhos.gif',
-    'Agachamento com Faixa Elástica em Afundo.gif',
-    'Agachamento com Faixa Elástica sobre a Cabeça.gif',
-    'Agachamento com Gymstick.gif',
-    'Agachamento com Salto.gif',
-    'Agachamento com Sustentação e Elevação de Panturrilhas.gif',
-    'Agachamento Cossaco.gif',
-    'Agachamento Dividido Profundo.gif',
-    'Agachamento Goblet com Kettlebell e Faixa Elástica.gif',
-    'Agachamento na Parede com Bola de Exercício.gif',
-    'Agachamento no Banco com Peso Corporal.gif',
-    'Agachamento Pistola com Apoio em Caixa.gif',
-    'Agachamento Pistola na Caixa.gif',
-    'Agachamento Skater.gif',
-    'Agachamento Sumô sem Pesos.gif',
-    'Agachamento unilateral cruzado.gif',
-    'Agachamento.gif',
-    'Andar de Bicicleta ao Ar Livre.gif',
-    'Arremesso de Bola de Reação.gif',
-    'Arremesso de Medicina Bola com Levantamento de Tronco.gif',
-    'Avanço com Joelho Alto em Cima da Bola Bosu.gif',
-    'Avanço com Joelho Elevado em Caminhada.gif',
-    'Avanço sem Peso Corporal.gif',
-    'Balanço com gymstick.gif',
-    'Balloon Drill.gif',
-    'Bola medicinal lançada para cima e para baixo.gif',
-    'Bola na parede.gif',
-    'Bom Dia com Faixa Elástica de Resistência.gif',
-    'Boxe jab.gif',
-    'Boxe Sombra.gif',
-    'Burpees.gif',
-    'Caminhada Lateral com Faixa de Resistência.gif',
-    'Caminhada Rápida.gif',
-    'Caminhar.gif',
-    'Cardio de Passos de Boxeador.gif',
-    'Chute em Gancho.gif',
-    'Chutes Alternados de Glúteos no Banco.gif',
-    'Chutes até o Glúteo.gif',
-    'Coice com Perna Flexionada.gif',
-    'Coice de Burro.gif',
-    'Cópia de Abdominal de Rã com Bola de Exercícios.gif',
-    'Corda de batalha.gif',
-    'Corrida com Elevação dos Joelhos.gif',
-    'Corrida com Joelhos Altos.gif',
-    'Corrida com Passos Rápidos.gif',
-    'Corrida com Salto.gif',
-    'Corrida de Passos Curtos.gif',
-    'Corrida de Sprint com Assistência de Faixa Elástica.gif',
-    'Corrida Estacionária.gif',
-    'Corrida Latera.gif',
-    'Corrida para Trás.gif',
-    'Corrida.gif',
-    'Crucifixo invertido com gymstick para deltoides posterior.gif',
-    'Cruz de ferro com halteres.gif',
-    'Cruzado de Direita.gif',
-    'Desenvolvimento de ombro sentado com faixa de resistência.gif',
-    'Desenvolvimento de ombro unilateral com banda.gif',
-    'Desenvolvimento lateral com gymstick.gif',
-    'Desenvolvimento militar atrás da cabeça com gymstick.gif',
-    'Desenvolvimento militar com peso do corpo.gif',
-    'Elevação com Giro do Cotovelo Oposto para o Joelho.gif',
-    'Elevação da Perna em Pé com Faixa Elástica de Resistência.gif',
-    'Elevação de Panturrilha com Faixa Elástica de Resistência.gif',
-    'Elevação de panturrilha em pé.gif',
-    'Elevação de Panturrilha em Uma Perna.gif',
-    'Elevação de Perna Reta em Pé com Faixa de Resistência.gif',
-    'Elevação de Perna Única com Equilíbrio e Rosca de Bíceps.gif',
-    'Elevação de Pernas deitado de Lado.gif',
-    'Elevação de Pernas estilo Sapo.gif',
-    'Elevação de Quadril com Banda de Resistência de Joelhos.gif',
-    'Elevação de Quadril com Peso Corporal.gif',
-    'Elevação frontal lateral com elástico.gif',
-    'Elevação lateral de braços.gif',
-    'Elevação Lateral de Perna com Faixa Elástica Deitado de Lado.gif',
-    'Elevação Lateral de Perna com Faixa Elástica.gif',
-    'Elevação Pélvica com Banda de Resistência.gif',
-    'Elevação Pélvica Declinado.gif',
-    'Escalador de Montanha.gif',
-    'Esquiador com gymstick.gif',
-    'Exercício Pliométrico X.gif',
-    'Exercícios das 5 Marcas.gif',
-    'Exercícios de escada de agilidade lateral.gif',
-    'Exercícios de Escada de Agilidade.gif',
-    'Extensão De Glúteo Em Pé.gif',
-    'Extensão de ombro com faixa.gif',
-    'Extensão de Perna em Pé com Faixa de Resistência.gif',
-    'Extensão De Perna Reta.gif',
-    'Extensão de Pernas com Faixa Elástica Sentado.gif',
-    'Extensão de Pernas Sentado com Faixa de Resistência.gif',
-    'Extensão de Quadril no Banco.gif',
-    'Extensão de Tríceps Acima da Cabeça com Gymstick.gif',
-    'Extensão de tríceps com elástico na posição horizontal.gif',
-    'Extensão de Tríceps com Faixa Elástica.gif',
-    'Extensão de Tríceps com Faixas Elásticas.gif',
-    'Flexão cobra.gif',
-    'Flexão com Rotação.gif',
-    'Flexão de Braço com Bola de Estabilidade.gif',
-    'Flexão de Braço com Bola Medicinal com Apoio em Um Braço.gif',
-    'Flexão de Braço com Uma Perna.gif',
-    'Flexão de Braço Declinada com Bola de Estabilidade.gif',
-    'Flexão de Braço na Parede com Pegada Fechada.gif',
-    'Flexão de Braço no Bosu.gif',
-    'Flexão de Braços com Apoio dos Joelhos Fechada.gif',
-    'Flexão de joelhos.gif',
-    'Flexão de ombro com faixa.gif',
-    'Flexão de Parede.gif',
-    'Flexão de Perna com Halteres em Decúbito Dorsal.gif',
-    'Flexão de Pernas com Faixa Elástica.gif',
-    'Flexão de pernas com toalha.gif',
-    'Flexão de Pernas deitado com Faixa Elástica.gif',
-    'Flexão de Pernas na Bola de Estabilidade.gif',
-    'Flexão hindu modificada.gif',
-    'Flexão.gif',
-    'Gancho de Direita.gif',
-    'Glúteo Coice com Gymstick.gif',
-    'Glúteo Coice com Pernas Flexionada com Faixa.gif',
-    'Glúteo Coice em Pé com Faixa Elástica.gif',
-    'Glúteos Coice com Faixa Elástica.gif',
-    'Hiperextensão Reversa com Faixa de Resistência.gif',
-    'Inclinação Pélvica.gif',
-    'Joelhos altos contra a parede.gif',
-    'Lançamento de Bola Medicinal deitado.gif',
-    'Lançamento de bola medicinal.gif',
-    'Leg Press Alternado Deitado com Gymstick.gif',
-    'Levantamento Lateral de Perna em Quatro Apoios.gif',
-    'Levantamento Terra Unilateral.gif',
-    'Medicine Ball Rotational Throw.gif',
-    'Mergulho reverso.gif',
-    'Minhoca.gif',
-    'Nave Seal Burpee.gif',
-    'Passagem de Bola Medicinal de Peito em Pé.gif',
-    'Passo de Esqui.gif',
-    'Passo Invertido com Elevação do Joelho.gif',
-    'Passo Lateral em Alta Velocidade.gif',
-    'Patinador.gif',
-    'Polichinelo Frontal.gif',
-    'Polichinelos.gif',
-    'Ponte com Faixa Elástica.gif',
-    'Ponte de Glúteos.gif',
-    'Ponte em Unilateral.gif',
-    'Ponte Unilateral Com Uma Perna Levantada.gif',
-    'Ponte Unilateral no Banco.gif',
-    'Pular Corda.gif',
-    'Pulos com Abertura de Pernas.gif',
-    'Pulos de Joelho Elevado.gif',
-    'Puxada ajoelhada com banda de resistência.gif',
-    'Puxada com Faixa Elástica.gif',
-    'Puxar com Faixa Elástica.gif',
-    'Quadrúpede com elevação de braço e perna contralateral.gif',
-    'Rastejo de Urso.gif',
-    'Remada afastada com banda de resistência.gif',
-    'Remada com banda de resistência curvada para deltoides posterior.gif',
-    'Remada sentada com faixa.gif',
-    'Remada unilateral com gymstick.gif',
-    'Rolamento na bola suíça.gif',
-    'Rosca bíceps com faixa elástica.gif',
-    'Rosca de bíceps unilateral com faixa de resistência.gif',
-    'Rosca martelo com faixa de resistência.gif',
-    'Rosca martelo com garrafa de água.gif',
-    'Salto com halteres dividido.gif',
-    'Salto com Joelhos Flexionados.gif',
-    'Salto em Agachamento com Joelhos Flexionados.gif',
-    'Salto em Distância.gif',
-    'Salto em Uma Perna para a Frente.gif',
-    'Salto na Caixa para Agachamento Pistola.gif',
-    'Salto na Caixa.gif',
-    'Salto para Caixa 2 para 1.gif',
-    'Salto para Trás.gif',
-    'Saltos com Joelhos Altos.gif',
-    'Saltos de afastamento.gif',
-    'Saltos em tesoura.gif',
-    'Saltos Pliométricos em Zigue-Zague.gif',
-    'Saltos Potentes.gif',
-    'Snap Jumps.gif',
-    'Soco direto de direita.gif',
-    'Socos.gif',
-    'Step com elástico.gif',
-    'Stiff com Elástico de Resistência.gif',
-    'Subida no Step com Elevação de Joelhos.gif',
-    'Superman.gif',
-    'Supino em Pé com Faixa Elástica.gif',
-    'Swimming.gif',
-    'Tesoura de Braços.gif',
-    'Torções do Cotovelo para o Joelho.gif',
-    'Tração lateral com elástico.gif',
-    'Tríceps Francês com Faixa Elástica Acima da Cabeça.gif',
-    'Tríceps Francês em Pé com Gymstick.gif',
-    'Tríceps Testa com Faixa Elástica.gif',
-    'V-Up com Bola de Estabilidade.gif',
-    'Wall Sit com Inclinação de Tronco.gif',
-    'Wall Sit.gif',
-  ],
+  // NOTA: Pastas de Mobilidade, Calistenia, Crossfit, Treinamento Funcional e Eretores foram removidas
+  // Se precisar adicionar de volta, criar as pastas correspondentes
 };
 
 /**
@@ -1345,25 +839,26 @@ const availableGifsByGroup: Record<string, string[]> = {
  */
 function findMuscleGroup(exerciseName: string): string | null {
   const normalized = normalizeText(exerciseName);
-  
+
   // PRIMEIRO: Verificar se o exercício está diretamente na lista de exercícios de QUALQUER grupo
   // Isso garante que exercícios sejam encontrados mesmo sem keywords no nome
   for (const [folder, gifs] of Object.entries(availableGifsByGroup)) {
+    // Se a lista estiver vazia, pular (será verificado por keywords depois)
     if (!gifs || gifs.length === 0) continue;
-    
+
     const exerciseInGroup = gifs.some(gif => {
       const gifNameNormalized = normalizeText(gif.replace('.gif', ''));
       // Verificar correspondência exata ou parcial
-      return gifNameNormalized === normalized || 
-             gifNameNormalized.includes(normalized) || 
-             normalized.includes(gifNameNormalized);
+      return gifNameNormalized === normalized ||
+        gifNameNormalized.includes(normalized) ||
+        normalized.includes(gifNameNormalized);
     });
-    
+
     if (exerciseInGroup) {
       return folder;
     }
   }
-  
+
   // SEGUNDO: Se não encontrou na lista direta, usar keywords específicas
   const specificKeywords = [
     'elevação de panturrilha',
@@ -1378,24 +873,24 @@ function findMuscleGroup(exerciseName: string): string | null {
     'remada alta',
     'puxada alta',
   ];
-  
+
   // Verificar keywords específicas primeiro
   for (const keyword of specificKeywords) {
     if (normalized.includes(keyword) && muscleGroupFolders[keyword]) {
       return muscleGroupFolders[keyword];
     }
   }
-  
+
   // TERCEIRO: Verificar todas as outras keywords
   for (const [keyword, folder] of Object.entries(muscleGroupFolders)) {
     // Pular keywords já verificadas
     if (specificKeywords.includes(keyword)) continue;
-    
+
     if (normalized.includes(keyword)) {
       return folder;
     }
   }
-  
+
   return null;
 }
 
@@ -1432,15 +927,123 @@ function findSimilarGif(
 }
 
 /**
- * Codifica um caminho de URL preservando os separadores de caminho (/)
- * Para o Vercel, precisamos normalizar os caminhos (remover acentos, minúsculas)
- * porque o Vercel não serve arquivos com acentos mesmo quando codificados
+ * Mapeamento de sinônimos comuns para melhorar matching
  */
-function encodeUrlPath(path: string): string {
-  // Caminhos já estão normalizados (sem espaços, sem acentos, apenas letras, números e hífens)
-  // Não precisa codificar - apenas retornar o caminho como está
-  // Isso funciona porque os arquivos foram renomeados para formato URL-safe
-  return path;
+const synonymMap: Record<string, string[]> = {
+  'carga': ['sobrecarga', 'peso'],
+  'sobrecarga': ['carga', 'peso'],
+  'peso': ['carga', 'sobrecarga'],
+  'halter': ['halteres', 'dumbbell'],
+  'halteres': ['halter', 'dumbbell'],
+  'barra': ['barbell'],
+  'barbell': ['barra'],
+};
+
+/**
+ * Expande sinônimos em uma string normalizada
+ */
+function expandSynonyms(normalized: string): string[] {
+  const variations = [normalized];
+  const words = normalized.split(/\s+/);
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    if (synonymMap[word]) {
+      for (const synonym of synonymMap[word]) {
+        const newWords = [...words];
+        newWords[i] = synonym;
+        variations.push(newWords.join(' '));
+      }
+    }
+  }
+
+  return variations;
+}
+
+/**
+ * Normaliza caminho de GIF de forma robusta e consistente
+ * Remove acentos, converte para minúsculas, substitui espaços por hífens
+ * Remove parênteses e caracteres especiais
+ * Garante compatibilidade com URLs e sistema de arquivos
+ * 
+ * IMPORTANTE: Esta função deve ser usada SEMPRE antes de construir caminhos de GIFs
+ * 
+ * @param path - Caminho do GIF (pode ser parcial ou completo)
+ * @returns Caminho normalizado no formato /gifs/pasta/arquivo.gif
+ */
+export function normalizeGifPath(path: string): string {
+  if (!path) return path;
+
+  // Se já estiver codificado, decodificar primeiro
+  let cleaned = path;
+  try {
+    if (path.includes('%')) {
+      cleaned = decodeURIComponent(path);
+    }
+  } catch (e) {
+    // Se falhar na decodificação, usar o caminho original
+    cleaned = path;
+  }
+
+  // Dividir o caminho em segmentos
+  const segments = cleaned.split('/').filter(s => s.length > 0);
+  const prefix = cleaned.startsWith('/') ? '/' : '';
+
+  const normalizedSegments = segments.map(segment => {
+    // Se tiver extensão, preservar
+    if (segment.includes('.')) {
+      const parts = segment.split('.');
+      const name = parts.slice(0, -1).join('.');
+      const ext = parts[parts.length - 1];
+
+      // Normalizar nome do arquivo
+      const normalizedName = name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+        .replace(/\s+/g, '-') // Espaços para hífen
+        .replace(/[()]/g, '') // Remove parênteses
+        .replace(/[^\w\-.]/g, '') // Remove caracteres especiais (manter letras, números, hífen e ponto)
+        .replace(/-+/g, '-') // Múltiplos hífens para um
+        .replace(/^-|-$/g, ''); // Remove hífens no início/fim
+
+      return normalizedName + '.' + ext.toLowerCase();
+    }
+
+    // Normalizar nome da pasta
+    return segment
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/\s+/g, '-') // Espaços para hífen
+      .replace(/[()]/g, '') // Remove parênteses
+      .replace(/[^\w\-.]/g, '') // Remove caracteres especiais
+      .replace(/-+/g, '-') // Múltiplos hífens para um
+      .replace(/^-|-$/g, ''); // Remove hífens no início/fim
+  });
+
+  // Garantir que comece com /gifs/ (minúsculo para compatibilidade com arquivos reais)
+  let result = prefix + normalizedSegments.join('/');
+  if (!result.startsWith('/gifs/') && !result.startsWith('/GIFS/')) {
+    if (result.startsWith('/')) {
+      result = '/gifs' + result.substring(1);
+    } else {
+      result = '/gifs/' + result;
+    }
+  }
+
+  // Converter /GIFS/ para /gifs/ (minúsculo) para compatibilidade com arquivos reais
+  result = result.replace(/^\/GIFS\//i, '/gifs/');
+
+  return result;
+}
+
+/**
+ * Limpa e padroniza o caminho do GIF (função legada - usa normalizeGifPath internamente)
+ * @deprecated Use normalizeGifPath diretamente
+ */
+function cleanGifPath(path: string): string {
+  return normalizeGifPath(path);
 }
 
 /**
@@ -1450,141 +1053,178 @@ function encodeUrlPath(path: string): string {
  */
 export function getExerciseGif(exerciseName: string): string | null {
   if (!exerciseName) return null;
-  
+
   // Verificar cache primeiro
   const cacheKey = normalizeText(exerciseName);
   if (gifCache.has(cacheKey)) {
     const cached = gifCache.get(cacheKey);
     // Debug para Prancha
     if (exerciseName.toLowerCase().includes('prancha')) {
-      console.log('🔍 [CACHE] Prancha encontrado no cache:', cached);
+      // console.log('🔍 [CACHE] Prancha encontrado no cache:', cached);
     }
     return cached || null;
   }
-  
+
   const normalized = normalizeText(exerciseName);
   let result: string | null = null;
-  
+
   // 1. Buscar por grupo muscular
   const muscleGroup = findMuscleGroup(exerciseName);
-  
-  // Debug para Prancha
-  if (exerciseName.toLowerCase().includes('prancha')) {
-    console.log('🔍 [DEBUG] Buscando GIF para:', {
-      exerciseName,
-      normalized,
-      muscleGroup,
-      availableGifsCount: muscleGroup ? availableGifsByGroup[muscleGroup]?.length : 0,
-    });
-  }
-  
+
   if (muscleGroup) {
     const availableGifs = availableGifsByGroup[muscleGroup];
+
+    // Debug: verificar se o grupo foi encontrado
+    if (!availableGifs && import.meta.env.DEV) {
+      console.warn(`[getExerciseGif] ⚠️ Grupo "${muscleGroup}" encontrado mas não há GIFs disponíveis. Grupos disponíveis:`, Object.keys(availableGifsByGroup));
+    }
     if (availableGifs && availableGifs.length > 0) {
-      // 2. PRIMEIRO: Tentar encontrar match exato (ignorando case e acentos)
+      // 0. PRIMEIRO: Tentar match direto sem normalização (caso o nome já seja exato)
+      const directMatch = availableGifs.find(gif => {
+        const gifNameWithoutExt = gif.replace(/\.gif$/i, '');
+        return gifNameWithoutExt === exerciseName;
+      });
+
+      if (directMatch) {
+        const normalizedFolder = normalizeFolderName(muscleGroup);
+        result = `/GIFS/${normalizedFolder}/${directMatch}`;
+        gifCache.set(cacheKey, result);
+        return result;
+      }
+
+      // 1. SEGUNDO: Tentar encontrar match exato (ignorando case e acentos)
       const exactMatch = availableGifs.find(gif => {
         const gifNameNormalized = normalizeText(gif.replace('.gif', ''));
         const matches = gifNameNormalized === normalized;
-        
-        // Debug para Prancha
-        if (exerciseName.toLowerCase().includes('prancha')) {
-          console.log('🔍 [MATCH] Comparando:', {
-            gif,
-            gifNameNormalized,
-            normalized,
-            matches,
-          });
-        }
-        
         return matches;
       });
-      
+
       if (exactMatch) {
-        // Normalizar sempre (arquivos foram renomeados tanto em dev quanto em produção)
-        const normalizedFileName = normalizeFileName(exactMatch);
-        const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
-        const rawPath = `/GIFS/${normalizedMuscleGroup}/${normalizedFileName}`;
-        result = encodeUrlPath(rawPath);
-        
-        // Debug em desenvolvimento e produção (para diagnóstico no Vercel)
-        if (import.meta.env.DEV || import.meta.env.PROD) {
-          console.log('🔍 [getExerciseGif] Caminho gerado:', {
-            exerciseName,
-            rawPath,
-            encoded: result,
-            muscleGroup,
-            exactMatch,
-            isProduction: import.meta.env.PROD,
-          });
-        }
-        
+        // IMPORTANTE: Usar o nome exato do arquivo como está na lista
+        // O Vite dev server trata corretamente arquivos com acentos e espaços
+        // Não é necessário usar encodeURIComponent - isso causava erros 404
+        const normalizedFolder = normalizeFolderName(muscleGroup);
+        // Construir caminho completo: /GIFS/pasta/arquivo.gif
+        // O caminho final será: /GIFS/Abdomen/Abdominais Oblíquos no Chão.gif
+        result = `/GIFS/${normalizedFolder}/${exactMatch}`;
+
         gifCache.set(cacheKey, result);
         return result;
       }
-      
+
       // 3. SEGUNDO: Tentar encontrar match parcial (nome do exercício contém no nome do GIF ou vice-versa)
+      // Também tentar com sinônimos expandidos
+      const normalizedVariations = expandSynonyms(normalized);
       const partialMatch = availableGifs.find(gif => {
         const gifNameNormalized = normalizeText(gif.replace('.gif', ''));
-        return gifNameNormalized.includes(normalized) || normalized.includes(gifNameNormalized);
+        // Verificar match direto
+        if (gifNameNormalized.includes(normalized) || normalized.includes(gifNameNormalized)) {
+          if (import.meta.env.DEV && exerciseName.toLowerCase().includes('carga')) {
+            console.log('[getExerciseGif] ✅ Match parcial direto encontrado:', {
+              exerciseName,
+              normalized,
+              gif,
+              gifNameNormalized
+            });
+          }
+          return true;
+        }
+        // Verificar com sinônimos
+        for (const variation of normalizedVariations) {
+          if (gifNameNormalized.includes(variation) || variation.includes(gifNameNormalized)) {
+            if (import.meta.env.DEV && exerciseName.toLowerCase().includes('carga')) {
+              console.log('[getExerciseGif] ✅ Match parcial com sinônimo encontrado:', {
+                exerciseName,
+                normalized,
+                variation,
+                gif,
+                gifNameNormalized
+              });
+            }
+            return true;
+          }
+        }
+        return false;
       });
-      
+
       if (partialMatch) {
-        // Normalizar sempre (arquivos foram renomeados)
-        const normalizedFileName = normalizeFileName(partialMatch);
-        const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
-        const rawPath = `/GIFS/${normalizedMuscleGroup}/${normalizedFileName}`;
-        result = encodeUrlPath(rawPath);
+        // Usar o nome exato do arquivo
+        const normalizedFolder = normalizeFolderName(muscleGroup);
+        result = `/GIFS/${normalizedFolder}/${partialMatch}`;
+        if (import.meta.env.DEV && exerciseName.toLowerCase().includes('carga')) {
+          console.log('[getExerciseGif] ✅ Caminho gerado via match parcial:', result);
+        }
         gifCache.set(cacheKey, result);
         return result;
       }
-      
+
       // 4. TERCEIRO: Buscar por palavras-chave principais (ex: "Abd Concentrado" deve encontrar "Abd Concentrado Braços estendidos")
       const exerciseWords = normalized.split(/\s+/).filter(w => w.length > 2); // Palavras com mais de 2 caracteres
       if (exerciseWords.length > 0) {
         const keywordMatch = availableGifs.find(gif => {
           const gifNameNormalized = normalizeText(gif.replace('.gif', ''));
-          // Verificar se todas as palavras principais estão no nome do GIF
-          const allWordsMatch = exerciseWords.every(word => gifNameNormalized.includes(word));
+          // Verificar se todas as palavras principais estão no nome do GIF (com sinônimos)
+          const allWordsMatch = exerciseWords.every(word => {
+            if (gifNameNormalized.includes(word)) return true;
+            // Verificar sinônimos
+            if (synonymMap[word]) {
+              return synonymMap[word].some(synonym => gifNameNormalized.includes(synonym));
+            }
+            return false;
+          });
           // Ou se o nome do GIF contém o nome do exercício
-          return allWordsMatch || gifNameNormalized.includes(normalized);
+          if (allWordsMatch) return true;
+          if (gifNameNormalized.includes(normalized)) return true;
+          // Verificar com sinônimos expandidos
+          for (const variation of normalizedVariations) {
+            if (gifNameNormalized.includes(variation)) return true;
+          }
+          return false;
         });
-        
+
         if (keywordMatch) {
-          // Normalizar sempre (arquivos foram renomeados)
-          const normalizedFileName = normalizeFileName(keywordMatch);
-          const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
-          const rawPath = `/GIFS/${normalizedMuscleGroup}/${normalizedFileName}`;
-          result = encodeUrlPath(rawPath);
+          // Usar o nome exato do arquivo
+          const encodedFileName = encodeURIComponent(keywordMatch);
+          // NOVA ESTRUTURA: pastas são diretas
+          const normalizedFolder = normalizeFolderName(muscleGroup);
+          result = `/gifs/${normalizedFolder}/${encodedFileName}`;
           gifCache.set(cacheKey, result);
           return result;
         }
       }
-      
+
       // 5. QUARTO: Tentar encontrar GIF similar por similaridade de nome
       const similarGif = findSimilarGif(normalized, muscleGroup, 0.3); // Reduzido threshold para 0.3
       if (similarGif) {
-        // Normalizar sempre (arquivos foram renomeados)
-        const normalizedFileName = normalizeFileName(similarGif);
-        const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
-        const rawPath = `/GIFS/${normalizedMuscleGroup}/${normalizedFileName}`;
-        result = encodeUrlPath(rawPath);
+        // Usar o nome exato do arquivo
+        const encodedFileName = encodeURIComponent(similarGif);
+        // NOVA ESTRUTURA: pastas são diretas
+        const normalizedFolder = normalizeFolderName(muscleGroup);
+        result = `/gifs/${normalizedFolder}/${encodedFileName}`;
         // Armazenar no cache
         gifCache.set(cacheKey, result);
         return result;
       }
-      
+
       // 6. ÚLTIMO: Se não encontrou similar, tentar retornar um GIF genérico do grupo
       // Retornar o primeiro GIF do grupo como fallback genérico
-      const normalizedFileName = normalizeFileName(availableGifs[0]);
-      const normalizedMuscleGroup = normalizeFilePath(muscleGroup);
-      const rawPath = `/GIFS/${normalizedMuscleGroup}/${normalizedFileName}`;
-      result = encodeUrlPath(rawPath);
+      const encodedFileName = encodeURIComponent(availableGifs[0]);
+      // NOVA ESTRUTURA: pastas são diretas
+      const normalizedFolder = normalizeFolderName(muscleGroup);
+      result = `/gifs/${normalizedFolder}/${encodedFileName}`;
       gifCache.set(cacheKey, result);
       return result;
     }
   }
-  
+
   // Armazenar null no cache para evitar buscas repetidas
+  if (import.meta.env.DEV) {
+    console.warn(`[getExerciseGif] ❌ GIF não encontrado para: "${exerciseName}"`, {
+      normalized,
+      muscleGroup: muscleGroup || 'NÃO ENCONTRADO',
+      availableGifsCount: muscleGroup ? availableGifsByGroup[muscleGroup]?.length || 0 : 0,
+    });
+  }
   gifCache.set(cacheKey, null);
   return null;
 }
@@ -1606,13 +1246,16 @@ export function getCacheSize(): number {
 
 /**
  * Gera URL completa para o GIF
+ * Usa normalizeGifPath para garantir consistência
  */
 export function getGifUrl(folder: string, filename: string): string {
-  // Normalizar sempre (arquivos foram renomeados)
-  const normalizedFolder = normalizeFilePath(folder);
-  const normalizedFilename = normalizeFileName(filename);
-  const rawPath = `/GIFS/${normalizedFolder}/${normalizedFilename}`;
-  return encodeUrlPath(rawPath);
+  // Normalizar sempre usando normalizeGifPath
+  const normalizedFolder = normalizeGifPath(folder);
+  const normalizedFilename = normalizeGifPath(filename);
+  // Extrair apenas o nome do arquivo (último segmento)
+  const fileName = normalizedFilename.split('/').pop() || normalizedFilename;
+  const rawPath = `${normalizedFolder}/${fileName}`;
+  return normalizeGifPath(rawPath);
 }
 
 /**
@@ -1621,7 +1264,7 @@ export function getGifUrl(folder: string, filename: string): string {
  */
 export function getAllAvailableExercises(): string[] {
   const exercises: string[] = [];
-  
+
   // Iterar sobre todos os grupos musculares
   for (const gifs of Object.values(availableGifsByGroup)) {
     for (const gif of gifs) {
@@ -1632,7 +1275,7 @@ export function getAllAvailableExercises(): string[] {
       }
     }
   }
-  
+
   // Ordenar alfabeticamente
   return exercises.sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
@@ -1643,7 +1286,7 @@ export function getAllAvailableExercises(): string[] {
 export function isExerciseAvailable(exerciseName: string): boolean {
   const normalized = normalizeText(exerciseName);
   const allExercises = getAllAvailableExercises();
-  
+
   // Verificar se há algum exercício que corresponda (por similaridade ou nome exato)
   for (const exercise of allExercises) {
     const normalizedExercise = normalizeText(exercise);
@@ -1651,7 +1294,7 @@ export function isExerciseAvailable(exerciseName: string): boolean {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -1660,53 +1303,159 @@ export function isExerciseAvailable(exerciseName: string): boolean {
  * Útil para incluir no prompt da IA
  */
 export function getAvailableExercisesByGroup(): Record<string, string[]> {
+  console.log('[getAvailableExercisesByGroup] ⚡ Função chamada');
   const grouped: Record<string, string[]> = {};
-  
+
   // Mapeamento de pastas para nomes de grupos limpos
+  // ATUALIZADO: Nova estrutura simplificada
   const groupNameMap: Record<string, string> = {
+    // Nova estrutura - pastas diretas
+    'Abdomen': 'Abdômen',
+    'Antebraco': 'Antebraço',
+    'Biceps': 'Bíceps',
+    'Cardio': 'Cárdio',
+    'Costas': 'Costas',
+    'GluteoS': 'Glúteo', // Note: pasta tem "S" maiúsculo
+    'Ombro': 'Ombro',
+    'Panturrilha': 'Panturrilha',
+    'Peitoral': 'Peitoral',
+    'Pernas': 'Pernas',
+    'Trapezio': 'Trapézio',
+    'Triceps': 'Tríceps',
+
+    // Compatibilidade com nomes antigos (caso ainda existam referências)
     'abdomen-18-20241202t155424z-001/abdomen-18': 'Abdômen',
-    'Antebraço (15)-20241202T155424Z-001/Antebraço (15)': 'Antebraço',
     'antebraco-15-20241202t155453z-001/antebraco-15': 'Antebraço',
-    'Bíceps (51)-20241202T155424Z-001/Bíceps (51)': 'Bíceps',
     'biceps-51-20241202t155806z-001/biceps-51': 'Bíceps',
-    'Cárdio Academia (11)-20241202T155424Z-001/Cárdio Academia (11)': 'Cárdio',
     'cardio-academia-11-20241202t161427z-001/cardio-academia-11': 'Cárdio',
-    'Costas (60)-20241202T155424Z-001/Costas (60)': 'Costas',
     'costas-60-20241202t162754z-001/costas-60': 'Costas',
-    'eretores-da-espinha-8-20241202t164933z-001/eretores-da-espinha-8': 'Eretores da Espinha',
-    'ERETORES DA ESPINHA-20241202T155424Z-001/ERETORES DA ESPINHA': 'Eretores da Espinha',
-    'Glúteo (31)-20241202T155424Z-001/Glúteo (31)': 'Glúteo',
     'gluteo-31-20241202t165017z-001/gluteo-31': 'Glúteo',
-    'Ombro (73)-20241202T155424Z-001/Ombro (73)': 'Ombro',
     'ombro-73-20241202t165511z-001/ombro-73': 'Ombro',
-    'Panturrilha (20)-20241202T155424Z-001/Panturrilha (20)': 'Panturrilha',
     'panturrilha-20-20241202t173337z-001/panturrilha-20': 'Panturrilha',
-    'Peitoral (67)-20241202T155424Z-001/Peitoral (67)': 'Peitoral',
     'peitoral-67-20241202t175211z-001/peitoral-67': 'Peitoral',
-    'Pernas (70)-20241202T155424Z-001/Pernas (70)': 'Pernas',
     'pernas-70-20241202t181042z-001/pernas-70': 'Pernas',
-    'Trapézio (9)-20241202T155424Z-001/Trapézio (9)': 'Trapézio',
     'trapezio-9-20241202t183753z-001/trapezio-9': 'Trapézio',
-    'Tríceps (47)-20241202T155424Z-001/Tríceps (47)': 'Tríceps',
     'triceps-47-20241202t183816z-001/triceps-47': 'Tríceps',
-    // Novos grupos
-    'GIFS CALISTENIA-20241202T155424Z-001/GIFS CALISTENIA': 'Calistenia',
-    'GIFS CROSSFIT-20241202T155424Z-001/GIFS CROSSFIT': 'Crossfit',
-    'MOBILIDADE ALONGAMENTO LIBERAÇÃO-20241202T155424Z-001/MOBILIDADE ALONGAMENTO LIBERAÇÃO': 'Mobilidade',
-    'GIFS TREINAMENTO FUNCIONAL-20241202T155424Z-001/GIFS TREINAMENTO FUNCIONAL': 'Treinamento Funcional',
   };
-  
+
+  // Usar Set para evitar duplicatas dentro de cada grupo
+  const groupedSets: Record<string, Set<string>> = {};
+  const unmappedFolders: string[] = [];
+
+  const totalFolders = Object.keys(availableGifsByGroup).length;
+  console.log(`[getAvailableExercisesByGroup] 📁 Total de pastas no availableGifsByGroup: ${totalFolders}`);
+  console.log(`[getAvailableExercisesByGroup] 📁 Pastas:`, Object.keys(availableGifsByGroup));
+
   for (const [folder, gifs] of Object.entries(availableGifsByGroup)) {
     // Usar mapeamento para obter nome limpo do grupo
-    const groupName = groupNameMap[folder] || folder.split('/')[0].split('-')[0].trim();
-    const exercises = gifs.map(gif => gif.replace('.gif', ''));
-    
-    if (!grouped[groupName]) {
-      grouped[groupName] = [];
+    let groupName = groupNameMap[folder];
+
+    // Se não encontrou no mapeamento, tentar inferir do nome da pasta
+    if (!groupName) {
+      // Tentar extrair nome do grupo da pasta
+      const folderParts = folder.split('/');
+      const firstPart = folderParts[0] || folderParts[folderParts.length - 1];
+
+      // Remover timestamps e normalizar
+      groupName = firstPart
+        .replace(/-20241202t\d+z-\d+/gi, '')
+        .replace(/^GIFS\s+/i, '')
+        .replace(/\s+\(.*?\)/g, '')
+        .trim();
+
+      // Normalizar nomes conhecidos - ATUALIZADO para nova estrutura
+      const lowerName = groupName.toLowerCase();
+      if (lowerName === 'abdomen' || lowerName.includes('abdomen')) groupName = 'Abdômen';
+      else if (lowerName === 'antebraco' || lowerName.includes('antebraco')) groupName = 'Antebraço';
+      else if (lowerName === 'biceps' || lowerName.includes('biceps')) groupName = 'Bíceps';
+      else if (lowerName === 'cardio' || lowerName.includes('cardio')) groupName = 'Cárdio';
+      else if (lowerName === 'costas' || lowerName.includes('costas')) groupName = 'Costas';
+      else if (lowerName === 'gluteos' || lowerName === 'gluteo' || lowerName.includes('gluteo')) groupName = 'Glúteo';
+      else if (lowerName === 'ombro' || lowerName.includes('ombro')) groupName = 'Ombro';
+      else if (lowerName === 'panturrilha' || lowerName.includes('panturrilha')) groupName = 'Panturrilha';
+      else if (lowerName === 'peitoral' || lowerName.includes('peitoral')) groupName = 'Peitoral';
+      else if (lowerName === 'pernas' || lowerName.includes('pernas')) groupName = 'Pernas';
+      else if (lowerName === 'trapezio' || lowerName.includes('trapezio')) groupName = 'Trapézio';
+      else if (lowerName === 'triceps' || lowerName.includes('triceps')) groupName = 'Tríceps';
+
+      if (import.meta.env.DEV && !groupNameMap[folder]) {
+        unmappedFolders.push(folder);
+      }
     }
-    grouped[groupName].push(...exercises);
+
+    const exercises = gifs.map(gif => gif.replace(/\.gif$/i, '').trim()).filter(ex => ex.length > 0);
+
+    // Se o groupName ainda estiver vazio ou inválido após inferência, usar o nome da pasta como fallback
+    if (!groupName || groupName.trim() === '') {
+      const folderParts = folder.split('/');
+      groupName = folderParts[folderParts.length - 1] || folderParts[0] || folder;
+      // Limpar o nome
+      groupName = groupName
+        .replace(/-20241202t\d+z-\d+/gi, '')
+        .replace(/^GIFS\s+/i, '')
+        .replace(/\s+\(.*?\)/g, '')
+        .trim();
+
+      if (import.meta.env.DEV) {
+        console.warn(`[getAvailableExercisesByGroup] ⚠️ Grupo sem nome válido, usando fallback: "${groupName}" para pasta: "${folder}"`);
+      }
+    }
+
+    if (!groupedSets[groupName]) {
+      groupedSets[groupName] = new Set<string>();
+    }
+
+    // Adicionar todos os exercícios ao Set (remove duplicatas automaticamente)
+    let addedCount = 0;
+    let skippedCount = 0;
+    exercises.forEach(ex => {
+      if (ex && ex.length > 0) {
+        const beforeSize = groupedSets[groupName].size;
+        groupedSets[groupName].add(ex);
+        const afterSize = groupedSets[groupName].size;
+        if (afterSize > beforeSize) {
+          addedCount++;
+        } else {
+          skippedCount++;
+        }
+      }
+    });
+
+    if (import.meta.env.DEV && exercises.length > 0) {
+      console.log(`[getAvailableExercisesByGroup] Processando pasta "${folder}" -> grupo "${groupName}": ${exercises.length} exercícios (adicionados: ${addedCount}, duplicatas ignoradas: ${skippedCount}, total no grupo: ${groupedSets[groupName].size})`);
+    }
   }
-  
+
+  // Avisar sobre pastas não mapeadas em desenvolvimento
+  if (import.meta.env.DEV && unmappedFolders.length > 0) {
+    console.warn('[getAvailableExercisesByGroup] Pastas não mapeadas (usando inferência):', unmappedFolders);
+  }
+
+  // Converter Sets de volta para arrays e ordenar
+  for (const [groupName, exerciseSet] of Object.entries(groupedSets)) {
+    const exerciseArray = Array.from(exerciseSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    grouped[groupName] = exerciseArray;
+
+    if (import.meta.env.DEV) {
+      console.log(`[getAvailableExercisesByGroup] Grupo final "${groupName}": ${exerciseArray.length} exercícios únicos`);
+    }
+  }
+
+  // Debug: contar total de exercícios (sempre executar)
+  const totalExercises = Object.values(grouped).reduce((sum, exercises) => sum + exercises.length, 0);
+  const totalGifsInSource = Object.values(availableGifsByGroup).reduce((sum, gifs) => sum + gifs.length, 0);
+  console.log(`[getAvailableExercisesByGroup] ✅ Total de exercícios únicos retornados: ${totalExercises}`);
+  console.log(`[getAvailableExercisesByGroup] 📊 Total de GIFs no source (availableGifsByGroup): ${totalGifsInSource}`);
+  console.log(`[getAvailableExercisesByGroup] 📊 Total de grupos no source: ${Object.keys(availableGifsByGroup).length}`);
+  console.log(`[getAvailableExercisesByGroup] 📊 Total de grupos retornados: ${Object.keys(grouped).length}`);
+  console.log(`[getAvailableExercisesByGroup] 📊 Pastas processadas: ${Object.keys(availableGifsByGroup).length}`);
+  Object.entries(grouped).forEach(([group, exercises]) => {
+    console.log(`[getAvailableExercisesByGroup] 📋 ${group}: ${exercises.length} exercícios`);
+  });
+  if (unmappedFolders.length > 0) {
+    console.warn(`[getAvailableExercisesByGroup] ⚠️ ${unmappedFolders.length} pastas não mapeadas:`, unmappedFolders);
+  }
+
   return grouped;
 }
 
@@ -1716,7 +1465,7 @@ export function getAvailableExercisesByGroup(): Record<string, string[]> {
  */
 export function getAvailableExercisesPrompt(): string {
   const allExercises = getAllAvailableExercises();
-  
+
   // Criar uma lista mais compacta, agrupando por tipo de exercício
   const exerciseTypes: Record<string, string[]> = {
     'Agachamentos': allExercises.filter(e => e.toLowerCase().includes('agachamento')),
@@ -1732,20 +1481,20 @@ export function getAvailableExercisesPrompt(): string {
     'Cardio': allExercises.filter(e => e.toLowerCase().includes('esteira') || e.toLowerCase().includes('bicicleta') || e.toLowerCase().includes('elíptico')),
     'Outros': allExercises.filter(e => {
       const lower = e.toLowerCase();
-      return !lower.includes('agachamento') && !lower.includes('supino') && 
-             !lower.includes('remada') && !lower.includes('puxada') && 
-             !lower.includes('rosca') && !lower.includes('tríceps') &&
-             !lower.includes('elevação') && !lower.includes('desenvolvimento') &&
-             !lower.includes('abdominal') && !lower.includes('prancha') &&
-             !lower.includes('esteira') && !lower.includes('bicicleta') && !lower.includes('elíptico');
+      return !lower.includes('agachamento') && !lower.includes('supino') &&
+        !lower.includes('remada') && !lower.includes('puxada') &&
+        !lower.includes('rosca') && !lower.includes('tríceps') &&
+        !lower.includes('elevação') && !lower.includes('desenvolvimento') &&
+        !lower.includes('abdominal') && !lower.includes('prancha') &&
+        !lower.includes('esteira') && !lower.includes('bicicleta') && !lower.includes('elíptico');
     }),
   };
-  
+
   let prompt = '\n\nEXERCÍCIOS DISPONÍVEIS (use APENAS estes exercícios, pois temos GIFs animados para eles):\n\n';
-  
+
   for (const [type, exercises] of Object.entries(exerciseTypes)) {
     if (exercises.length === 0) continue;
-    
+
     prompt += `${type} (${exercises.length} exercícios):\n`;
     // Mostrar apenas os primeiros 15 de cada tipo
     const limitedExercises = exercises.slice(0, 15);
@@ -1757,10 +1506,153 @@ export function getAvailableExercisesPrompt(): string {
     }
     prompt += '\n';
   }
-  
+
   prompt += '\nIMPORTANTE: Use APENAS os exercícios listados acima. Não invente nomes de exercícios.';
   prompt += '\nSe precisar de um exercício específico, escolha o mais similar da lista acima.';
   prompt += `\nTotal de exercícios disponíveis: ${allExercises.length}`;
-  
+
   return prompt;
 }
+
+/**
+ * Converte nome de arquivo normalizado para nome legível de exercício
+ * Ex: "flexao-de-pulso-neutra-sentado-com-halteres" -> "Flexão de Pulso Neutra Sentado com Halteres"
+ */
+function denormalizeExerciseName(normalizedName: string): string {
+  // Dividir por hífens
+  const words = normalizedName.split('-');
+  
+  // Capitalizar primeira letra de cada palavra
+  const capitalized = words.map(word => {
+    if (word.length === 0) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  });
+  
+  // Juntar com espaços
+  let result = capitalized.join(' ');
+  
+  // Restaurar acentos comuns (mapeamento básico)
+  const accentMap: Record<string, string> = {
+    'ao': 'ão',
+    'oes': 'ões',
+    'coes': 'ções',
+    'aoes': 'ões',
+  };
+  
+  // Aplicar mapeamento de acentos
+  for (const [key, value] of Object.entries(accentMap)) {
+    // Procurar padrões no final das palavras
+    result = result.replace(new RegExp(`\\b(\\w+)${key}\\b`, 'gi'), (match, prefix) => {
+      return prefix + value;
+    });
+  }
+  
+  // Correções específicas comuns
+  result = result.replace(/\bFlexao\b/gi, 'Flexão');
+  result = result.replace(/\bRosca\b/gi, 'Rosca');
+  result = result.replace(/\bAntebraco\b/gi, 'Antebraço');
+  result = result.replace(/\bAntebracos\b/gi, 'Antebraços');
+  result = result.replace(/\bBraco\b/gi, 'Braço');
+  result = result.replace(/\bBraco\b/gi, 'Braço');
+  result = result.replace(/\bAtras\b/gi, 'Atrás');
+  result = result.replace(/\bChao\b/gi, 'Chão');
+  result = result.replace(/\bPunho\b/gi, 'Punho');
+  result = result.replace(/\bPulso\b/gi, 'Pulso');
+  result = result.replace(/\bHalteres\b/gi, 'Halteres');
+  result = result.replace(/\bAnilhas\b/gi, 'Anilhas');
+  result = result.replace(/\bBarra\b/gi, 'Barra');
+  result = result.replace(/\bCabo\b/gi, 'Cabo');
+  result = result.replace(/\bSentado\b/gi, 'Sentado');
+  result = result.replace(/\bReversa\b/gi, 'Reversa');
+  result = result.replace(/\bNeutra\b/gi, 'Neutra');
+  result = result.replace(/\bPegada\b/gi, 'Pegada');
+  result = result.replace(/\bBanco\b/gi, 'Banco');
+  result = result.replace(/\bDedos\b/gi, 'Dedos');
+  result = result.replace(/\bDedo\b/gi, 'Dedo');
+  result = result.replace(/\bRolinho\b/gi, 'Rolinho');
+  result = result.replace(/\bHand Grip\b/gi, 'Hand Grip');
+  
+  return result;
+}
+
+/**
+ * Retorna lista completa de exercícios com caminhos de GIF já construídos
+ * CONSTRÓI OS CAMINHOS DIRETAMENTE dos nomes dos arquivos, sem matching inteligente
+ * Garante que TODOS os GIFs sejam encontrados
+ * 
+ * Esta é a solução definitiva para garantir que todos os GIFs apareçam corretamente
+ */
+export function getAvailableExercisesWithGifPaths(): ExerciseInfo[] {
+  const exercises: ExerciseInfo[] = [];
+  
+  // Mapeamento de pastas para nomes de grupos limpos
+  const groupNameMap: Record<string, string> = {
+    'Abdomen': 'Abdômen',
+    'Antebraco': 'Antebraço',
+    'Biceps': 'Bíceps',
+    'Cardio': 'Cárdio',
+    'Costas': 'Costas',
+    'GluteoS': 'Glúteo',
+    'Ombro': 'Ombro',
+    'Panturrilha': 'Panturrilha',
+    'Peitoral': 'Peitoral',
+    'Pernas': 'Pernas',
+    'Trapezio': 'Trapézio',
+    'Triceps': 'Tríceps',
+  };
+  
+  // Iterar sobre todos os grupos de GIFs
+  for (const [folder, gifs] of Object.entries(availableGifsByGroup)) {
+    // Obter nome do grupo
+    const groupName = groupNameMap[folder] || folder;
+    
+    // Normalizar nome da pasta (preservar case original)
+    const normalizedFolder = normalizeFolderName(folder);
+    
+    // Para cada GIF, criar um exercício com caminho já construído
+    for (const gifFileName of gifs) {
+      // Remover extensão .gif para obter nome do exercício
+      const fileNameWithoutExt = gifFileName.replace(/\.gif$/i, '').trim();
+      
+      // Detectar se o nome já está normalizado (com hífens) ou se tem espaços/acentos
+      // Se tem espaços, usar diretamente; se tem hífens, denormalizar
+      let exerciseName: string;
+      if (fileNameWithoutExt.includes(' ')) {
+        // Nome já tem espaços (ex: "Abdominais Oblíquos no Chão")
+        // Capitalizar primeira letra de cada palavra
+        exerciseName = fileNameWithoutExt
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+      } else {
+        // Nome normalizado (ex: "flexao-de-pulso-neutra")
+        // Converter para nome legível
+        exerciseName = denormalizeExerciseName(fileNameWithoutExt);
+      }
+      
+      // Construir caminho DIRETAMENTE: /GIFS/pasta/arquivo.gif
+      // Usar o nome exato do arquivo para o caminho
+      const gifPath = `/GIFS/${normalizedFolder}/${gifFileName}`;
+
+      exercises.push({
+        name: exerciseName,
+        gifPath: gifPath,
+        muscleGroup: groupName,
+      });
+    }
+  }
+
+  // Ordenar por nome
+  const sorted = exercises.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+  if (import.meta.env.DEV) {
+    console.log(`[getAvailableExercisesWithGifPaths] ✅ Total de exercícios criados: ${sorted.length}`);
+    const withGif = sorted.filter(ex => ex.gifPath).length;
+    const withoutGif = sorted.filter(ex => !ex.gifPath).length;
+    console.log(`[getAvailableExercisesWithGifPaths] 📊 Com GIF: ${withGif}, Sem GIF: ${withoutGif}`);
+  }
+
+  return sorted;
+}
+
+
