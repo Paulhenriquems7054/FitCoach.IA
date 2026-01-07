@@ -62,30 +62,37 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
     const img = e.target as HTMLImageElement;
     const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${normalizedSrc}` : normalizedSrc;
     
-    // Log detalhado apenas em desenvolvimento
-    if (import.meta.env.DEV) {
-      console.error('[SimpleGifDisplay] ❌ Erro ao carregar GIF:', {
-        src: normalizedSrc,
-        attemptedUrl: img?.src,
-        currentSrc: img?.currentSrc,
-        origin: typeof window !== 'undefined' ? window.location.origin : 'N/A',
-        fullUrl,
-        // Verificar se o arquivo existe fazendo uma requisição HEAD
-      });
-      
-      // Tentar verificar se o arquivo existe
-      if (typeof window !== 'undefined') {
-        fetch(fullUrl, { method: 'HEAD' })
-          .then(response => {
-            console.error(`[SimpleGifDisplay] 🔍 Status do arquivo: ${response.status} ${response.statusText}`);
-            if (response.status === 404) {
-              console.error(`[SimpleGifDisplay] ⚠️ Arquivo não encontrado: ${fullUrl}`);
-            }
-          })
-          .catch(err => {
-            console.error(`[SimpleGifDisplay] 🔍 Erro ao verificar arquivo:`, err);
-          });
-      }
+    // Log detalhado sempre (também em produção para debug no Vercel)
+    console.error('[SimpleGifDisplay] ❌ Erro ao carregar GIF:', {
+      src: normalizedSrc,
+      attemptedUrl: img?.src,
+      currentSrc: img?.currentSrc,
+      origin: typeof window !== 'undefined' ? window.location.origin : 'N/A',
+      fullUrl,
+      environment: import.meta.env.MODE,
+    });
+    
+    // Tentar verificar se o arquivo existe fazendo uma requisição HEAD
+    if (typeof window !== 'undefined') {
+      fetch(fullUrl, { method: 'HEAD' })
+        .then(response => {
+          console.error(`[SimpleGifDisplay] 🔍 Status do arquivo: ${response.status} ${response.statusText}`);
+          if (response.status === 404) {
+            console.error(`[SimpleGifDisplay] ⚠️ Arquivo não encontrado: ${fullUrl}`);
+            // Tentar com caminho alternativo (case-insensitive)
+            const lowerPath = normalizedSrc.replace('/GIFS/', '/gifs/');
+            const lowerFullUrl = `${window.location.origin}${lowerPath}`;
+            console.log(`[SimpleGifDisplay] 🔄 Tentando caminho alternativo: ${lowerFullUrl}`);
+            fetch(lowerFullUrl, { method: 'HEAD' })
+              .then(lowerResponse => {
+                console.log(`[SimpleGifDisplay] 🔍 Status do caminho alternativo: ${lowerResponse.status}`);
+              })
+              .catch(() => {});
+          }
+        })
+        .catch(err => {
+          console.error(`[SimpleGifDisplay] 🔍 Erro ao verificar arquivo:`, err);
+        });
     }
   };
 
