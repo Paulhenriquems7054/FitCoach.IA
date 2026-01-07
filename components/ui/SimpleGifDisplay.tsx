@@ -23,37 +23,11 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
   // Garantir que o caminho comece com /
   const normalizedSrc = src.startsWith('/') ? src : `/${src}`;
 
-  // Tentar encontrar o caminho correto do arquivo (case sensitivity no Vercel)
+  // Usar o caminho diretamente - o navegador fará a codificação automática quando necessário
   React.useEffect(() => {
-    const findCorrectPath = async () => {
-      // Lista de variações de caminho para tentar
-      const pathVariations = [
-        normalizedSrc, // Caminho original
-        normalizedSrc.replace('/GIFS/', '/gifs/'), // Minúsculas
-        normalizedSrc.replace('/gifs/', '/GIFS/'), // Maiúsculas (se já estava minúsculo)
-      ];
-
-      // Tentar cada variação
-      for (const path of pathVariations) {
-        const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path;
-        try {
-          const response = await fetch(fullUrl, { method: 'HEAD' });
-          if (response.ok) {
-            console.log(`[SimpleGifDisplay] ✅ Caminho encontrado: ${path}`);
-            setActualSrc(path);
-            return;
-          }
-        } catch (err) {
-          // Continuar tentando
-        }
-      }
-
-      // Se nenhum caminho funcionou, usar o original
-      console.warn(`[SimpleGifDisplay] ⚠️ Nenhum caminho válido encontrado, usando original: ${normalizedSrc}`);
-      setActualSrc(normalizedSrc);
-    };
-
-    findCorrectPath();
+    // Não fazer verificação prévia - apenas usar o caminho diretamente
+    // O navegador fará a codificação automática de espaços e acentos quando colocar no src
+    setActualSrc(normalizedSrc);
   }, [normalizedSrc]);
 
   // Verificar se a imagem já está carregada (cache do navegador)
