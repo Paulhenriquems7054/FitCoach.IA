@@ -17,18 +17,54 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
 }) => {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [actualSrc, setActualSrc] = useState<string>('');
   const imgRef = React.useRef<HTMLImageElement>(null);
 
   // Garantir que o caminho comece com /
   const normalizedSrc = src.startsWith('/') ? src : `/${src}`;
 
+  // Tentar encontrar o caminho correto do arquivo (case sensitivity no Vercel)
+  React.useEffect(() => {
+    const findCorrectPath = async () => {
+      // Lista de variações de caminho para tentar
+      const pathVariations = [
+        normalizedSrc, // Caminho original
+        normalizedSrc.replace('/GIFS/', '/gifs/'), // Minúsculas
+        normalizedSrc.replace('/gifs/', '/GIFS/'), // Maiúsculas (se já estava minúsculo)
+      ];
+
+      // Tentar cada variação
+      for (const path of pathVariations) {
+        const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path;
+        try {
+          const response = await fetch(fullUrl, { method: 'HEAD' });
+          if (response.ok) {
+            console.log(`[SimpleGifDisplay] ✅ Caminho encontrado: ${path}`);
+            setActualSrc(path);
+            return;
+          }
+        } catch (err) {
+          // Continuar tentando
+        }
+      }
+
+      // Se nenhum caminho funcionou, usar o original
+      console.warn(`[SimpleGifDisplay] ⚠️ Nenhum caminho válido encontrado, usando original: ${normalizedSrc}`);
+      setActualSrc(normalizedSrc);
+    };
+
+    findCorrectPath();
+  }, [normalizedSrc]);
+
   // Verificar se a imagem já está carregada (cache do navegador)
   React.useEffect(() => {
+    if (!actualSrc) return; // Aguardar até encontrar o caminho correto
+
     const checkImageLoaded = () => {
       if (imgRef.current?.complete && imgRef.current?.naturalHeight !== 0) {
         setIsLoading(false);
         setHasError(false);
-        console.log('[SimpleGifDisplay] ✅ GIF já estava em cache:', normalizedSrc);
+        console.log('[SimpleGifDisplay] ✅ GIF já estava em cache:', actualSrc);
         return true;
       }
       return false;
@@ -39,16 +75,16 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
       return;
     }
 
-    // Timeout de fallback: se após 3 segundos a imagem não carregou, assumir que está pronta
+    // Timeout de fallback: se após 5 segundos a imagem não carregou, assumir que está pronta
     const timeout = setTimeout(() => {
       if (isLoading) {
-        console.warn('[SimpleGifDisplay] ⚠️ Timeout ao carregar GIF, assumindo que está pronto:', normalizedSrc);
+        console.warn('[SimpleGifDisplay] ⚠️ Timeout ao carregar GIF, assumindo que está pronto:', actualSrc);
         setIsLoading(false);
       }
-    }, 3000);
+    }, 5000);
 
     return () => clearTimeout(timeout);
-  }, [normalizedSrc, isLoading]);
+  }, [actualSrc, isLoading]);
 
   const handleLoad = () => {
     setIsLoading(false);
@@ -60,40 +96,17 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
     setIsLoading(false);
     setHasError(true);
     const img = e.target as HTMLImageElement;
-    const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${normalizedSrc}` : normalizedSrc;
+    const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${actualSrc || normalizedSrc}` : (actualSrc || normalizedSrc);
     
     // Log detalhado sempre (também em produção para debug no Vercel)
     console.error('[SimpleGifDisplay] ❌ Erro ao carregar GIF:', {
-      src: normalizedSrc,
+      src: actualSrc || normalizedSrc,
       attemptedUrl: img?.src,
       currentSrc: img?.currentSrc,
       origin: typeof window !== 'undefined' ? window.location.origin : 'N/A',
       fullUrl,
       environment: import.meta.env.MODE,
     });
-    
-    // Tentar verificar se o arquivo existe fazendo uma requisição HEAD
-    if (typeof window !== 'undefined') {
-      fetch(fullUrl, { method: 'HEAD' })
-        .then(response => {
-          console.error(`[SimpleGifDisplay] 🔍 Status do arquivo: ${response.status} ${response.statusText}`);
-          if (response.status === 404) {
-            console.error(`[SimpleGifDisplay] ⚠️ Arquivo não encontrado: ${fullUrl}`);
-            // Tentar com caminho alternativo (case-insensitive)
-            const lowerPath = normalizedSrc.replace('/GIFS/', '/gifs/');
-            const lowerFullUrl = `${window.location.origin}${lowerPath}`;
-            console.log(`[SimpleGifDisplay] 🔄 Tentando caminho alternativo: ${lowerFullUrl}`);
-            fetch(lowerFullUrl, { method: 'HEAD' })
-              .then(lowerResponse => {
-                console.log(`[SimpleGifDisplay] 🔍 Status do caminho alternativo: ${lowerResponse.status}`);
-              })
-              .catch(() => {});
-          }
-        })
-        .catch(err => {
-          console.error(`[SimpleGifDisplay] 🔍 Erro ao verificar arquivo:`, err);
-        });
-    }
   };
 
   if (hasError) {
@@ -126,16 +139,18 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
           <div className="text-xs text-slate-500 dark:text-slate-400">Carregando...</div>
         </div>
       )}
-      <img
-        ref={imgRef}
-        src={normalizedSrc}
-        alt={alt}
-        className={`w-full h-full object-cover ${className} ${isLoading ? 'opacity-0 invisible' : 'opacity-100 visible'} transition-opacity duration-300`}
-        onLoad={handleLoad}
-        onError={handleError}
-        loading="lazy"
-        decoding="async"
-      />
+      {actualSrc && (
+        <img
+          ref={imgRef}
+          src={actualSrc}
+          alt={alt}
+          className={`w-full h-full object-cover ${className} ${isLoading ? 'opacity-0 invisible' : 'opacity-100 visible'} transition-opacity duration-300`}
+          onLoad={handleLoad}
+          onError={handleError}
+          loading="lazy"
+          decoding="async"
+        />
+      )}
     </div>
   );
 };
