@@ -11,6 +11,15 @@
       "destination": "/index.html"
     }
   ],
+  "routes": [
+    {
+      "src": "/GIFS/(.*)",
+      "dest": "/GIFS/$1",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    }
+  ],
   "cleanUrls": false,
   "headers": [
     {

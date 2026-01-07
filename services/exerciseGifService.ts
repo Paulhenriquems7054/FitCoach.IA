@@ -1087,7 +1087,9 @@ export function getExerciseGif(exerciseName: string): string | null {
 
       if (directMatch) {
         const normalizedFolder = normalizeFolderName(muscleGroup);
-        result = `/GIFS/${normalizedFolder}/${directMatch}`;
+        // Codificar nome do arquivo para garantir compatibilidade com Vercel (espaços e acentos)
+        const encodedFileName = encodeURIComponent(directMatch);
+        result = `/GIFS/${normalizedFolder}/${encodedFileName}`;
         gifCache.set(cacheKey, result);
         return result;
       }
@@ -1105,8 +1107,9 @@ export function getExerciseGif(exerciseName: string): string | null {
         // Não é necessário usar encodeURIComponent - isso causava erros 404
         const normalizedFolder = normalizeFolderName(muscleGroup);
         // Construir caminho completo: /GIFS/pasta/arquivo.gif
-        // O caminho final será: /GIFS/Abdomen/Abdominais Oblíquos no Chão.gif
-        result = `/GIFS/${normalizedFolder}/${exactMatch}`;
+        // Codificar nome do arquivo para garantir compatibilidade com Vercel (espaços e acentos)
+        const encodedFileName = encodeURIComponent(exactMatch);
+        result = `/GIFS/${normalizedFolder}/${encodedFileName}`;
 
         gifCache.set(cacheKey, result);
         return result;
@@ -1150,7 +1153,9 @@ export function getExerciseGif(exerciseName: string): string | null {
       if (partialMatch) {
         // Usar o nome exato do arquivo
         const normalizedFolder = normalizeFolderName(muscleGroup);
-        result = `/GIFS/${normalizedFolder}/${partialMatch}`;
+        // Codificar nome do arquivo para garantir compatibilidade com Vercel (espaços e acentos)
+        const encodedFileName = encodeURIComponent(partialMatch);
+        result = `/GIFS/${normalizedFolder}/${encodedFileName}`;
         if (import.meta.env.DEV && exerciseName.toLowerCase().includes('carga')) {
           console.log('[getExerciseGif] ✅ Caminho gerado via match parcial:', result);
         }
@@ -1631,8 +1636,11 @@ export function getAvailableExercisesWithGifPaths(): ExerciseInfo[] {
       }
       
       // Construir caminho DIRETAMENTE: /GIFS/pasta/arquivo.gif
-      // Usar o nome exato do arquivo para o caminho
-      const gifPath = `/GIFS/${normalizedFolder}/${gifFileName}`;
+      // Codificar cada segmento separadamente para garantir compatibilidade com Vercel
+      // Isso é necessário porque alguns arquivos têm espaços e acentos nos nomes
+      const encodedFolder = encodeURIComponent(normalizedFolder).replace(/%2F/g, '/');
+      const encodedFileName = encodeURIComponent(gifFileName);
+      const gifPath = `/GIFS/${encodedFolder}/${encodedFileName}`;
 
       exercises.push({
         name: exerciseName,
