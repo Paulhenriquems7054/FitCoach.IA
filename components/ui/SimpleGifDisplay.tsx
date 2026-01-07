@@ -25,10 +25,14 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
 
   // Usar o caminho diretamente - o navegador fará a codificação automática quando necessário
   React.useEffect(() => {
+    // Log para debug
+    if (import.meta.env.DEV) {
+      console.log('[SimpleGifDisplay] 📍 Caminho recebido:', src, '→ Normalizado:', normalizedSrc);
+    }
     // Não fazer verificação prévia - apenas usar o caminho diretamente
     // O navegador fará a codificação automática de espaços e acentos quando colocar no src
     setActualSrc(normalizedSrc);
-  }, [normalizedSrc]);
+  }, [normalizedSrc, src]);
 
   // Verificar se a imagem já está carregada (cache do navegador)
   React.useEffect(() => {
@@ -123,6 +127,7 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
           onError={handleError}
           loading="lazy"
           decoding="async"
+          crossOrigin="anonymous"
         />
       )}
     </div>
