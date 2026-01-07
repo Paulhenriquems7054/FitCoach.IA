@@ -75,23 +75,24 @@ Este guia te ajudará a configurar o Cloudflare R2 do zero para hospedar os GIFs
 
 Você tem duas opções para fazer upload:
 
-#### Opção A: Via Interface Web (Recomendado para começar)
+#### Opção A: Via Interface Web (Limitado a 100 arquivos)
 
+⚠️ **LIMITAÇÃO:** O painel web do R2 permite upload de até 100 arquivos por vez. Como temos mais de 100 GIFs, **use a CLI do Wrangler** (Opção B).
+
+Se quiser testar com poucos arquivos:
 1. **Acessar o bucket:**
    - No painel do R2, clique no seu bucket (`fitcoach-gifs`)
 
 2. **Upload de arquivos:**
    - Clique em **"Upload"** ou **"Upload files"**
-   - Selecione a pasta `public/GIFS/` do seu projeto
+   - Selecione alguns arquivos para testar
    - ⚠️ **IMPORTANTE:** Mantenha a estrutura de pastas!
-     - O R2 permite fazer upload de pastas inteiras
-     - Certifique-se de que a estrutura seja: `GIFS/Abdomen/`, `GIFS/Biceps/`, etc.
 
-3. **Aguardar upload:**
-   - O upload pode demorar alguns minutos (1.4 GB)
-   - Você verá o progresso na interface
+#### Opção B: Via CLI (Recomendado - Sem limite de arquivos)
 
-#### Opção B: Via CLI (Mais rápido para grandes volumes)
+> 📖 **Guia completo:** Veja [UPLOAD_GIFS_WRANGLER.md](./UPLOAD_GIFS_WRANGLER.md) para instruções detalhadas.
+
+**Resumo rápido:**
 
 1. **Instalar Wrangler CLI:**
    ```bash
@@ -110,10 +111,12 @@ Você tem duas opções para fazer upload:
    cd D:\FitCoach.IA
    
    # Faça upload da pasta GIFS mantendo a estrutura
-   wrangler r2 object put fitcoach-gifs/GIFS/ --file public/GIFS/ --recursive
+   wrangler r2 object put fitcoach-gifs/GIFS --file public/GIFS --recursive
    ```
    
-   ⚠️ **Nota:** O comando acima pode variar. Verifique a documentação do Wrangler para o comando exato.
+   **Ou use o script automatizado:**
+   - Veja `docs/UPLOAD_GIFS_WRANGLER.md` para scripts PowerShell/Node.js prontos
+   - Os scripts fazem upload de todos os grupos musculares automaticamente
 
 ### Passo 5: Verificar Estrutura dos Arquivos
 
