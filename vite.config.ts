@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import removeConsole from 'vite-plugin-remove-console';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,7 +14,7 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
-        strictPort: true, // SEMPRE usar porta 3000 - falhar se estiver ocupada
+        strictPort: true, // SEMPRE usar porta 3000 - o script kill-port-3000.ps1 garante que está livre
         // Forçar fechamento limpo de conexões
         force: false,
         open: true, // Abre o navegador automaticamente
@@ -83,7 +84,7 @@ export default defineConfig(({ mode }) => {
         // Proxy para redirecionar /api para o backend
         proxy: {
           '/api': {
-            target: env.VITE_AI_BACKEND_URL || 'http://localhost:3001',
+            target: env.VITE_AI_BACKEND_URL || 'http://localhost:3000',
             changeOrigin: true,
             secure: false,
             rewrite: (path) => path.replace(/^\/api/, ''),
@@ -91,10 +92,24 @@ export default defineConfig(({ mode }) => {
               proxy.on('error', (err, _req, res) => {
                 // Em desenvolvimento, não falhar se o backend não estiver rodando
                 if (mode === 'development') {
-                  console.warn('[Vite Proxy] Backend não disponível:', err.message);
+                  // Silenciar erro 503 para endpoint de uso de IA (é esperado quando backend não está rodando)
+                  const isUsageEndpoint = _req?.url?.includes('/ai/usage');
+                  if (!isUsageEndpoint) {
+                    console.warn('[Vite Proxy] Backend não disponível:', err.message);
+                  }
                   if (res && !res.headersSent) {
                     res.writeHead(503, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Backend não disponível em desenvolvimento' }));
+                  }
+                }
+              });
+              // Tratar resposta 503 do backend de forma silenciosa para endpoints opcionais
+              proxy.on('proxyRes', (proxyRes, req) => {
+                if (mode === 'development' && proxyRes.statusCode === 503) {
+                  const isUsageEndpoint = req.url?.includes('/ai/usage');
+                  if (isUsageEndpoint) {
+                    // Silenciar este erro específico - é tratado graciosamente pelo frontend
+                    // Não fazer nada, apenas deixar passar
                   }
                 }
               });
@@ -126,19 +141,39 @@ export default defineConfig(({ mode }) => {
         {
           name: 'disable-service-worker-dev',
           configureServer(server) {
-            // Middleware para forçar no-cache em todos os arquivos em desenvolvimento
+            // Middleware simplificado - apenas corrigir case sensitivity e deixar o Vite servir
             server.middlewares.use((req, res, next) => {
-              // Forçar headers de no-cache para evitar erros 504
-              if (mode === 'development') {
-                res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-                res.setHeader('Pragma', 'no-cache');
-                res.setHeader('Expires', '0');
-                res.setHeader('Last-Modified', new Date().toUTCString());
-                // Adicionar ETag único para forçar revalidação
-                res.setHeader('ETag', `"${Date.now()}-${Math.random()}"`);
+              // Interceptar /api/ai/usage em desenvolvimento e retornar dados vazios
+              // Isso evita erro 503 quando o backend não está rodando
+              if (mode === 'development' && req.url?.startsWith('/api/ai/usage')) {
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+                res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+                
+                // Responder a OPTIONS (preflight)
+                if (req.method === 'OPTIONS') {
+                  res.writeHead(200);
+                  res.end();
+                  return;
+                }
+                
+                // Retornar dados vazios para GET
+                res.writeHead(200);
+                res.end(JSON.stringify({
+                  byDay: [],
+                  totals: {
+                    calls: 0,
+                    tokensIn: 0,
+                    tokensOut: 0,
+                    costUsd: 0,
+                  },
+                  month: null,
+                }));
+                return;
               }
               
-              // In development, return empty service worker
+              // In development, return empty service worker ANTES de qualquer outra coisa
               if (req.url === '/service-worker.js' || req.url?.startsWith('/service-worker.js?')) {
                 res.setHeader('Content-Type', 'application/javascript');
                 res.end(`
@@ -160,6 +195,118 @@ self.addEventListener('fetch', () => {
 `);
                 return;
               }
+              
+              // Redirecionar /favicon.ico para o favicon SVG
+              if (req.url === '/favicon.ico') {
+                req.url = '/icons/favicon.svg';
+              }
+              
+              // Corrigir case sensitivity para GIFs: sempre usar /GIFS/ (maiúscula)
+              // Isso garante compatibilidade com sistemas case-sensitive (Linux/Vercel)
+              if (req.url?.toLowerCase().startsWith('/gifs/')) {
+                req.url = '/GIFS' + req.url.substring(5);
+              }
+              
+              // Decodificar URL se necessário para verificar se é um GIF e servir o arquivo
+              let decodedUrl = req.url;
+              try {
+                if (req.url?.includes('%')) {
+                  decodedUrl = decodeURIComponent(req.url);
+                  // Atualizar req.url para o Vite servir o arquivo com o nome decodificado
+                  // Isso garante que o Vite encontre o arquivo no sistema de arquivos
+                  req.url = decodedUrl;
+                }
+              } catch (e) {
+                // Se falhar na decodificação, usar o URL original
+                decodedUrl = req.url;
+              }
+              
+              // Para arquivos GIF, servir diretamente do sistema de arquivos
+              // Isso garante que arquivos com espaços e acentos funcionem corretamente
+              const isGif = req.url?.endsWith('.gif') || decodedUrl?.endsWith('.gif');
+              if (req.url?.startsWith('/GIFS/') && isGif) {
+                // Construir caminho do arquivo no sistema de arquivos
+                // Remover /GIFS/ e construir caminho relativo a public/GIFS/
+                let gifPath = decodedUrl.replace(/^\/GIFS\//i, '');
+                
+                // Normalizar separadores de caminho para o sistema operacional
+                gifPath = gifPath.replace(/\//g, path.sep);
+                
+                const filePath = path.join(__dirname, 'public', 'GIFS', gifPath);
+                
+                // Verificar se o arquivo existe
+                try {
+                  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+                    // Ler e servir o arquivo diretamente
+                    const fileContent = fs.readFileSync(filePath);
+                    res.setHeader('Content-Type', 'image/gif');
+                    res.setHeader('Accept-Ranges', 'bytes');
+                    res.setHeader('Access-Control-Allow-Origin', '*');
+                    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+                    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+                    // Em desenvolvimento, desabilitar cache para evitar problemas
+                    if (mode === 'development') {
+                      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+                      res.setHeader('Pragma', 'no-cache');
+                      res.setHeader('Expires', '0');
+                    } else {
+                      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+                    }
+                    res.writeHead(200);
+                    res.end(fileContent);
+                    return; // Não chamar next(), já servimos o arquivo
+                  } else {
+                    // Arquivo não encontrado - tentar variações do nome
+                    // Em Windows, o sistema de arquivos não é case-sensitive, mas vamos tentar encontrar
+                    if (mode === 'development') {
+                      // Tentar encontrar arquivo com case diferente
+                      const dirPath = path.dirname(filePath);
+                      const fileName = path.basename(filePath);
+                      
+                      try {
+                        if (fs.existsSync(dirPath)) {
+                          const files = fs.readdirSync(dirPath);
+                          const foundFile = files.find(f => f.toLowerCase() === fileName.toLowerCase());
+                          if (foundFile) {
+                            const correctPath = path.join(dirPath, foundFile);
+                            const fileContent = fs.readFileSync(correctPath);
+                            res.setHeader('Content-Type', 'image/gif');
+                            res.setHeader('Access-Control-Allow-Origin', '*');
+                            if (mode === 'development') {
+                              res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+                            } else {
+                              res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+                            }
+                            res.writeHead(200);
+                            res.end(fileContent);
+                            console.log(`[Vite] GIF encontrado com case diferente: ${foundFile} (procurado: ${fileName})`);
+                            return;
+                          }
+                        }
+                      } catch (dirError) {
+                        // Ignorar erro de leitura de diretório
+                      }
+                      
+                      console.warn(`[Vite] GIF não encontrado: ${filePath} (URL: ${req.url}, decoded: ${decodedUrl})`);
+                    }
+                  }
+                } catch (error) {
+                  // Erro ao ler arquivo - logar em desenvolvimento
+                  if (mode === 'development') {
+                    console.warn(`[Vite] Erro ao ler GIF: ${filePath}`, error);
+                  }
+                }
+              }
+              
+              // Para favicon SVG, definir headers corretos
+              if (req.url?.endsWith('/favicon.svg') || req.url?.endsWith('favicon.svg')) {
+                res.setHeader('Content-Type', 'image/svg+xml');
+                res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+              }
+              
+              // SEMPRE chamar next() para deixar o Vite processar a requisição
+              // O Vite serve index.html automaticamente para rotas não encontradas
+              // IMPORTANTE: Não retornar aqui, apenas chamar next()
               next();
             });
           },
@@ -183,6 +330,8 @@ self.addEventListener('fetch', () => {
       build: {
         chunkSizeWarningLimit: 1500, // Aumentar limite para evitar avisos desnecessários
         minify: 'esbuild', // Usar esbuild que já vem com Vite (mais rápido que terser)
+        // Garantir que arquivos da pasta public sejam copiados
+        copyPublicDir: true,
         rollupOptions: {
           output: {
             manualChunks: (id) => {
