@@ -1087,9 +1087,8 @@ export function getExerciseGif(exerciseName: string): string | null {
 
       if (directMatch) {
         const normalizedFolder = normalizeFolderName(muscleGroup);
-        // Codificar nome do arquivo para garantir compatibilidade com Vercel (espaços e acentos)
-        const encodedFileName = encodeURIComponent(directMatch);
-        result = `/GIFS/${normalizedFolder}/${encodedFileName}`;
+        // NÃO codificar manualmente - o navegador fará isso automaticamente quando necessário
+        result = `/GIFS/${normalizedFolder}/${directMatch}`;
         gifCache.set(cacheKey, result);
         return result;
       }
@@ -1103,13 +1102,10 @@ export function getExerciseGif(exerciseName: string): string | null {
 
       if (exactMatch) {
         // IMPORTANTE: Usar o nome exato do arquivo como está na lista
-        // O Vite dev server trata corretamente arquivos com acentos e espaços
-        // Não é necessário usar encodeURIComponent - isso causava erros 404
+        // O navegador fará a codificação automática quando necessário
         const normalizedFolder = normalizeFolderName(muscleGroup);
         // Construir caminho completo: /GIFS/pasta/arquivo.gif
-        // Codificar nome do arquivo para garantir compatibilidade com Vercel (espaços e acentos)
-        const encodedFileName = encodeURIComponent(exactMatch);
-        result = `/GIFS/${normalizedFolder}/${encodedFileName}`;
+        result = `/GIFS/${normalizedFolder}/${exactMatch}`;
 
         gifCache.set(cacheKey, result);
         return result;
@@ -1153,9 +1149,8 @@ export function getExerciseGif(exerciseName: string): string | null {
       if (partialMatch) {
         // Usar o nome exato do arquivo
         const normalizedFolder = normalizeFolderName(muscleGroup);
-        // Codificar nome do arquivo para garantir compatibilidade com Vercel (espaços e acentos)
-        const encodedFileName = encodeURIComponent(partialMatch);
-        result = `/GIFS/${normalizedFolder}/${encodedFileName}`;
+        // NÃO codificar manualmente - o navegador fará isso automaticamente quando necessário
+        result = `/GIFS/${normalizedFolder}/${partialMatch}`;
         if (import.meta.env.DEV && exerciseName.toLowerCase().includes('carga')) {
           console.log('[getExerciseGif] ✅ Caminho gerado via match parcial:', result);
         }
@@ -1636,11 +1631,10 @@ export function getAvailableExercisesWithGifPaths(): ExerciseInfo[] {
       }
       
       // Construir caminho DIRETAMENTE: /GIFS/pasta/arquivo.gif
-      // Codificar cada segmento separadamente para garantir compatibilidade com Vercel
-      // Isso é necessário porque alguns arquivos têm espaços e acentos nos nomes
-      const encodedFolder = encodeURIComponent(normalizedFolder).replace(/%2F/g, '/');
-      const encodedFileName = encodeURIComponent(gifFileName);
-      const gifPath = `/GIFS/${encodedFolder}/${encodedFileName}`;
+      // IMPORTANTE: NÃO codificar manualmente - o navegador fará isso automaticamente
+      // quando necessário. Codificar manualmente pode causar double encoding no Vercel.
+      // Usar o nome exato do arquivo como está no sistema de arquivos.
+      const gifPath = `/GIFS/${normalizedFolder}/${gifFileName}`;
 
       exercises.push({
         name: exerciseName,
