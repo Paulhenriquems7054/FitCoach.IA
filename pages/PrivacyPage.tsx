@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { useUser } from '../context/UserContext';
 import { Button } from '../components/ui/Button';
@@ -31,15 +31,27 @@ const PrivacyPage: React.FC = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteOption, setDeleteOption] = useState<'delete' | 'anonymize'>('delete');
     const [isExporting, setIsExporting] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isLoadingSessions, setIsLoadingSessions] = useState(false);
     const [permissions, setPermissions] = useState(getUserPermissions(user));
+    const mountedRef = useRef(true);
 
     // Carregar dados ao montar
     useEffect(() => {
+        mountedRef.current = true;
         loadData();
         // Criar/atualizar sessão atual
         createOrUpdateSession().then(() => {
-            loadSessions();
+            if (mountedRef.current) {
+                loadSessions();
+            }
+        }).catch((error) => {
+            console.error('Erro ao criar/atualizar sessão:', error);
         });
+        
+        return () => {
+            mountedRef.current = false;
+        };
     }, []);
 
     const loadData = () => {
@@ -47,19 +59,38 @@ const PrivacyPage: React.FC = () => {
         loadSessions();
     };
 
-    const loadSessions = () => {
-        setActiveSessions(getActiveSessions());
+    const loadSessions = async () => {
+        if (!mountedRef.current) return;
+        setIsLoadingSessions(true);
+        try {
+            const sessions = getActiveSessions();
+            if (mountedRef.current) {
+                setActiveSessions(sessions);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar sessões:', error);
+            if (mountedRef.current) {
+                showError('Erro ao carregar sessões ativas');
+            }
+        } finally {
+            if (mountedRef.current) {
+                setIsLoadingSessions(false);
+            }
+        }
     };
 
     const handleToggleAnonymization = () => {
+        if (!mountedRef.current) return;
+        const newValue = !user.isAnonymized;
         toggleAnonymization();
         logActivity('Anonimização de dados alterada', 'security', {
-            isAnonymized: !user.isAnonymized
+            isAnonymized: newValue
         });
-        showSuccess(user.isAnonymized ? 'Anonimização desativada' : 'Anonimização ativada');
+        showSuccess(newValue ? 'Anonimização ativada' : 'Anonimização desativada');
     };
 
     const handleToggleSecurityNotifications = () => {
+        if (!mountedRef.current) return;
         const newValue = !securityNotifications;
         setSecurityNotifications(newValue);
         setUser({
@@ -69,10 +100,14 @@ const PrivacyPage: React.FC = () => {
                 securityNotifications: newValue,
             },
         });
+        logActivity('Notificações de segurança alteradas', 'security', {
+            enabled: newValue
+        });
         showSuccess(newValue ? 'Notificações de segurança ativadas' : 'Notificações de segurança desativadas');
     };
 
     const handlePermissionChange = (permission: keyof typeof permissions) => {
+        if (!mountedRef.current) return;
         const newPermissions = {
             ...permissions,
             [permission]: !permissions[permission],
@@ -80,8 +115,8 @@ const PrivacyPage: React.FC = () => {
         setPermissions(newPermissions);
         const updatedUser = updateUserPermissions(user, newPermissions);
         setUser(updatedUser);
-        logActivity(`Permissão de dados alterada: ${permission}`, 'security', {
-            permission,
+        logActivity(`Permissão de dados alterada: ${String(permission)}`, 'security', {
+            permission: String(permission),
             allowed: newPermissions[permission]
         });
         showSuccess('Permissões atualizadas com sucesso');
@@ -110,51 +145,113 @@ const PrivacyPage: React.FC = () => {
         }
     };
 
-    const handleEndSession = (sessionId: string) => {
-        endSession(sessionId);
-        loadSessions();
-        logActivity('Sessão encerrada', 'security', { sessionId });
-        showSuccess('Sessão encerrada com sucesso');
+    const handleEndSession = async (sessionId: string) => {
+        if (!mountedRef.current) return;
+        try {
+            endSession(sessionId);
+            await loadSessions();
+            logActivity('Sessão encerrada', 'security', { sessionId });
+            if (mountedRef.current) {
+                showSuccess('Sessão encerrada com sucesso');
+            }
+        } catch (error) {
+            console.error('Erro ao encerrar sessão:', error);
+            if (mountedRef.current) {
+                showError('Erro ao encerrar sessão');
+            }
+        }
     };
 
-    const handleEndAllSessions = () => {
-        endAllOtherSessions();
-        loadSessions();
-        logActivity('Todas as outras sessões encerradas', 'security');
-        showSuccess('Todas as outras sessões foram encerradas');
+    const handleEndAllSessions = async () => {
+        if (!mountedRef.current) return;
+        if (!window.confirm('Tem certeza que deseja encerrar todas as outras sessões?')) {
+            return;
+        }
+        try {
+            endAllOtherSessions();
+            await loadSessions();
+            logActivity('Todas as outras sessões encerradas', 'security', {});
+            if (mountedRef.current) {
+                showSuccess('Todas as outras sessões foram encerradas');
+            }
+        } catch (error) {
+            console.error('Erro ao encerrar sessões:', error);
+            if (mountedRef.current) {
+                showError('Erro ao encerrar sessões');
+            }
+        }
     };
 
     const handleDeleteAccount = async () => {
-        if (deleteOption === 'anonymize') {
-            try {
-                const result = await anonymizeUserData(user);
-                if (result.success) {
-                    showSuccess('Dados anonimizados com sucesso');
-                    setShowDeleteConfirm(false);
-                    window.location.hash = '#/presentation';
-                    window.location.reload();
-                } else {
-                    showError(result.error || 'Erro ao anonimizar dados');
-                }
-            } catch (error) {
-                showError('Erro ao anonimizar dados');
-            }
-        } else {
-            if (!window.confirm('Tem CERTEZA que deseja excluir sua conta permanentemente? Esta ação não pode ser desfeita!')) {
+        if (!mountedRef.current) return;
+        
+        // Confirmação adicional para exclusão permanente
+        if (deleteOption === 'delete') {
+            const confirmText = 'EXCLUIR';
+            const userInput = window.prompt(
+                `⚠️ ATENÇÃO: Esta ação é PERMANENTE e IRREVERSÍVEL!\n\n` +
+                `Todos os seus dados serão deletados permanentemente:\n` +
+                `- Perfil e dados pessoais\n` +
+                `- Histórico de treinos\n` +
+                `- Planos alimentares\n` +
+                `- Conversas e análises\n` +
+                `- Assinaturas e pagamentos\n\n` +
+                `Digite "${confirmText}" para confirmar:`
+            );
+            
+            if (userInput !== confirmText) {
+                showWarning('Confirmação cancelada. Nenhuma ação foi realizada.');
                 return;
             }
-            try {
+        }
+        
+        setIsDeleting(true);
+        try {
+            if (deleteOption === 'anonymize') {
+                const result = await anonymizeUserData(user);
+                if (result.success) {
+                    logActivity('Dados anonimizados', 'security');
+                    if (mountedRef.current) {
+                        showSuccess('Dados anonimizados com sucesso');
+                        setShowDeleteConfirm(false);
+                        // Aguardar um pouco antes de redirecionar
+                        setTimeout(() => {
+                            window.location.hash = '#/presentation';
+                            window.location.reload();
+                        }, 1000);
+                    }
+                } else {
+                    if (mountedRef.current) {
+                        showError(result.error || 'Erro ao anonimizar dados');
+                    }
+                }
+            } else {
                 const result = await deleteUserAccount();
                 if (result.success) {
-                    showSuccess('Conta excluída com sucesso');
-                    setShowDeleteConfirm(false);
-                    window.location.hash = '#/login';
-                    window.location.reload();
+                    logActivity('Conta excluída permanentemente', 'security');
+                    if (mountedRef.current) {
+                        showSuccess('Conta excluída com sucesso');
+                        setShowDeleteConfirm(false);
+                        // Aguardar um pouco antes de redirecionar
+                        setTimeout(() => {
+                            window.location.hash = '#/login';
+                            window.location.reload();
+                        }, 1000);
+                    }
                 } else {
-                    showError(result.error || 'Erro ao excluir conta');
+                    if (mountedRef.current) {
+                        showError(result.error || 'Erro ao excluir conta');
+                    }
                 }
-            } catch (error) {
-                showError('Erro ao excluir conta');
+            }
+        } catch (error) {
+            console.error('Erro ao processar exclusão/anonimização:', error);
+            if (mountedRef.current) {
+                showError(deleteOption === 'anonymize' ? 'Erro ao anonimizar dados' : 'Erro ao excluir conta');
+            }
+        } finally {
+            if (mountedRef.current) {
+                setIsDeleting(false);
             }
         }
     };
@@ -223,27 +320,39 @@ const PrivacyPage: React.FC = () => {
                                     </p>
                                 </div>
                             </div>
-                            <div className="space-y-3 ml-10">
-                                {Object.entries(permissions).map(([key, value]) => (
-                                    <div key={key} className="flex items-center justify-between">
-                                        <label className="text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
-                                            {key === 'allowWeightHistory' && 'Histórico de Peso'}
-                                            {key === 'allowMealPlans' && 'Planos Alimentares'}
-                                            {key === 'allowPhotoAnalysis' && 'Análises de Fotos'}
-                                            {key === 'allowWorkoutData' && 'Dados de Treino'}
-                                            {key === 'allowChatHistory' && 'Histórico de Chat'}
-                                        </label>
-                                        <button
-                                            type="button"
-                                            onClick={() => handlePermissionChange(key as keyof typeof permissions)}
-                                            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 ${value ? 'bg-primary-600' : 'bg-gray-200 dark:bg-slate-700'}`}
-                                            role="switch"
-                                            aria-checked={value}
-                                        >
-                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${value ? 'translate-x-4' : 'translate-x-0'}`}></span>
-                                        </button>
-                                    </div>
-                                ))}
+                            <div className="space-y-4 ml-10">
+                                {Object.entries(permissions).map(([key, value]) => {
+                                    const permissionInfo = {
+                                        allowWeightHistory: { title: 'Histórico de Peso', desc: 'Permite que o app armazene seu histórico de peso para análise de progresso' },
+                                        allowMealPlans: { title: 'Planos Alimentares', desc: 'Permite que o app salve seus planos alimentares gerados' },
+                                        allowPhotoAnalysis: { title: 'Análises de Fotos', desc: 'Permite que o app analise e armazene fotos de refeições para análise nutricional' },
+                                        allowWorkoutData: { title: 'Dados de Treino', desc: 'Permite que o app salve seus planos de treino e progresso' },
+                                        allowChatHistory: { title: 'Histórico de Chat', desc: 'Permite que o app salve o histórico de conversas com o assistente de IA' },
+                                    }[key] || { title: key, desc: '' };
+                                    
+                                    return (
+                                        <div key={key} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 cursor-pointer flex-1">
+                                                    {permissionInfo.title}
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handlePermissionChange(key as keyof typeof permissions)}
+                                                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 ${value ? 'bg-primary-600' : 'bg-gray-200 dark:bg-slate-700'}`}
+                                                    role="switch"
+                                                    aria-checked={value}
+                                                    aria-label={`${permissionInfo.title} - ${value ? 'Ativado' : 'Desativado'}`}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${value ? 'translate-x-4' : 'translate-x-0'}`}></span>
+                                                </button>
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                {permissionInfo.desc}
+                                            </p>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -255,9 +364,14 @@ const PrivacyPage: React.FC = () => {
                                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
                                         Exportar Meus Dados (LGPD)
                                     </h3>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                                        Baixe uma cópia completa de todos os seus dados em formato JSON.
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                                        Baixe uma cópia completa de todos os seus dados em formato JSON. Conforme a Lei Geral de Proteção de Dados (LGPD), você tem direito de acessar seus dados pessoais.
                                     </p>
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+                                        <p className="text-xs text-blue-800 dark:text-blue-300">
+                                            <strong>O que será exportado:</strong> Perfil, histórico de peso, planos alimentares, planos de treino, análises de fotos, conversas com IA e configurações.
+                                        </p>
+                                    </div>
                                     <Button
                                         onClick={handleExportData}
                                         disabled={isExporting}
@@ -332,7 +446,9 @@ const PrivacyPage: React.FC = () => {
                                 </div>
                             </div>
                             <div className="space-y-2 ml-10">
-                                {activeSessions.length === 0 ? (
+                                {isLoadingSessions ? (
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">Carregando sessões...</p>
+                                ) : activeSessions.length === 0 ? (
                                     <p className="text-sm text-slate-500 dark:text-slate-400">Nenhuma sessão ativa</p>
                                 ) : (
                                     activeSessions.map((session) => (
@@ -352,7 +468,13 @@ const PrivacyPage: React.FC = () => {
                                                     )}
                                                 </div>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                                    {session.ip} • Última atividade: {new Date(session.lastActivity).toLocaleString('pt-BR')}
+                                                    {session.ip || 'IP não disponível'} • Última atividade: {new Date(session.lastActivity).toLocaleString('pt-BR', {
+                                                        day: '2-digit',
+                                                        month: '2-digit',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
                                                 </p>
                                             </div>
                                             {!session.isCurrent && (
@@ -427,7 +549,16 @@ const PrivacyPage: React.FC = () => {
                                             <tr key={log.id} className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/30">
                                                 <td className="p-3 text-slate-900 dark:text-slate-100">{log.event}</td>
                                                 <td className="p-3 font-mono text-xs text-slate-600 dark:text-slate-400">{log.ip || 'N/A'}</td>
-                                                <td className="p-3 text-slate-600 dark:text-slate-400">{log.timestamp}</td>
+                                                <td className="p-3 text-slate-600 dark:text-slate-400">
+                                                    {new Date(log.timestamp).toLocaleString('pt-BR', {
+                                                        day: '2-digit',
+                                                        month: '2-digit',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        second: '2-digit'
+                                                    })}
+                                                </td>
                                             </tr>
                                         ))
                                     )}
@@ -453,9 +584,14 @@ const PrivacyPage: React.FC = () => {
                                 <h3 className="text-lg font-semibold text-red-900 dark:text-red-300 mb-2">
                                     Excluir ou Anonimizar Conta
                                 </h3>
-                                <p className="text-sm text-red-700 dark:text-red-400 mb-4">
-                                    Esta ação não pode ser desfeita. Escolha entre excluir completamente sua conta ou anonimizar seus dados.
-                                </p>
+                                <div className="text-sm text-red-700 dark:text-red-400 mb-4 space-y-2">
+                                    <p className="font-semibold">⚠️ Esta ação não pode ser desfeita!</p>
+                                    <p>Escolha entre excluir completamente sua conta ou anonimizar seus dados:</p>
+                                    <ul className="list-disc list-inside ml-2 space-y-1 text-xs">
+                                        <li><strong>Anonimizar:</strong> Remove informações pessoais mas mantém a conta ativa</li>
+                                        <li><strong>Excluir:</strong> Remove permanentemente todos os dados e a conta</li>
+                                    </ul>
+                                </div>
                                 
                                 {!showDeleteConfirm ? (
                                     <div className="space-y-3">
@@ -498,12 +634,13 @@ const PrivacyPage: React.FC = () => {
                                             </label>
                                         </div>
                                         <div className="flex gap-2">
-                                            <Button
-                                                onClick={handleDeleteAccount}
-                                                className="bg-red-600 hover:bg-red-700 text-white"
-                                            >
-                                                Confirmar
-                                            </Button>
+                                        <Button
+                                            onClick={handleDeleteAccount}
+                                            disabled={isDeleting}
+                                            className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {isDeleting ? 'Processando...' : 'Confirmar'}
+                                        </Button>
                                             <Button
                                                 onClick={() => setShowDeleteConfirm(false)}
                                                 variant="secondary"
