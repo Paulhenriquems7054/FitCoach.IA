@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { SparklesIcon } from '../components/icons/SparklesIcon';
 import { CameraIcon } from '../components/icons/CameraIcon';
@@ -14,6 +14,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { ProtectedFeature } from '../components/ProtectedFeature';
 import { checkAndResetLimits, incrementPhotoAnalysisCount, getPhotosAnalyzedToday } from '../services/usageLimitsService';
 import { useToast } from '../components/ui/Toast';
+import { logger } from '../utils/logger';
 
 
 const AnalysisSkeleton = () => (
@@ -48,22 +49,31 @@ const AnalyzerPage: React.FC = () => {
     const { user, setUser, addPoints } = useUser();
     const { canAnalyzePhoto, getLimitMessage, isPremium } = usePremiumAccess();
     const { getRemainingMinutes } = useSubscription();
-    const { showError, showWarning } = useToast();
+    const { showError, showWarning, showSuccess } = useToast();
     const [selectedImage, setSelectedImage] = useState<{ base64: string; mimeType: string; } | null>(null);
     const [analysis, setAnalysis] = useState<MealAnalysisResponse | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const mountedRef = useRef(true);
 
     // Verificar e resetar limites ao carregar (apenas uma vez)
     useEffect(() => {
-        setUser(prevUser => {
-            const updatedUser = checkAndResetLimits(prevUser);
-            // Só atualizar se realmente mudou
-            if (JSON.stringify(updatedUser.usageLimits) !== JSON.stringify(prevUser.usageLimits)) {
-                return updatedUser;
-            }
-            return prevUser;
-        });
+        mountedRef.current = true;
+        
+        if (mountedRef.current) {
+            setUser(prevUser => {
+                const updatedUser = checkAndResetLimits(prevUser);
+                // Só atualizar se realmente mudou
+                if (JSON.stringify(updatedUser.usageLimits) !== JSON.stringify(prevUser.usageLimits)) {
+                    return updatedUser;
+                }
+                return prevUser;
+            });
+        }
+        
+        return () => {
+            mountedRef.current = false;
+        };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const photosAnalyzedToday = getPhotosAnalyzedToday(user);
@@ -80,7 +90,13 @@ const AnalyzerPage: React.FC = () => {
     };
 
     const handleAnalyze = async () => {
-        if (!selectedImage) return;
+        if (!mountedRef.current) return;
+        
+        if (!selectedImage) {
+            setError('Por favor, selecione uma imagem primeiro.');
+            showWarning('Selecione uma foto da sua refeição antes de analisar.');
+            return;
+        }
 
         // Verificar se é desenvolvedor (acesso ilimitado)
         const isDeveloper = user?.username === 'dev123' || user?.username === 'dev' || user?.nome === 'Desenvolvedor';
@@ -90,7 +106,6 @@ const AnalyzerPage: React.FC = () => {
             const limitMessage = getLimitMessage('análise de fotos', '3 análises por dia');
             setError(limitMessage);
             showWarning(limitMessage);
-            showError('Erro ao analisar foto. Tente novamente.');
             return;
         }
 
@@ -100,6 +115,14 @@ const AnalyzerPage: React.FC = () => {
 
         try {
             const result = await analyzeMealPhoto(selectedImage.base64, selectedImage.mimeType);
+            
+            if (!mountedRef.current) return;
+            
+            // Validar resultado
+            if (!result || !result.alimentos_identificados || result.alimentos_identificados.length === 0) {
+                throw new Error('Não foi possível identificar alimentos na imagem. Tente com uma foto mais clara e nítida.');
+            }
+            
             setAnalysis(result);
             
             // Incrementar contador de análises
@@ -107,11 +130,25 @@ const AnalyzerPage: React.FC = () => {
             setUser(updatedUser);
             
             addPoints(20); // Award more points for photo analysis
+            
+            if (mountedRef.current) {
+                showSuccess('Análise concluída com sucesso! 🎉');
+            }
         } catch (err) {
-            console.error(err);
-            setError('Ocorreu um erro ao analisar sua refeição. Tente novamente com uma imagem mais clara.');
+            console.error('Erro ao analisar foto:', err);
+            
+            if (!mountedRef.current) return;
+            
+            const errorMessage = err instanceof Error 
+                ? err.message 
+                : 'Ocorreu um erro ao analisar sua refeição. Verifique sua conexão e tente novamente com uma imagem mais clara.';
+            
+            setError(errorMessage);
+            showError(errorMessage);
         } finally {
-            setIsLoading(false);
+            if (mountedRef.current) {
+                setIsLoading(false);
+            }
         }
     };
     
@@ -123,22 +160,50 @@ const AnalyzerPage: React.FC = () => {
             </div>
 
             <ProtectedFeature feature="photoAnalysis">
+                {/* Informações sobre limite */}
+                {photosAnalyzedToday > 0 && (
+                    <div className="mb-4">
+                        <Alert type="info">
+                            <p className="text-sm">
+                                Análises realizadas hoje: <strong>{photosAnalyzedToday}/3</strong>
+                                {photosAnalyzedToday >= 3 && (
+                                    <span className="block mt-1 text-xs text-slate-600 dark:text-slate-400">
+                                        Você atingiu o limite diário. O limite será resetado amanhã.
+                                    </span>
+                                )}
+                            </p>
+                        </Alert>
+                    </div>
+                )}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
                     <div className="space-y-3 sm:space-y-4">
-                        <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white text-center md:text-left">1. Envie sua Foto</h2>
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white text-center md:text-left">1. Envie sua Foto</h2>
+                            {photosAnalyzedToday > 0 && (
+                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                    {photosAnalyzedToday}/3 hoje
+                                </span>
+                            )}
+                        </div>
                         <Card>
-                            <div className="p-6 space-y-4">
+                            <div className="p-4 sm:p-6 space-y-4">
                                 <ImageUploader onImageUpload={handleImageUpload} onImageRemove={handleImageRemove} />
                                 <Button
                                     onClick={handleAnalyze}
-                                    disabled={!selectedImage || isLoading}
+                                    disabled={!selectedImage || isLoading || (photosAnalyzedToday >= 3 && user?.username !== 'dev123' && user?.username !== 'dev' && user?.nome !== 'Desenvolvedor')}
                                     isLoading={isLoading}
                                     className="w-full"
                                     size="lg"
                                 >
                                     <SparklesIcon className="-ml-1 mr-2 h-5 w-5" />
-                                    Analisar com IA
+                                    {isLoading ? 'Analisando...' : 'Analisar com IA'}
                                 </Button>
+                                {!selectedImage && (
+                                    <p className="text-xs text-center text-slate-500 dark:text-slate-400">
+                                        💡 Dica: Tire uma foto bem iluminada e nítida para melhores resultados
+                                    </p>
+                                )}
                             </div>
                         </Card>
                     </div>
