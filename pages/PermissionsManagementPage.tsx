@@ -3,9 +3,10 @@
  * Permite que administradores configurem permissões para treinadores e recepcionistas
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { Alert } from '../components/ui/Alert';
 import { useToast } from '../components/ui/Toast';
 import { useUser } from '../context/UserContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -15,11 +16,13 @@ import {
     type RolePermissions,
     type GymRolePermissions,
 } from '../services/permissionsService';
+import { logger } from '../utils/logger';
 
 const PermissionsManagementPage: React.FC = () => {
     const { user } = useUser();
-    const { showSuccess, showError } = useToast();
+    const { showSuccess, showError, showWarning } = useToast();
     const permissions = usePermissions();
+    const mountedRef = useRef(true);
     
     const isAdmin = user.gymRole === 'admin' || user.username === 'Administrador' || user.username === 'Desenvolvedor';
     
@@ -54,23 +57,47 @@ const PermissionsManagementPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        mountedRef.current = true;
         loadPermissions();
+        
+        return () => {
+            mountedRef.current = false;
+        };
     }, []);
 
     const loadPermissions = async () => {
+        if (!mountedRef.current) return;
+        
         try {
             setIsLoading(true);
+            setError(null);
+            
+            logger.info('Carregando permissões de roles da academia', 'PermissionsManagementPage');
+            
             const saved = await loadGymRolePermissions();
+            
+            if (!mountedRef.current) return;
+            
             setTrainerPermissions(saved.trainer);
             setReceptionistPermissions(saved.receptionist);
             setHasChanges(false);
+            
+            logger.info('Permissões carregadas com sucesso', 'PermissionsManagementPage');
         } catch (error) {
-            console.error('Erro ao carregar permissões:', error);
-            showError('Erro ao carregar permissões');
+            logger.error('Erro ao carregar permissões', 'PermissionsManagementPage', error);
+            
+            if (!mountedRef.current) return;
+            
+            const errorMessage = 'Erro ao carregar permissões. Tente recarregar a página.';
+            setError(errorMessage);
+            showError(errorMessage);
         } finally {
-            setIsLoading(false);
+            if (mountedRef.current) {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -85,28 +112,63 @@ const PermissionsManagementPage: React.FC = () => {
     };
 
     const handleSave = async () => {
+        if (!mountedRef.current) return;
+        
+        if (!hasChanges) {
+            showWarning('Nenhuma alteração para salvar.');
+            return;
+        }
+        
+        // Confirmação antes de salvar
+        const confirmMessage = 'Tem certeza que deseja salvar as alterações nas permissões? Isso afetará todos os treinadores e recepcionistas da academia.';
+        if (!window.confirm(confirmMessage)) {
+            return;
+        }
+        
         try {
             setIsSaving(true);
+            setError(null);
+            
             const permissions: GymRolePermissions = {
                 trainer: trainerPermissions,
                 receptionist: receptionistPermissions,
             };
+            
+            logger.info(`Salvando permissões de roles (treinadores: ${Object.values(trainerPermissions).filter(v => v).length} ativas, recepcionistas: ${Object.values(receptionistPermissions).filter(v => v).length} ativas)`, 'PermissionsManagementPage');
+            
             await saveGymRolePermissions(permissions);
-            showSuccess('Permissões salvas com sucesso!');
+            
+            if (!mountedRef.current) return;
+            
+            logger.info('Permissões salvas com sucesso', 'PermissionsManagementPage');
+            showSuccess('Permissões salvas com sucesso! As alterações já estão ativas.');
             setHasChanges(false);
         } catch (error) {
-            console.error('Erro ao salvar permissões:', error);
-            showError('Erro ao salvar permissões');
+            logger.error('Erro ao salvar permissões', 'PermissionsManagementPage', error);
+            
+            if (!mountedRef.current) return;
+            
+            const errorMessage = 'Erro ao salvar permissões. Verifique sua conexão e tente novamente.';
+            setError(errorMessage);
+            showError(errorMessage);
         } finally {
-            setIsSaving(false);
+            if (mountedRef.current) {
+                setIsSaving(false);
+            }
         }
     };
 
     const handleReset = () => {
-        if (!window.confirm('Tem certeza que deseja restaurar as permissões padrão? Isso afetará todos os treinadores e recepcionistas.')) {
+        if (!mountedRef.current) return;
+        
+        const confirmMessage = '⚠️ ATENÇÃO: Tem certeza que deseja restaurar as permissões padrão?\n\nIsso afetará TODOS os treinadores e recepcionistas da academia. Todas as alterações personalizadas serão perdidas.';
+        if (!window.confirm(confirmMessage)) {
             return;
         }
+        
+        logger.info('Restaurando permissões padrão', 'PermissionsManagementPage');
         loadPermissions();
+        showWarning('Permissões restauradas para os valores padrão.');
     };
 
     const PermissionCheckbox: React.FC<{
@@ -138,9 +200,11 @@ const PermissionsManagementPage: React.FC = () => {
             <div className="container mx-auto px-4 py-8">
                 <Card>
                     <div className="p-6 text-center">
-                        <p className="text-slate-600 dark:text-slate-400">
-                            Você não tem permissão para acessar esta página.
-                        </p>
+                        <Alert type="error" title="Acesso Negado">
+                            <p className="text-slate-600 dark:text-slate-400">
+                                Você não tem permissão para acessar esta página. Apenas administradores podem gerenciar permissões.
+                            </p>
+                        </Alert>
                     </div>
                 </Card>
             </div>
@@ -152,7 +216,11 @@ const PermissionsManagementPage: React.FC = () => {
             <div className="container mx-auto px-4 py-8">
                 <Card>
                     <div className="p-6 text-center">
-                        <p className="text-slate-600 dark:text-slate-400">Carregando permissões...</p>
+                        <div className="animate-pulse space-y-4">
+                            <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-1/3 mx-auto"></div>
+                            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2 mx-auto"></div>
+                        </div>
+                        <p className="mt-4 text-slate-600 dark:text-slate-400">Carregando permissões...</p>
                     </div>
                 </Card>
             </div>
@@ -165,9 +233,25 @@ const PermissionsManagementPage: React.FC = () => {
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
                     Gerenciamento de Permissões
                 </h1>
-                <p className="text-slate-600 dark:text-slate-400">
+                <p className="text-slate-600 dark:text-slate-400 mb-4">
                     Configure as permissões para treinadores e recepcionistas da academia
                 </p>
+                
+                {/* Informações sobre permissões */}
+                <Alert type="info" className="mb-4">
+                    <p className="text-sm mb-2">
+                        <strong>Como funciona:</strong> As permissões configuradas aqui serão aplicadas a todos os usuários com o role correspondente (treinador ou recepcionista).
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                        ⚠️ Alterações nas permissões afetam imediatamente todos os usuários do role. Certifique-se de revisar as alterações antes de salvar.
+                    </p>
+                </Alert>
+                
+                {error && (
+                    <Alert type="error" className="mb-4">
+                        <p className="text-sm">{error}</p>
+                    </Alert>
+                )}
             </div>
 
             {/* Permissões de Treinadores */}
@@ -344,23 +428,34 @@ const PermissionsManagementPage: React.FC = () => {
             <Card>
                 <div className="p-6">
                     <div className="flex flex-wrap items-center justify-between gap-4">
-                        {hasChanges && (
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                                ⚠️ Há alterações não salvas
-                            </p>
-                        )}
-                        <div className="flex gap-3">
+                        <div className="flex-1">
+                            {hasChanges && (
+                                <Alert type="warning" className="mb-0">
+                                    <p className="text-sm">
+                                        ⚠️ <strong>Há alterações não salvas.</strong> Não esqueça de salvar as alterações antes de sair da página.
+                                    </p>
+                                </Alert>
+                            )}
+                            {!hasChanges && !error && (
+                                <p className="text-sm text-green-600 dark:text-green-400">
+                                    ✓ Todas as alterações foram salvas
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                             <Button
                                 variant="secondary"
                                 onClick={handleReset}
-                                disabled={isSaving}
+                                disabled={isSaving || isLoading}
+                                className="w-full sm:w-auto"
                             >
                                 🔄 Restaurar Padrão
                             </Button>
                             <Button
                                 variant="primary"
                                 onClick={handleSave}
-                                disabled={!hasChanges || isSaving}
+                                disabled={!hasChanges || isSaving || isLoading}
+                                className="w-full sm:w-auto"
                             >
                                 {isSaving ? '⏳ Salvando...' : '💾 Salvar Permissões'}
                             </Button>
