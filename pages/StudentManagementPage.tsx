@@ -35,9 +35,10 @@ import { getPersonalTrainerClients, getPersonalTrainerActivationCode, getPersona
 
 const StudentManagementPage: React.FC = () => {
     const { user: currentUser } = useUser();
-    const { showSuccess, showError } = useToast();
+    const { showSuccess, showError, showWarning } = useToast();
     const permissions = usePermissions();
     const accountType = getAccountType(currentUser);
+    const mountedRef = useRef(true);
     const [students, setStudents] = useState<User[]>([]);
     const [trainers, setTrainers] = useState<User[]>([]);
     const [receptionists, setReceptionists] = useState<User[]>([]);
@@ -138,7 +139,11 @@ const StudentManagementPage: React.FC = () => {
     }, [currentUser.id]);
 
     useEffect(() => {
+        mountedRef.current = true;
         loadUsers();
+        return () => {
+            mountedRef.current = false;
+        };
     }, []);
 
     const loadUsers = async () => {
@@ -146,12 +151,16 @@ const StudentManagementPage: React.FC = () => {
         const isDefaultAdmin = currentUser.username === 'Administrador' || currentUser.username === 'Desenvolvedor';
         
         if (!currentUser.gymId && !isDefaultAdmin) {
-            setIsLoading(false);
+            if (mountedRef.current) {
+                setIsLoading(false);
+            }
             return;
         }
 
         try {
-            setIsLoading(true);
+            if (mountedRef.current) {
+                setIsLoading(true);
+            }
             
             if (isDefaultAdmin) {
                 // Para Administrador/Desenvolvedor padrão, usar gymId padrão
@@ -161,24 +170,32 @@ const StudentManagementPage: React.FC = () => {
                     getAllTrainers(defaultGymId),
                     getAllReceptionists(defaultGymId),
                 ]);
-                setStudents(studentsData);
-                setTrainers(trainersData);
-                setReceptionists(receptionistsData);
+                if (mountedRef.current) {
+                    setStudents(studentsData);
+                    setTrainers(trainersData);
+                    setReceptionists(receptionistsData);
+                }
             } else {
                 const [studentsData, trainersData, receptionistsData] = await Promise.all([
                     getAllStudents(currentUser.gymId!),
                     getAllTrainers(currentUser.gymId!),
                     getAllReceptionists(currentUser.gymId!),
                 ]);
-                setStudents(studentsData);
-                setTrainers(trainersData);
-                setReceptionists(receptionistsData);
+                if (mountedRef.current) {
+                    setStudents(studentsData);
+                    setTrainers(trainersData);
+                    setReceptionists(receptionistsData);
+                }
             }
         } catch (error) {
-            showError('Erro ao carregar usuários');
-            console.error(error);
+            logger.error('Erro ao carregar usuários', 'StudentManagementPage', error);
+            if (mountedRef.current) {
+                showError('Erro ao carregar usuários. Tente novamente.');
+            }
         } finally {
-            setIsLoading(false);
+            if (mountedRef.current) {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -208,6 +225,8 @@ const StudentManagementPage: React.FC = () => {
 
     const handleCreateStudent = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!mountedRef.current) return;
 
         // Verificar se é Administrador ou Desenvolvedor padrão
         const isDefaultAdmin = currentUser.username === 'Administrador' || currentUser.username === 'Desenvolvedor';
@@ -231,7 +250,20 @@ const StudentManagementPage: React.FC = () => {
             return;
         }
 
+        // Validações adicionais
+        if (studentForm.nome.length < 2) {
+            showError('O nome deve ter pelo menos 2 caracteres');
+            return;
+        }
+
+        if (studentForm.matricula.length < 2) {
+            showError('A matrícula deve ter pelo menos 2 caracteres');
+            return;
+        }
+
         try {
+            logger.info(`Criando aluno: ${studentForm.nome}`, 'StudentManagementPage');
+            
             // Para alunos, username será o nome e senha será a matrícula
             await createStudent(
                 studentForm.nome, // username = nome
@@ -246,6 +278,8 @@ const StudentManagementPage: React.FC = () => {
                 gymId
             );
 
+            if (!mountedRef.current) return;
+
             showSuccess('Aluno criado com sucesso!');
             setShowStudentForm(false);
             setStudentForm({
@@ -256,7 +290,10 @@ const StudentManagementPage: React.FC = () => {
             });
             loadUsers();
         } catch (error: any) {
-            showError(error.message || 'Erro ao criar aluno');
+            logger.error('Erro ao criar aluno', 'StudentManagementPage', error);
+            if (mountedRef.current) {
+                showError(error.message || 'Erro ao criar aluno. Verifique se o nome já não está em uso.');
+            }
         }
     };
 
@@ -700,6 +737,8 @@ const StudentManagementPage: React.FC = () => {
         const file = event.target.files?.[0];
         if (!file) return;
 
+        if (!mountedRef.current) return;
+
         // Verificar se é Administrador ou Desenvolvedor padrão
         const isDefaultAdmin = currentUser.username === 'Administrador' || currentUser.username === 'Desenvolvedor';
         
@@ -712,15 +751,33 @@ const StudentManagementPage: React.FC = () => {
         // Para admin padrão, usar um gymId padrão ou criar um
         const gymId = currentUser.gymId || 'default-gym';
 
-        setIsImporting(true);
+        // Validação de tamanho do arquivo (máximo 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            showError('O arquivo é muito grande. Tamanho máximo: 5MB');
+            return;
+        }
+
+        if (mountedRef.current) {
+            setIsImporting(true);
+        }
         
         try {
+            logger.info(`Importando arquivo: ${file.name}`, 'StudentManagementPage');
+            
             const studentsData = await parseFileContent(file);
             
+            if (!mountedRef.current) return;
+            
             if (!studentsData || studentsData.length === 0) {
-                showError('Nenhum dado encontrado no arquivo.');
+                showError('Nenhum dado encontrado no arquivo. Verifique o formato.');
                 setIsImporting(false);
                 return;
+            }
+
+            // Limitar importação a 100 alunos por vez para evitar sobrecarga
+            if (studentsData.length > 100) {
+                showWarning(`O arquivo contém ${studentsData.length} alunos. Apenas os primeiros 100 serão importados.`);
             }
 
             let successCount = 0;
@@ -728,27 +785,37 @@ const StudentManagementPage: React.FC = () => {
             const errors: string[] = [];
 
             // Processar cada aluno
-            for (const studentData of studentsData) {
+            for (const studentData of studentsData.slice(0, 100)) {
+                if (!mountedRef.current) break;
+                
                 try {
                     // Validar dados mínimos
-                    const username = studentData.username || studentData.nome?.toLowerCase().replace(/\s+/g, '') || `aluno${Date.now()}`;
-                    const password = studentData.password || '1234';
-                    const nome = studentData.nome || username;
+                    const nome = studentData.nome || studentData.name || '';
+                    const matricula = studentData.matricula || studentData.password || '';
+                    
+                    if (!nome.trim() || !matricula.trim()) {
+                        errorCount++;
+                        errors.push(`Linha inválida: Nome ou matrícula vazios`);
+                        continue;
+                    }
+
+                    const username = nome.toLowerCase().replace(/\s+/g, '');
 
                     // Verificar se o usuário já existe
-                    const existingStudent = students.find(s => s.username === username);
+                    const existingStudent = students.find(s => s.username === username || s.nome === nome);
                     if (existingStudent) {
                         errorCount++;
-                        errors.push(`${nome} (${username}): Usuário já existe`);
+                        errors.push(`${nome}: Usuário já existe`);
                         continue;
                     }
 
                     // Criar aluno
                     await createStudent(
-                        username,
-                        password,
+                        nome,
+                        matricula,
                         {
                             nome: nome,
+                            matricula: matricula,
                             idade: studentData.idade || 30,
                             genero: studentData.genero || 'Masculino',
                             // Peso, altura e objetivo serão coletados na enquete
@@ -759,9 +826,13 @@ const StudentManagementPage: React.FC = () => {
                     successCount++;
                 } catch (error: any) {
                     errorCount++;
-                    errors.push(`${studentData.nome || 'Aluno desconhecido'}: ${error.message || 'Erro ao criar'}`);
+                    const studentName = studentData.nome || studentData.name || 'Aluno desconhecido';
+                    errors.push(`${studentName}: ${error.message || 'Erro ao criar'}`);
+                    logger.error(`Erro ao criar aluno durante importação: ${studentName}`, 'StudentManagementPage', error);
                 }
             }
+
+            if (!mountedRef.current) return;
 
             // Mostrar resultado
             if (successCount > 0) {
@@ -769,7 +840,9 @@ const StudentManagementPage: React.FC = () => {
             }
             
             if (errorCount > 0) {
-                showError(`${errorCount} aluno(s) não puderam ser importados. ${errors.slice(0, 5).join('; ')}${errors.length > 5 ? '...' : ''}`);
+                const errorPreview = errors.slice(0, 5).join('; ');
+                const moreErrors = errors.length > 5 ? ` e mais ${errors.length - 5} erro(s)` : '';
+                showWarning(`${errorCount} aluno(s) não puderam ser importados. ${errorPreview}${moreErrors}`);
             }
 
             // Limpar input e recarregar lista
@@ -778,9 +851,14 @@ const StudentManagementPage: React.FC = () => {
             }
             loadUsers();
         } catch (error: any) {
-            showError(error.message || 'Erro ao importar arquivo');
+            logger.error('Erro ao importar arquivo', 'StudentManagementPage', error);
+            if (mountedRef.current) {
+                showError(error.message || 'Erro ao importar arquivo. Verifique o formato do arquivo.');
+            }
         } finally {
-            setIsImporting(false);
+            if (mountedRef.current) {
+                setIsImporting(false);
+            }
         }
     };
 
@@ -1058,163 +1136,169 @@ const StudentManagementPage: React.FC = () => {
                 </Card>
             )}
 
-            {/* Botões de ação */}
-            {permissions.canCreateStudents && (
-                <div className="mb-6">
-                    <div className="flex flex-wrap gap-3 mb-4">
-                        <Button
-                            onClick={() => {
-                                setShowStudentForm(!showStudentForm);
-                                setShowTrainerForm(false);
-                                setShowReceptionistForm(false);
-                                setEditingUser(null);
-                            }}
-                            variant="primary"
-                        >
-                            {showStudentForm ? '❌ Cancelar' : '➕ Criar Aluno'}
-                        </Button>
-                        <Button
-                            onClick={() => fileInputRef.current?.click()}
-                            variant="secondary"
-                            disabled={isImporting}
-                        >
-                            {isImporting ? '⏳ Importando...' : '📥 Importar Alunos'}
-                        </Button>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="*/*"
-                            onChange={handleImportFile}
-                            className="hidden"
-                            aria-label="Importar lista de alunos"
-                        />
-                        {permissions.canCreateTrainers && (
-                            <Button
-                                onClick={() => {
-                                    setShowTrainerForm(!showTrainerForm);
-                                    setShowStudentForm(false);
-                                    setShowReceptionistForm(false);
-                                    setEditingUser(null);
-                                }}
-                                variant="secondary"
-                            >
-                                {showTrainerForm ? '❌ Cancelar' : '👨‍🏫 Criar Treinador'}
-                            </Button>
-                        )}
-                        {permissions.canCreateTrainers && (
-                            <Button
-                                onClick={() => {
-                                    setShowReceptionistForm(!showReceptionistForm);
-                                    setShowStudentForm(false);
-                                    setShowTrainerForm(false);
-                                    setEditingUser(null);
-                                }}
-                                variant="secondary"
-                            >
-                                {showReceptionistForm ? '❌ Cancelar' : '👤 Criar Recepcionista'}
-                            </Button>
-                        )}
-                        {/* Convites B2B2C: alunos e personal */}
-                        {currentUser?.gymId && (
-                            <>
-                                <Button
-                                    variant="outline"
-                                    onClick={async () => {
-                                        try {
-                                            const result = await createInvite(currentUser.gymId!, currentUser.id!, 'student');
-                                            const link = `${window.location.origin}/#/login?invite=${result.code}`;
-                                            setInviteStudentLink(link);
-                                            if (navigator.clipboard && navigator.clipboard.writeText) {
-                                                navigator.clipboard.writeText(link).catch(() => {});
+            {/* Método Principal: Convites */}
+            {permissions.canCreateStudents && currentUser?.gymId && (
+                <Card className="mb-6 bg-gradient-to-br from-primary-50 to-emerald-50 dark:from-primary-900/20 dark:to-emerald-900/20 border-2 border-primary-200 dark:border-primary-800">
+                    <div className="p-6">
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className="flex-shrink-0">
+                                <span className="text-3xl">📧</span>
+                            </div>
+                            <div className="flex-1">
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                                    Método Recomendado: Convites
+                                </h2>
+                                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                                    Gere links de convite para que alunos, treinadores e recepcionistas façam seu próprio cadastro. 
+                                    <strong className="text-primary-600 dark:text-primary-400"> Recomendado para a maioria dos casos.</strong>
+                                </p>
+                                <div className="flex flex-wrap gap-3">
+                                    <Button
+                                        variant="primary"
+                                        onClick={async () => {
+                                            if (!mountedRef.current) return;
+                                            try {
+                                                logger.info('Gerando convite para aluno', 'StudentManagementPage');
+                                                const result = await createInvite(currentUser.gymId!, currentUser.id!, 'student');
+                                                const link = `${window.location.origin}/#/login?invite=${result.code}`;
+                                                if (mountedRef.current) {
+                                                    setInviteStudentLink(link);
+                                                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                        navigator.clipboard.writeText(link).catch(() => {});
+                                                    }
+                                                    showSuccess('Convite para aluno gerado! Link copiado para a área de transferência.');
+                                                }
+                                            } catch (error) {
+                                                logger.error('Erro ao gerar convite de aluno', 'StudentManagementPage', error);
+                                                if (mountedRef.current) {
+                                                    showError('Erro ao gerar convite de aluno. Tente novamente.');
+                                                }
                                             }
-                                            showSuccess('Convite para aluno gerado! Link copiado para a área de transferência.');
-                                        } catch (error) {
-                                            logger.error('Erro ao gerar convite de aluno', 'StudentManagementPage', error);
-                                            showError('Erro ao gerar convite de aluno.');
-                                        }
-                                    }}
-                                >
-                                    🔗 Gerar Convite Aluno
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={async () => {
-                                        try {
-                                            const result = await createInvite(currentUser.gymId!, currentUser.id!, 'personal');
-                                            const link = `${window.location.origin}/#/login?invite=${result.code}`;
-                                            setInvitePersonalLink(link);
-                                            if (navigator.clipboard && navigator.clipboard.writeText) {
-                                                navigator.clipboard.writeText(link).catch(() => {});
-                                            }
-                                            showSuccess('Convite para personal gerado! Link copiado para a área de transferência.');
-                                        } catch (error) {
-                                            logger.error('Erro ao gerar convite de personal', 'StudentManagementPage', error);
-                                            showError('Erro ao gerar convite de personal.');
-                                        }
-                                    }}
-                                >
-                                    🧑‍🏫 Gerar Convite Personal
-                                </Button>
-                            </>
-                        )}
-                    </div>
-                    {(inviteStudentLink || invitePersonalLink) && (
-                        <Card className="mt-4 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700">
-                            <div className="p-4 space-y-2 text-sm">
+                                        }}
+                                    >
+                                        🔗 Gerar Convite Aluno
+                                    </Button>
+                                    {permissions.canCreateTrainers && (
+                                        <Button
+                                            variant="primary"
+                                            onClick={async () => {
+                                                if (!mountedRef.current) return;
+                                                try {
+                                                    logger.info('Gerando convite para personal', 'StudentManagementPage');
+                                                    const result = await createInvite(currentUser.gymId!, currentUser.id!, 'personal');
+                                                    const link = `${window.location.origin}/#/login?invite=${result.code}`;
+                                                    if (mountedRef.current) {
+                                                        setInvitePersonalLink(link);
+                                                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                            navigator.clipboard.writeText(link).catch(() => {});
+                                                        }
+                                                        showSuccess('Convite para personal gerado! Link copiado para a área de transferência.');
+                                                    }
+                                                } catch (error) {
+                                                    logger.error('Erro ao gerar convite de personal', 'StudentManagementPage', error);
+                                                    if (mountedRef.current) {
+                                                        showError('Erro ao gerar convite de personal. Tente novamente.');
+                                                    }
+                                                }
+                                            }}
+                                        >
+                                            🧑‍🏫 Gerar Convite Personal
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        {(inviteStudentLink || invitePersonalLink) && (
+                            <div className="mt-4 p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg border border-emerald-200 dark:border-emerald-700 space-y-3">
                                 {inviteStudentLink && (
                                     <div>
-                                        <p className="font-semibold text-emerald-900 dark:text-emerald-100">
-                                            Convite para Aluno:
+                                        <p className="font-semibold text-emerald-900 dark:text-emerald-100 mb-1">
+                                            ✅ Convite para Aluno gerado:
                                         </p>
-                                        <p className="break-all text-emerald-800 dark:text-emerald-200">
-                                            {inviteStudentLink}
-                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="break-all text-sm text-emerald-800 dark:text-emerald-200 flex-1 bg-white dark:bg-slate-800 p-2 rounded border border-emerald-300 dark:border-emerald-600">
+                                                {inviteStudentLink}
+                                            </p>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                        navigator.clipboard.writeText(inviteStudentLink).then(() => {
+                                                            showSuccess('Link copiado!');
+                                                        }).catch(() => {});
+                                                    }
+                                                }}
+                                            >
+                                                📋 Copiar
+                                            </Button>
+                                        </div>
                                     </div>
                                 )}
                                 {invitePersonalLink && (
                                     <div>
-                                        <p className="font-semibold text-emerald-900 dark:text-emerald-100 mt-2">
-                                            Convite para Personal:
+                                        <p className="font-semibold text-emerald-900 dark:text-emerald-100 mb-1">
+                                            ✅ Convite para Personal gerado:
                                         </p>
-                                        <p className="break-all text-emerald-800 dark:text-emerald-200">
-                                            {invitePersonalLink}
-                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="break-all text-sm text-emerald-800 dark:text-emerald-200 flex-1 bg-white dark:bg-slate-800 p-2 rounded border border-emerald-300 dark:border-emerald-600">
+                                                {invitePersonalLink}
+                                            </p>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                        navigator.clipboard.writeText(invitePersonalLink).then(() => {
+                                                            showSuccess('Link copiado!');
+                                                        }).catch(() => {});
+                                                    }
+                                                }}
+                                            >
+                                                📋 Copiar
+                                            </Button>
+                                        </div>
                                     </div>
                                 )}
                                 <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
-                                    Envie estes links por WhatsApp, e-mail ou mostre como QR Code para que alunos e profissionais se cadastrem já vinculados à sua academia.
+                                    💬 Envie estes links por WhatsApp, e-mail ou mostre como QR Code para que alunos e profissionais se cadastrem já vinculados à sua academia.
                                 </p>
                                 {currentUser.gymId && (
                                     <Button
                                         variant="secondary"
                                         size="sm"
-                                        className="mt-3 w-full"
+                                        className="w-full"
                                         onClick={async () => {
+                                            if (!mountedRef.current) return;
                                             setIsLoadingInviteHistory(true);
                                             const newShowState = !showInviteHistory;
                                             setShowInviteHistory(newShowState);
                                             if (newShowState) {
                                                 try {
                                                     const history = await getInviteUsageHistory(currentUser.gymId!);
-                                                    setInviteUsageHistory(history);
+                                                    if (mountedRef.current) {
+                                                        setInviteUsageHistory(history);
+                                                    }
                                                 } catch (error) {
                                                     logger.error('Erro ao carregar histórico de convites', 'StudentManagementPage', error);
-                                                    showError('Erro ao carregar histórico de convites.');
+                                                    if (mountedRef.current) {
+                                                        showError('Erro ao carregar histórico de convites.');
+                                                    }
                                                 }
                                             }
-                                            setIsLoadingInviteHistory(false);
+                                            if (mountedRef.current) {
+                                                setIsLoadingInviteHistory(false);
+                                            }
                                         }}
                                     >
                                         {isLoadingInviteHistory ? 'Carregando...' : showInviteHistory ? '🔒 Ocultar Histórico' : '📊 Ver Histórico de Uso'}
                                     </Button>
                                 )}
                             </div>
-                        </Card>
-                    )}
-                    {/* Histórico de uso de convites */}
-                    {showInviteHistory && inviteUsageHistory.length > 0 && (
-                        <Card className="mt-4 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700">
-                            <div className="p-4">
+                        )}
+                        {/* Histórico de uso de convites */}
+                        {showInviteHistory && inviteUsageHistory.length > 0 && (
+                            <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
                                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
                                     📊 Histórico de Uso dos Convites
                                 </h3>
@@ -1260,32 +1344,110 @@ const StudentManagementPage: React.FC = () => {
                                     </table>
                                 </div>
                             </div>
-                        </Card>
-                    )}
-                    {showInviteHistory && inviteUsageHistory.length === 0 && !isLoadingInviteHistory && (
-                        <Card className="mt-4 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700">
-                            <div className="p-4 text-center">
+                        )}
+                        {showInviteHistory && inviteUsageHistory.length === 0 && !isLoadingInviteHistory && (
+                            <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 text-center">
                                 <p className="text-slate-600 dark:text-slate-400">
                                     Nenhum uso de convite registrado ainda.
                                 </p>
                             </div>
-                        </Card>
-                    )}
-                    <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                        <div className="p-4">
-                            <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
-                                <strong>💡 Dica de Importação:</strong> Você pode importar alunos de qualquer tipo de arquivo (CSV, TXT, JSON, Excel, etc.).
-                            </p>
-                            <p className="text-xs text-blue-700 dark:text-blue-300">
-                                <strong>Formato recomendado:</strong> Nome, Matrícula, Idade, Gênero (separados por vírgula, ponto e vírgula ou tab). 
-                                <br />
-                                <strong>Login:</strong> O aluno fará login usando o <strong>Nome</strong> como usuário e a <strong>Matrícula</strong> como senha.
-                                <br />
-                                <strong>Dados adicionais:</strong> Peso, altura e objetivo serão coletados na enquete após o primeiro login.
-                            </p>
+                        )}
+                    </div>
+                </Card>
+            )}
+
+            {/* Método Alternativo: Criação Manual */}
+            {permissions.canCreateStudents && (
+                <Card className="mb-6 border-2 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
+                    <div className="p-6">
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className="flex-shrink-0">
+                                <span className="text-3xl">⚙️</span>
+                            </div>
+                            <div className="flex-1">
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                                    Método Alternativo: Criação Manual
+                                </h2>
+                                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                                    Crie usuários diretamente. <strong className="text-amber-600 dark:text-amber-400">Use para casos especiais:</strong> importação em massa, 
+                                    acesso imediato, ou funcionários internos.
+                                </p>
+                                <div className="flex flex-wrap gap-3">
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => {
+                                            if (!mountedRef.current) return;
+                                            setShowStudentForm(!showStudentForm);
+                                            setShowTrainerForm(false);
+                                            setShowReceptionistForm(false);
+                                            setEditingUser(null);
+                                        }}
+                                    >
+                                        {showStudentForm ? '❌ Cancelar' : '➕ Criar Aluno Manualmente'}
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => {
+                                            if (!mountedRef.current) return;
+                                            fileInputRef.current?.click();
+                                        }}
+                                        disabled={isImporting}
+                                    >
+                                        {isImporting ? '⏳ Importando...' : '📥 Importar Alunos (CSV)'}
+                                    </Button>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="*/*"
+                                        onChange={handleImportFile}
+                                        className="hidden"
+                                        aria-label="Importar lista de alunos"
+                                    />
+                                    {permissions.canCreateTrainers && (
+                                        <>
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => {
+                                                    if (!mountedRef.current) return;
+                                                    setShowTrainerForm(!showTrainerForm);
+                                                    setShowStudentForm(false);
+                                                    setShowReceptionistForm(false);
+                                                    setEditingUser(null);
+                                                }}
+                                            >
+                                                {showTrainerForm ? '❌ Cancelar' : '👨‍🏫 Criar Treinador'}
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => {
+                                                    if (!mountedRef.current) return;
+                                                    setShowReceptionistForm(!showReceptionistForm);
+                                                    setShowStudentForm(false);
+                                                    setShowTrainerForm(false);
+                                                    setEditingUser(null);
+                                                }}
+                                            >
+                                                {showReceptionistForm ? '❌ Cancelar' : '👤 Criar Recepcionista'}
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                    <p className="text-xs text-blue-800 dark:text-blue-200 mb-1">
+                                        <strong>💡 Dica de Importação:</strong> Você pode importar alunos de qualquer tipo de arquivo (CSV, TXT, JSON, Excel, etc.).
+                                    </p>
+                                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                                        <strong>Formato recomendado:</strong> Nome, Matrícula, Idade, Gênero (separados por vírgula, ponto e vírgula ou tab). 
+                                        <br />
+                                        <strong>Login:</strong> O aluno fará login usando o <strong>Nome</strong> como usuário e a <strong>Matrícula</strong> como senha.
+                                        <br />
+                                        <strong>Dados adicionais:</strong> Peso, altura e objetivo serão coletados na enquete após o primeiro login.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                    </Card>
-                </div>
+                    </div>
+                </Card>
             )}
 
             {/* Formulário de criar aluno (no topo) */}
