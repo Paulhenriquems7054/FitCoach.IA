@@ -43,8 +43,15 @@ export function getGifUrls(localPath: string): {
   // Construir URL do CDN se disponível
   let cdnUrl: string | null = null;
   if (cdnBaseUrl) {
-    // Remover a barra inicial do caminho local para construir a URL do CDN
-    const cdnPath = normalizedLocalPath.startsWith('/') ? normalizedLocalPath.slice(1) : normalizedLocalPath;
+    // Remover a barra inicial do caminho local
+    let cdnPath = normalizedLocalPath.startsWith('/') ? normalizedLocalPath.slice(1) : normalizedLocalPath;
+    
+    // Remover o prefixo "GIFS/" do caminho para o CDN, pois no R2 os arquivos estão diretamente nas pastas
+    // (ex: /GIFS/Abdomen/arquivo.gif -> Abdomen/arquivo.gif)
+    if (cdnPath.startsWith('GIFS/')) {
+      cdnPath = cdnPath.replace(/^GIFS\//, '');
+    }
+    
     cdnUrl = `${cdnBaseUrl}/${cdnPath}`;
   }
   
