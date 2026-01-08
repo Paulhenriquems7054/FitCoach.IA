@@ -32,6 +32,7 @@ import { createInvite, getInviteUsageHistory, type InviteUsageHistory } from '..
 import { logger } from '../utils/logger';
 import { getAccountType } from '../utils/accountType';
 import { getPersonalTrainerClients, getPersonalTrainerActivationCode, getPersonalTrainerStats, type PersonalTrainerClient } from '../services/personalTrainerService';
+import { loadGymConfig } from '../services/gymConfigService';
 
 const StudentManagementPage: React.FC = () => {
     const { user: currentUser } = useUser();
@@ -146,11 +147,31 @@ const StudentManagementPage: React.FC = () => {
         };
     }, []);
 
+    // Função helper para obter gymId (tenta do user, senão busca da academia salva)
+    const getGymId = (): string | null => {
+        // Se o usuário tem gymId, usar ele
+        if (currentUser.gymId) {
+            return currentUser.gymId;
+        }
+        
+        // Se não tem, tentar buscar da academia salva no localStorage
+        const savedGym = loadGymConfig();
+        if (savedGym && savedGym.id) {
+            logger.info(`Usando gymId da academia salva: ${savedGym.id}`, 'StudentManagementPage');
+            return savedGym.id;
+        }
+        
+        return null;
+    };
+
     const loadUsers = async () => {
         // Se for Administrador ou Desenvolvedor padrão, pode ver todos os usuários
         const isDefaultAdmin = currentUser.username === 'Administrador' || currentUser.username === 'Desenvolvedor';
         
-        if (!currentUser.gymId && !isDefaultAdmin) {
+        // Tentar obter gymId (do user ou da academia salva)
+        const gymId = getGymId();
+        
+        if (!gymId && !isDefaultAdmin) {
             if (mountedRef.current) {
                 setIsLoading(false);
             }
@@ -162,30 +183,16 @@ const StudentManagementPage: React.FC = () => {
                 setIsLoading(true);
             }
             
-            if (isDefaultAdmin) {
-                // Para Administrador/Desenvolvedor padrão, usar gymId padrão
-                const defaultGymId = 'default-gym';
-                const [studentsData, trainersData, receptionistsData] = await Promise.all([
-                    getAllStudents(defaultGymId),
-                    getAllTrainers(defaultGymId),
-                    getAllReceptionists(defaultGymId),
-                ]);
-                if (mountedRef.current) {
-                    setStudents(studentsData);
-                    setTrainers(trainersData);
-                    setReceptionists(receptionistsData);
-                }
-            } else {
-                const [studentsData, trainersData, receptionistsData] = await Promise.all([
-                    getAllStudents(currentUser.gymId!),
-                    getAllTrainers(currentUser.gymId!),
-                    getAllReceptionists(currentUser.gymId!),
-                ]);
-                if (mountedRef.current) {
-                    setStudents(studentsData);
-                    setTrainers(trainersData);
-                    setReceptionists(receptionistsData);
-                }
+            const gymIdToUse = isDefaultAdmin ? 'default-gym' : gymId!;
+            const [studentsData, trainersData, receptionistsData] = await Promise.all([
+                getAllStudents(gymIdToUse),
+                getAllTrainers(gymIdToUse),
+                getAllReceptionists(gymIdToUse),
+            ]);
+            if (mountedRef.current) {
+                setStudents(studentsData);
+                setTrainers(trainersData);
+                setReceptionists(receptionistsData);
             }
         } catch (error) {
             logger.error('Erro ao carregar usuários', 'StudentManagementPage', error);
@@ -231,14 +238,17 @@ const StudentManagementPage: React.FC = () => {
         // Verificar se é Administrador ou Desenvolvedor padrão
         const isDefaultAdmin = currentUser.username === 'Administrador' || currentUser.username === 'Desenvolvedor';
         
+        // Tentar obter gymId (do user ou da academia salva)
+        const gymId = getGymId();
+        
         // Se não tem gymId e não é admin padrão, precisa criar/associar uma academia primeiro
-        if (!currentUser.gymId && !isDefaultAdmin) {
+        if (!gymId && !isDefaultAdmin) {
             showError('Você precisa estar associado a uma academia. Configure a academia primeiro em Configurações da Academia.');
             return;
         }
         
-        // Para admin padrão, usar um gymId padrão ou criar um
-        const gymId = currentUser.gymId || 'default-gym';
+        // Para admin padrão, usar um gymId padrão, senão usar o gymId obtido
+        const gymIdToUse = isDefaultAdmin ? 'default-gym' : gymId!;
 
         if (!studentForm.nome.trim()) {
             showError('O nome do aluno é obrigatório');
@@ -299,18 +309,23 @@ const StudentManagementPage: React.FC = () => {
 
     const handleCreateTrainer = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!mountedRef.current) return;
 
         // Verificar se é Administrador ou Desenvolvedor padrão
         const isDefaultAdmin = currentUser.username === 'Administrador' || currentUser.username === 'Desenvolvedor';
         
+        // Tentar obter gymId (do user ou da academia salva)
+        const gymId = getGymId();
+        
         // Se não tem gymId e não é admin padrão, precisa criar/associar uma academia primeiro
-        if (!currentUser.gymId && !isDefaultAdmin) {
+        if (!gymId && !isDefaultAdmin) {
             showError('Você precisa estar associado a uma academia. Configure a academia primeiro em Configurações da Academia.');
             return;
         }
         
-        // Para admin padrão, usar um gymId padrão ou criar um
-        const gymId = currentUser.gymId || 'default-gym';
+        // Para admin padrão, usar um gymId padrão, senão usar o gymId obtido
+        const gymIdToUse = isDefaultAdmin ? 'default-gym' : gymId!;
 
         if (trainerForm.password !== trainerForm.confirmPassword) {
             showError('As senhas não coincidem');
@@ -331,8 +346,10 @@ const StudentManagementPage: React.FC = () => {
                     idade: trainerForm.idade,
                     genero: trainerForm.genero,
                 },
-                gymId
+                gymIdToUse
             );
+
+            if (!mountedRef.current) return;
 
             showSuccess('Treinador criado com sucesso!');
             setShowTrainerForm(false);
@@ -352,18 +369,23 @@ const StudentManagementPage: React.FC = () => {
 
     const handleCreateReceptionist = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!mountedRef.current) return;
 
         // Verificar se é Administrador ou Desenvolvedor padrão
         const isDefaultAdmin = currentUser.username === 'Administrador' || currentUser.username === 'Desenvolvedor';
         
+        // Tentar obter gymId (do user ou da academia salva)
+        const gymId = getGymId();
+        
         // Se não tem gymId e não é admin padrão, precisa criar/associar uma academia primeiro
-        if (!currentUser.gymId && !isDefaultAdmin) {
+        if (!gymId && !isDefaultAdmin) {
             showError('Você precisa estar associado a uma academia. Configure a academia primeiro em Configurações da Academia.');
             return;
         }
         
-        // Para admin padrão, usar um gymId padrão ou criar um
-        const gymId = currentUser.gymId || 'default-gym';
+        // Para admin padrão, usar um gymId padrão, senão usar o gymId obtido
+        const gymIdToUse = isDefaultAdmin ? 'default-gym' : gymId!;
 
         if (receptionistForm.password !== receptionistForm.confirmPassword) {
             showError('As senhas não coincidem');
@@ -384,8 +406,10 @@ const StudentManagementPage: React.FC = () => {
                     idade: receptionistForm.idade,
                     genero: receptionistForm.genero,
                 },
-                gymId
+                gymIdToUse
             );
+
+            if (!mountedRef.current) return;
 
             showSuccess('Recepcionista criado com sucesso!');
             setShowReceptionistForm(false);
@@ -742,14 +766,17 @@ const StudentManagementPage: React.FC = () => {
         // Verificar se é Administrador ou Desenvolvedor padrão
         const isDefaultAdmin = currentUser.username === 'Administrador' || currentUser.username === 'Desenvolvedor';
         
+        // Tentar obter gymId (do user ou da academia salva)
+        const gymId = getGymId();
+        
         // Se não tem gymId e não é admin padrão, precisa criar/associar uma academia primeiro
-        if (!currentUser.gymId && !isDefaultAdmin) {
+        if (!gymId && !isDefaultAdmin) {
             showError('Você precisa estar associado a uma academia. Configure a academia primeiro em Configurações da Academia.');
             return;
         }
         
-        // Para admin padrão, usar um gymId padrão ou criar um
-        const gymId = currentUser.gymId || 'default-gym';
+        // Para admin padrão, usar um gymId padrão, senão usar o gymId obtido
+        const gymIdToUse = isDefaultAdmin ? 'default-gym' : gymId!;
 
         // Validação de tamanho do arquivo (máximo 5MB)
         const maxSize = 5 * 1024 * 1024; // 5MB
@@ -820,7 +847,7 @@ const StudentManagementPage: React.FC = () => {
                             genero: studentData.genero || 'Masculino',
                             // Peso, altura e objetivo serão coletados na enquete
                         },
-                        gymId
+                        gymIdToUse
                     );
 
                     successCount++;
@@ -1137,7 +1164,7 @@ const StudentManagementPage: React.FC = () => {
             )}
 
             {/* Método Principal: Convites */}
-            {permissions.canCreateStudents && currentUser?.gymId && (
+            {permissions.canCreateStudents && (currentUser?.gymId || getGymId()) && (
                 <Card className="mb-6 bg-gradient-to-br from-primary-50 to-emerald-50 dark:from-primary-900/20 dark:to-emerald-900/20 border-2 border-primary-200 dark:border-primary-800">
                     <div className="p-6">
                         <div className="flex items-start gap-3 mb-4">
@@ -1158,8 +1185,13 @@ const StudentManagementPage: React.FC = () => {
                                         onClick={async () => {
                                             if (!mountedRef.current) return;
                                             try {
+                                                const gymId = getGymId();
+                                                if (!gymId) {
+                                                    showError('Você precisa estar associado a uma academia. Configure a academia primeiro em Configurações da Academia.');
+                                                    return;
+                                                }
                                                 logger.info('Gerando convite para aluno', 'StudentManagementPage');
-                                                const result = await createInvite(currentUser.gymId!, currentUser.id!, 'student');
+                                                const result = await createInvite(gymId, currentUser.id!, 'student');
                                                 const link = `${window.location.origin}/#/login?invite=${result.code}`;
                                                 if (mountedRef.current) {
                                                     setInviteStudentLink(link);
@@ -1181,11 +1213,16 @@ const StudentManagementPage: React.FC = () => {
                                     {permissions.canCreateTrainers && (
                                         <Button
                                             variant="primary"
-                                            onClick={async () => {
-                                                if (!mountedRef.current) return;
-                                                try {
-                                                    logger.info('Gerando convite para personal', 'StudentManagementPage');
-                                                    const result = await createInvite(currentUser.gymId!, currentUser.id!, 'personal');
+                                        onClick={async () => {
+                                            if (!mountedRef.current) return;
+                                            try {
+                                                const gymId = getGymId();
+                                                if (!gymId) {
+                                                    showError('Você precisa estar associado a uma academia. Configure a academia primeiro em Configurações da Academia.');
+                                                    return;
+                                                }
+                                                logger.info('Gerando convite para personal', 'StudentManagementPage');
+                                                const result = await createInvite(gymId, currentUser.id!, 'personal');
                                                     const link = `${window.location.origin}/#/login?invite=${result.code}`;
                                                     if (mountedRef.current) {
                                                         setInvitePersonalLink(link);
@@ -1263,7 +1300,7 @@ const StudentManagementPage: React.FC = () => {
                                 <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
                                     💬 Envie estes links por WhatsApp, e-mail ou mostre como QR Code para que alunos e profissionais se cadastrem já vinculados à sua academia.
                                 </p>
-                                {currentUser.gymId && (
+                                {(currentUser.gymId || getGymId()) && (
                                     <Button
                                         variant="secondary"
                                         size="sm"
@@ -1275,7 +1312,13 @@ const StudentManagementPage: React.FC = () => {
                                             setShowInviteHistory(newShowState);
                                             if (newShowState) {
                                                 try {
-                                                    const history = await getInviteUsageHistory(currentUser.gymId!);
+                                                    const gymId = getGymId();
+                                                    if (!gymId) {
+                                                        showError('Você precisa estar associado a uma academia.');
+                                                        setIsLoadingInviteHistory(false);
+                                                        return;
+                                                    }
+                                                    const history = await getInviteUsageHistory(gymId);
                                                     if (mountedRef.current) {
                                                         setInviteUsageHistory(history);
                                                     }
