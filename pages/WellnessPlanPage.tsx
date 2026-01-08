@@ -17,10 +17,12 @@ import {
     getWellnessPlan, 
     saveCompletedWorkout, 
     getCompletedWorkouts,
-    clearCompletedWorkouts 
+    clearCompletedWorkouts,
+    saveUser 
 } from '../services/databaseService';
 import { logger } from '../utils/logger';
 import type { WellnessPlan, WorkoutDay } from '../types';
+import { Goal } from '../types';
 import { useToast } from '../components/ui/Toast';
 
 const WellnessPlanSkeleton = () => (
@@ -60,19 +62,23 @@ const WellnessPlanSkeleton = () => (
  * Exibe plano de treinos personalizado, suplementos e dicas inteligentes geradas pela IA
  */
 const WellnessPlanPage: React.FC = () => {
-    const { user } = useUser();
-    const { showSuccess, showError } = useToast();
+    const { user, setUser } = useUser();
+    const { showSuccess, showError, showWarning } = useToast();
     const [plan, setPlan] = useState<WellnessPlan | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [completedWorkouts, setCompletedWorkouts] = useState<Set<number>>(new Set());
     const [isEditing, setIsEditing] = useState<boolean>(false);
     const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
+    const [selectedGoal, setSelectedGoal] = useState<Goal>(user.objetivo);
+    const [goalChanged, setGoalChanged] = useState<boolean>(false);
     const mountedRef = useRef(true);
 
     // Carregar plano salvo e treinos concluídos do banco de dados
     useEffect(() => {
         mountedRef.current = true;
+        setSelectedGoal(user.objetivo);
+        setGoalChanged(false);
         
         const loadData = async () => {
             try {
@@ -97,7 +103,65 @@ const WellnessPlanPage: React.FC = () => {
         return () => {
             mountedRef.current = false;
         };
-    }, []);
+    }, [user.objetivo]);
+
+    /**
+     * Atualiza o objetivo do usuário
+     */
+    const handleGoalChange = async (newGoal: Goal) => {
+        if (!mountedRef.current || !user) return;
+        
+        if (newGoal === user.objetivo) {
+            setSelectedGoal(newGoal);
+            setGoalChanged(false);
+            return;
+        }
+        
+        try {
+            const updatedUser = {
+                ...user,
+                objetivo: newGoal
+            };
+            
+            setSelectedGoal(newGoal);
+            setUser(updatedUser);
+            setGoalChanged(true);
+            
+            // Salvar no banco de dados
+            try {
+                await saveUser(updatedUser);
+                logger.info(`Objetivo alterado para: ${newGoal}`, 'WellnessPlanPage');
+            } catch (saveError) {
+                logger.warn('Erro ao salvar objetivo atualizado', 'WellnessPlanPage', saveError);
+            }
+            
+            if (mountedRef.current) {
+                showSuccess(`Objetivo alterado para: ${getGoalLabel(newGoal)}`);
+                showWarning('Recomendamos gerar um novo plano de treino para refletir a mudança de objetivo.');
+            }
+        } catch (error) {
+            logger.error('Erro ao alterar objetivo', 'WellnessPlanPage', error);
+            if (mountedRef.current) {
+                showError('Erro ao alterar objetivo. Tente novamente.');
+            }
+        }
+    };
+
+    /**
+     * Retorna o label do objetivo
+     */
+    const getGoalLabel = (goal: Goal): string => {
+        switch (goal) {
+            case Goal.PERDER_PESO:
+                return 'Perder Peso';
+            case Goal.GANHAR_MASSA:
+                return 'Ganhar Massa Muscular';
+            case Goal.MANTER_PESO:
+                return 'Manter Peso';
+            default:
+                return goal;
+        }
+    };
 
     /**
      * Gera um novo plano de treino usando IA
@@ -111,15 +175,35 @@ const WellnessPlanPage: React.FC = () => {
             return;
         }
 
+        // Usar o objetivo atualizado se houver mudança
+        const userToUse = selectedGoal !== user.objetivo 
+            ? { ...user, objetivo: selectedGoal }
+            : user;
+
         setIsLoading(true);
         setError(null);
         setPlan(null);
         setCompletedWorkouts(new Set()); // Resetar progresso ao gerar novo plano
+        setGoalChanged(false); // Resetar flag de mudança
         
         try {
-            logger.info(`Iniciando geração de plano de treino (userId: ${user.id}, objetivo: ${user.objetivo})`, 'WellnessPlanPage');
+            logger.info(`Iniciando geração de plano de treino (userId: ${user.id}, objetivo: ${userToUse.objetivo})`, 'WellnessPlanPage');
             
-            const result = await generateWellnessPlan(user);
+            const result = await generateWellnessPlan(userToUse);
+            
+            // Se o objetivo foi alterado, atualizar o usuário também
+            if (selectedGoal !== user.objetivo) {
+                const updatedUser = {
+                    ...user,
+                    objetivo: selectedGoal
+                };
+                setUser(updatedUser);
+                try {
+                    await saveUser(updatedUser);
+                } catch (saveError) {
+                    logger.warn('Erro ao salvar objetivo atualizado durante geração', 'WellnessPlanPage', saveError);
+                }
+            }
             
             // Verificar se o componente ainda está montado antes de atualizar estado
             if (!mountedRef.current) return;
@@ -304,53 +388,87 @@ const WellnessPlanPage: React.FC = () => {
                     {/* Cabeçalho com progresso e ações */}
                     <Card>
                         <div className="p-4 sm:p-6">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
-                                <div className="flex-1 min-w-0">
-                                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-2">
-                                        Meu Plano Semanal
-                                    </h2>
-                                    {plan.data_geracao && (
-                                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                                            Gerado em {new Date(plan.data_geracao).toLocaleDateString('pt-BR')}
+                            <div className="flex flex-col gap-4">
+                                {/* Seleção de Objetivo */}
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 pb-4 border-b border-slate-200 dark:border-slate-700">
+                                    <div className="flex-1 min-w-0">
+                                        <label htmlFor="goal-select" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                            Meu Objetivo
+                                        </label>
+                                        <select
+                                            id="goal-select"
+                                            value={selectedGoal}
+                                            onChange={(e) => handleGoalChange(e.target.value as Goal)}
+                                            className="block w-full sm:w-auto min-w-[200px] px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-slate-900 dark:text-slate-100"
+                                        >
+                                            <option value={Goal.PERDER_PESO}>Perder Peso</option>
+                                            <option value={Goal.GANHAR_MASSA}>Ganhar Massa Muscular</option>
+                                            <option value={Goal.MANTER_PESO}>Manter Peso</option>
+                                        </select>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            Alterar o objetivo permite gerar planos de treino personalizados
                                         </p>
-                                    )}
-                                    {progress.total > 0 && (
-                                        <div className="mt-3">
-                                            <div className="flex items-center justify-between text-xs sm:text-sm mb-2">
-                                                <span className="text-slate-600 dark:text-slate-400">
-                                                    Progresso da semana
-                                                </span>
-                                                <span className="font-semibold text-primary-600 dark:text-primary-400 whitespace-nowrap ml-2">
-                                                    {progress.completed}/{progress.total} treinos
-                                                </span>
-                                            </div>
-                                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 sm:h-3">
-                                                <div
-                                                    className="bg-primary-500 h-2 sm:h-3 rounded-full transition-all duration-300"
-                                                    style={{ width: `${progress.percentage}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
+                                    </div>
                                 </div>
-                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full md:w-auto">
-                                    <Button
-                                        onClick={() => setIsEditing(true)}
-                                        variant="secondary"
-                                        size="sm"
-                                        className="w-full sm:w-auto text-xs sm:text-sm"
-                                    >
-                                        ✏️ Editar Plano
-                                    </Button>
-                                    <Button
-                                        onClick={handleGeneratePlan}
-                                        variant="secondary"
-                                        size="sm"
-                                        className="w-full sm:w-auto text-xs sm:text-sm"
-                                    >
-                                        <SparklesIcon className="w-4 h-4 mr-2" />
-                                        Gerar Novo Plano
-                                    </Button>
+                                
+                                {/* Alerta quando objetivo é alterado */}
+                                {goalChanged && (
+                                    <Alert type="info" className="mb-0">
+                                        <p className="text-sm">
+                                            <strong>Objetivo alterado!</strong> Recomendamos gerar um novo plano de treino para refletir sua nova meta.
+                                        </p>
+                                    </Alert>
+                                )}
+                                
+                                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-2">
+                                            Meu Plano Semanal
+                                        </h2>
+                                        {plan.data_geracao && (
+                                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                                                Gerado em {new Date(plan.data_geracao).toLocaleDateString('pt-BR')} • Objetivo: <strong>{getGoalLabel(user.objetivo)}</strong>
+                                            </p>
+                                        )}
+                                        {progress.total > 0 && (
+                                            <div className="mt-3">
+                                                <div className="flex items-center justify-between text-xs sm:text-sm mb-2">
+                                                    <span className="text-slate-600 dark:text-slate-400">
+                                                        Progresso da semana
+                                                    </span>
+                                                    <span className="font-semibold text-primary-600 dark:text-primary-400 whitespace-nowrap ml-2">
+                                                        {progress.completed}/{progress.total} treinos
+                                                    </span>
+                                                </div>
+                                                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 sm:h-3">
+                                                    <div
+                                                        className="bg-primary-500 h-2 sm:h-3 rounded-full transition-all duration-300"
+                                                        style={{ width: `${progress.percentage}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full md:w-auto">
+                                        <Button
+                                            onClick={() => setIsEditing(true)}
+                                            variant="secondary"
+                                            size="sm"
+                                            className="w-full sm:w-auto text-xs sm:text-sm"
+                                        >
+                                            ✏️ Editar Plano
+                                        </Button>
+                                        <Button
+                                            onClick={handleGeneratePlan}
+                                            variant="secondary"
+                                            size="sm"
+                                            className="w-full sm:w-auto text-xs sm:text-sm"
+                                            disabled={isLoading}
+                                        >
+                                            <SparklesIcon className="w-4 h-4 mr-2" />
+                                            {isLoading ? 'Gerando...' : 'Gerar Novo Plano'}
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -421,8 +539,8 @@ const WellnessPlanPage: React.FC = () => {
                 )
             ) : (
                     <Card>
-                        <div className="flex flex-col items-center justify-center h-96 p-6 text-center">
-                            <HeartIcon className="w-16 h-16 text-primary-500" />
+                        <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center">
+                            <HeartIcon className="w-16 h-16 text-primary-500 mb-4" />
                             <h2 className="mt-4 text-2xl font-bold text-slate-800 dark:text-slate-100">
                                 Pronto para começar seus treinos?
                             </h2>
@@ -430,9 +548,43 @@ const WellnessPlanPage: React.FC = () => {
                                 Clique abaixo para que a IA crie um plano de treino personalizado 
                                 baseado no seu perfil, objetivo e histórico de treinos.
                             </p>
-                            <Button onClick={handleGeneratePlan} className="w-full max-w-xs" size="lg">
+                            
+                            {/* Seleção de Objetivo */}
+                            <div className="w-full max-w-md mb-6">
+                                <label htmlFor="goal-select-initial" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 text-left">
+                                    Selecione seu objetivo:
+                                </label>
+                                <select
+                                    id="goal-select-initial"
+                                    value={selectedGoal}
+                                    onChange={(e) => handleGoalChange(e.target.value as Goal)}
+                                    className="block w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-slate-900 dark:text-slate-100 mb-4"
+                                >
+                                    <option value={Goal.PERDER_PESO}>Perder Peso</option>
+                                    <option value={Goal.GANHAR_MASSA}>Ganhar Massa Muscular</option>
+                                    <option value={Goal.MANTER_PESO}>Manter Peso</option>
+                                </select>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 text-left mb-4">
+                                    O plano será gerado com base no objetivo selecionado acima.
+                                </p>
+                            </div>
+                            
+                            {goalChanged && (
+                                <Alert type="info" className="max-w-md mb-4">
+                                    <p className="text-sm">
+                                        <strong>Objetivo alterado!</strong> O novo plano será gerado com base no objetivo: <strong>{getGoalLabel(selectedGoal)}</strong>
+                                    </p>
+                                </Alert>
+                            )}
+                            
+                            <Button 
+                                onClick={handleGeneratePlan} 
+                                className="w-full max-w-xs" 
+                                size="lg"
+                                disabled={isLoading}
+                            >
                                 <SparklesIcon className="-ml-1 mr-2 h-5 w-5" />
-                                Gerar Meu Plano de Treino
+                                {isLoading ? 'Gerando Plano...' : 'Gerar Meu Plano de Treino'}
                             </Button>
                         </div>
                     </Card>
