@@ -587,6 +587,22 @@ const App: React.FC = () => {
     
     // Página de Apresentação (Vídeo)
     if (normalizedPath === '/presentation') {
+        // Verificar se o vídeo já foi visto
+        const PRESENTATION_SEEN_KEY = 'fitcoach.presentation.seen';
+        const hasSeenPresentation = typeof window !== 'undefined' && 
+            localStorage.getItem(PRESENTATION_SEEN_KEY) === 'true';
+        
+        // Se já foi visto, redirecionar para login ou home
+        if (hasSeenPresentation) {
+            // Redirecionar imediatamente sem mostrar o vídeo
+            if (isLoggedIn) {
+                window.location.hash = '#/';
+            } else {
+                window.location.hash = '#/login';
+            }
+            return <PageLoader />;
+        }
+        
         return (
             <Suspense fallback={<PageLoader />}>
                 <VideoPresentationPage />
