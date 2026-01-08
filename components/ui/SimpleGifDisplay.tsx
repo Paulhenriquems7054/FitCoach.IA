@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getGifUrls } from '../../services/gifUrlService';
+import { getGifUrls, getGifCdnBaseUrl } from '../../services/gifUrlService';
 
 interface SimpleGifDisplayProps {
   src: string;
@@ -23,19 +23,29 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
   const imgRef = React.useRef<HTMLImageElement>(null);
 
   // Obter URLs (local e CDN se disponível)
-  const gifUrls = React.useMemo(() => getGifUrls(src), [src]);
+  const gifUrls = React.useMemo(() => {
+    const urls = getGifUrls(src);
+    // Log para debug - verificar se CDN está disponível
+    const cdnBaseUrl = getGifCdnBaseUrl();
+    console.log('[SimpleGifDisplay] 🔍 Debug CDN:', {
+      cdnBaseUrl,
+      envVar: import.meta.env.VITE_GIF_CDN_URL,
+      hasCdnUrl: !!urls.cdn,
+      cdnUrl: urls.cdn,
+    });
+    return urls;
+  }, [src]);
 
   // Inicializar com URL local primeiro
   React.useEffect(() => {
-    // Log para debug
-    if (import.meta.env.DEV) {
-      console.log('[SimpleGifDisplay] 📍 Caminho recebido:', src);
-      console.log('[SimpleGifDisplay] 🔗 URLs disponíveis:', {
-        local: gifUrls.local,
-        cdn: gifUrls.cdn,
-        primary: gifUrls.primary,
-      });
-    }
+    // Log para debug (sempre, não apenas em DEV)
+    console.log('[SimpleGifDisplay] 📍 Caminho recebido:', src);
+    console.log('[SimpleGifDisplay] 🔗 URLs disponíveis:', {
+      local: gifUrls.local,
+      cdn: gifUrls.cdn,
+      primary: gifUrls.primary,
+      cdnBaseUrl: getGifCdnBaseUrl(),
+    });
     
     // Começar com URL local
     setActualSrc(gifUrls.primary);
