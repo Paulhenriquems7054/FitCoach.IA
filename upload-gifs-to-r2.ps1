@@ -4,26 +4,26 @@
 $bucketName = "fitcoach-gifs"
 $gifsPath = "public\GIFS"
 
-Write-Host "🚀 Iniciando upload de GIFs para Cloudflare R2..." -ForegroundColor Green
+Write-Host "[INICIO] Iniciando upload de GIFs para Cloudflare R2..." -ForegroundColor Green
 Write-Host "Bucket: $bucketName" -ForegroundColor Cyan
 Write-Host "Pasta local: $gifsPath" -ForegroundColor Cyan
 Write-Host ""
 
 # Verificar se a pasta existe
 if (-not (Test-Path $gifsPath)) {
-    Write-Host "❌ Erro: Pasta $gifsPath não encontrada!" -ForegroundColor Red
+    Write-Host "[ERRO] Pasta $gifsPath nao encontrada!" -ForegroundColor Red
     exit 1
 }
 
 # Contar arquivos
 $gifFiles = Get-ChildItem -Path $gifsPath -Recurse -Filter "*.gif"
 $totalFiles = $gifFiles.Count
-Write-Host "📊 Total de arquivos GIF encontrados: $totalFiles" -ForegroundColor Yellow
+Write-Host "[INFO] Total de arquivos GIF encontrados: $totalFiles" -ForegroundColor Yellow
 Write-Host ""
 
 # Listar grupos musculares
 $muscleGroups = Get-ChildItem -Path $gifsPath -Directory
-Write-Host "📁 Grupos musculares encontrados:" -ForegroundColor Yellow
+Write-Host "[INFO] Grupos musculares encontrados:" -ForegroundColor Yellow
 foreach ($group in $muscleGroups) {
     $count = (Get-ChildItem -Path $group.FullName -Filter "*.gif").Count
     Write-Host "   - $($group.Name): $count arquivos" -ForegroundColor Gray
@@ -49,7 +49,7 @@ foreach ($group in $muscleGroups) {
     $gifFiles = Get-ChildItem -Path $groupPath -Filter "*.gif"
     $fileCount = $gifFiles.Count
     
-    Write-Host "📤 Fazendo upload de $groupName ($fileCount arquivos)..." -ForegroundColor Cyan
+    Write-Host "[UPLOAD] Fazendo upload de $groupName ($fileCount arquivos)..." -ForegroundColor Cyan
     
     $groupUploaded = 0
     $groupFailed = 0
@@ -66,24 +66,24 @@ foreach ($group in $muscleGroups) {
             
             if ($LASTEXITCODE -eq 0) {
                 $groupUploaded++
-                Write-Host "   ✅ $fileName" -ForegroundColor Gray
+                Write-Host "   [OK] $fileName" -ForegroundColor Gray
             } else {
                 $groupFailed++
-                Write-Host "   ❌ Erro: $fileName" -ForegroundColor Red
+                Write-Host "   [ERRO] $fileName" -ForegroundColor Red
                 Write-Host "      $output" -ForegroundColor DarkRed
             }
         } catch {
             $groupFailed++
-            Write-Host "   ❌ Erro ao fazer upload de $fileName : $_" -ForegroundColor Red
+            Write-Host "   [ERRO] Erro ao fazer upload de $fileName : $_" -ForegroundColor Red
         }
     }
     
     if ($groupFailed -eq 0) {
         $uploaded++
-        Write-Host "✅ $groupName concluído! ($groupUploaded arquivos)" -ForegroundColor Green
+        Write-Host "[OK] $groupName concluido! ($groupUploaded arquivos)" -ForegroundColor Green
     } else {
         $failed++
-        Write-Host "⚠️  $groupName: $groupUploaded sucesso, $groupFailed falhas" -ForegroundColor Yellow
+        Write-Host "[ATENCAO] $groupName : $groupUploaded sucesso, $groupFailed falhas" -ForegroundColor Yellow
     }
     
     Write-Host ""
@@ -92,22 +92,22 @@ foreach ($group in $muscleGroups) {
 $endTime = Get-Date
 $duration = $endTime - $startTime
 
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
-Write-Host "📊 Resumo do Upload:" -ForegroundColor Yellow
-Write-Host "✅ Grupos enviados com sucesso: $uploaded" -ForegroundColor Green
-Write-Host "❌ Grupos com erro: $failed" -ForegroundColor $(if ($failed -gt 0) { "Red" } else { "Green" })
-Write-Host "⏱️  Tempo total: $($duration.ToString('mm\:ss'))" -ForegroundColor Cyan
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "[RESUMO] Resumo do Upload:" -ForegroundColor Yellow
+Write-Host "[OK] Grupos enviados com sucesso: $uploaded" -ForegroundColor Green
+Write-Host "[ERRO] Grupos com erro: $failed" -ForegroundColor $(if ($failed -gt 0) { "Red" } else { "Green" })
+Write-Host "[TEMPO] Tempo total: $($duration.ToString('mm\:ss'))" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 
 if ($failed -eq 0) {
     Write-Host ""
-    Write-Host "🎉 Upload concluído com sucesso!" -ForegroundColor Green
-    Write-Host "Próximos passos:" -ForegroundColor Yellow
+    Write-Host "[SUCESSO] Upload concluido com sucesso!" -ForegroundColor Green
+    Write-Host "Proximos passos:" -ForegroundColor Yellow
     Write-Host "1. Verifique os arquivos no painel do R2" -ForegroundColor Gray
-    Write-Host "2. Configure o domínio público (Settings → Public Access)" -ForegroundColor Gray
+    Write-Host "2. Configure o dominio publico (Settings -> Public Access)" -ForegroundColor Gray
     Write-Host "3. Configure VITE_GIF_CDN_URL no Vercel" -ForegroundColor Gray
 } else {
     Write-Host ""
-    Write-Host "⚠️  Alguns grupos falharam. Verifique os erros acima." -ForegroundColor Yellow
+    Write-Host "[ATENCAO] Alguns grupos falharam. Verifique os erros acima." -ForegroundColor Yellow
 }
 

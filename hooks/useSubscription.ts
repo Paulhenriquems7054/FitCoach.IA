@@ -101,7 +101,9 @@ export function useSubscription() {
   const getRemainingMinutes = useCallback((): number => {
     if (!status || !status.isActive) return 0;
     if (status.features.voiceUnlimitedUntil) return Infinity;
-    return status.features.voiceMinutesDaily;
+    const minutes = status.features.voiceMinutesDaily;
+    // Garantir que retorna um número válido
+    return typeof minutes === 'number' && !isNaN(minutes) && isFinite(minutes) ? minutes : 0;
   }, [status]);
 
   return {

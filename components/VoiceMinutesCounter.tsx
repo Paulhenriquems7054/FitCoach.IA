@@ -26,18 +26,26 @@ export function VoiceMinutesCounter({
   useEffect(() => {
     if (!isActive || !user?.id) return;
 
+    let mounted = true;
+    let lastWarningShown = false;
+
     const updateMinutes = () => {
+      if (!mounted) return;
+      
       const remaining = getRemainingMinutes();
+      const unlimited = remaining === Infinity;
+      
       setRemainingMinutes(remaining);
-      setIsUnlimited(remaining === Infinity);
+      setIsUnlimited(unlimited);
 
       // Verificar se minutos acabaram
-      if (remaining <= 0 && !isUnlimited && onMinutesExhausted) {
+      if (remaining <= 0 && !unlimited && onMinutesExhausted) {
         onMinutesExhausted();
       }
 
-      // Notificação quando limite estiver próximo (<= 3 minutos)
-      if (remaining > 0 && remaining <= 3 && !isUnlimited) {
+      // Notificação quando limite estiver próximo (<= 3 minutos) - mostrar apenas uma vez
+      if (remaining > 0 && remaining <= 3 && !unlimited && !lastWarningShown) {
+        lastWarningShown = true;
         showWarning('Seus minutos de voz estão quase acabando. Considere recarregar na página de planos.');
       }
     };
@@ -48,8 +56,11 @@ export function VoiceMinutesCounter({
     // Atualizar a cada 10 segundos durante uso ativo
     const interval = setInterval(updateMinutes, 10000);
 
-    return () => clearInterval(interval);
-  }, [isActive, user?.id, getRemainingMinutes, isUnlimited, onMinutesExhausted]);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [isActive, user?.id, getRemainingMinutes, onMinutesExhausted, showWarning]);
 
   if (!isActive || !status?.isActive) {
     return null;

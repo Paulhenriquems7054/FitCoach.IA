@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { useUser } from '../context/UserContext';
 import { generateWellnessPlan } from '../services/geminiService';
@@ -68,26 +68,35 @@ const WellnessPlanPage: React.FC = () => {
     const [completedWorkouts, setCompletedWorkouts] = useState<Set<number>>(new Set());
     const [isEditing, setIsEditing] = useState<boolean>(false);
     const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
+    const mountedRef = useRef(true);
 
     // Carregar plano salvo e treinos concluídos do banco de dados
     useEffect(() => {
+        mountedRef.current = true;
+        
         const loadData = async () => {
             try {
                 // Carregar plano salvo
                 const savedPlan = await getWellnessPlan();
-                if (savedPlan) {
+                if (savedPlan && mountedRef.current) {
                     setPlan(savedPlan);
                 }
 
                 // Carregar treinos concluídos
                 const completed = await getCompletedWorkouts();
-                setCompletedWorkouts(completed);
+                if (mountedRef.current) {
+                    setCompletedWorkouts(completed);
+                }
             } catch (e) {
                 logger.warn('Erro ao carregar dados do banco de dados', 'WellnessPlanPage', e);
             }
         };
 
         loadData();
+        
+        return () => {
+            mountedRef.current = false;
+        };
     }, []);
 
     /**
@@ -108,9 +117,12 @@ const WellnessPlanPage: React.FC = () => {
         setCompletedWorkouts(new Set()); // Resetar progresso ao gerar novo plano
         
         try {
-            logger.info('Iniciando geração de plano de treino', 'WellnessPlanPage', { userId: user.id, objetivo: user.objetivo });
+            logger.info(`Iniciando geração de plano de treino (userId: ${user.id}, objetivo: ${user.objetivo})`, 'WellnessPlanPage');
             
             const result = await generateWellnessPlan(user);
+            
+            // Verificar se o componente ainda está montado antes de atualizar estado
+            if (!mountedRef.current) return;
             
             // Validar se o resultado é válido
             if (!result) {
@@ -122,17 +134,18 @@ const WellnessPlanPage: React.FC = () => {
                 throw new Error('O plano gerado não possui treinos válidos.');
             }
 
-            logger.info('Plano gerado com sucesso', 'WellnessPlanPage', { 
-                dias: result.plano_treino_semanal.length,
-                suplementos: result.recomendacoes_suplementos?.length || 0
-            });
+            logger.info(`Plano gerado com sucesso (${result.plano_treino_semanal.length} dias, ${result.recomendacoes_suplementos?.length || 0} suplementos)`, 'WellnessPlanPage');
             
-            setPlan(result);
+            if (mountedRef.current) {
+                setPlan(result);
+            }
             
             // Salvar no banco de dados
             try {
                 await saveWellnessPlan(result);
-                logger.info('Plano salvo no banco de dados', 'WellnessPlanPage');
+                if (mountedRef.current) {
+                    logger.info('Plano salvo no banco de dados', 'WellnessPlanPage');
+                }
             } catch (saveError) {
                 logger.warn('Erro ao salvar plano no banco de dados, mas plano foi gerado', 'WellnessPlanPage', saveError);
                 // Não bloquear se o salvamento falhar, o plano ainda é exibido
@@ -141,22 +154,30 @@ const WellnessPlanPage: React.FC = () => {
             // Resetar progresso
             try {
                 await clearCompletedWorkouts();
-                setCompletedWorkouts(new Set());
+                if (mountedRef.current) {
+                    setCompletedWorkouts(new Set());
+                }
             } catch (clearError) {
                 logger.warn('Erro ao limpar progresso, mas plano foi gerado', 'WellnessPlanPage', clearError);
                 // Não bloquear se limpar progresso falhar
             }
 
             // Mostrar feedback de sucesso
-            showSuccess('Plano de treino gerado com sucesso! 🎉');
+            if (mountedRef.current) {
+                showSuccess('Plano de treino gerado com sucesso! 🎉');
+            }
             
         } catch (err: unknown) {
+            if (!mountedRef.current) return;
+            
             const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro ao gerar o plano de treino. Tente novamente.';
             logger.error('Erro ao gerar plano de treino', 'WellnessPlanPage', err);
             setError(errorMessage);
             showError(errorMessage);
         } finally {
-            setIsLoading(false);
+            if (mountedRef.current) {
+                setIsLoading(false);
+            }
         }
     };
 
