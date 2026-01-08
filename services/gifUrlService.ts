@@ -52,7 +52,22 @@ export function getGifUrls(localPath: string): {
       cdnPath = cdnPath.replace(/^GIFS\//, '');
     }
     
-    cdnUrl = `${cdnBaseUrl}/${cdnPath}`;
+    // IMPORTANTE: Codificar cada segmento do caminho para suportar espaços, acentos e caracteres especiais
+    // Exemplo: "Abdomen/Abdominais Oblíquos no Chão.gif" -> "Abdomen/Abdominais%20Obl%C3%ADquos%20no%20Ch%C3%A3o.gif"
+    const pathSegments = cdnPath.split('/').filter(segment => segment.length > 0);
+    const encodedSegments = pathSegments.map(segment => {
+      // Decodificar primeiro se já estiver codificado (evitar dupla codificação)
+      try {
+        const decoded = decodeURIComponent(segment);
+        return encodeURIComponent(decoded);
+      } catch {
+        // Se não conseguir decodificar, codificar diretamente
+        return encodeURIComponent(segment);
+      }
+    });
+    const encodedPath = encodedSegments.join('/');
+    
+    cdnUrl = `${cdnBaseUrl}/${encodedPath}`;
   }
   
   // Por padrão, tentar primeiro o caminho local
