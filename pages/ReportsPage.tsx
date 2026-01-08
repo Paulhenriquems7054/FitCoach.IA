@@ -41,19 +41,29 @@ const ReportsPage: React.FC = () => {
     const { canGenerateReport: canGenerate, getLimitMessage, isPremium } = usePremiumAccess();
     const [report, setReport] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isExporting, setIsExporting] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const reportRef = useRef<HTMLDivElement>(null);
+    const mountedRef = useRef(true);
 
     // Verificar e resetar limites ao carregar (apenas uma vez)
     useEffect(() => {
-        setUser(prevUser => {
-            const updatedUser = checkAndResetLimits(prevUser);
-            // Só atualizar se realmente mudou
-            if (JSON.stringify(updatedUser.usageLimits) !== JSON.stringify(prevUser.usageLimits)) {
-                return updatedUser;
-            }
-            return prevUser;
-        });
+        mountedRef.current = true;
+        
+        if (mountedRef.current) {
+            setUser(prevUser => {
+                const updatedUser = checkAndResetLimits(prevUser);
+                // Só atualizar se realmente mudou
+                if (JSON.stringify(updatedUser.usageLimits) !== JSON.stringify(prevUser.usageLimits)) {
+                    return updatedUser;
+                }
+                return prevUser;
+            });
+        }
+        
+        return () => {
+            mountedRef.current = false;
+        };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const reportsGeneratedThisWeek = getReportsGeneratedThisWeek(user);
@@ -84,51 +94,87 @@ const ReportsPage: React.FC = () => {
     }, [user.disciplineScore, user.weightHistory]);
 
     const handleGenerateReport = async () => {
+        if (!mountedRef.current) return;
+        
+        // Verificar se há dados suficientes para gerar relatório
+        if (user.weightHistory.length === 0) {
+            const msg = 'Adicione pelo menos um registro de peso para gerar um relatório.';
+            setError(msg);
+            showWarning(msg);
+            return;
+        }
+        
         if (!canGenerateReport) {
             const limitMessage = getLimitMessage('relatórios', '1 relatório por semana');
             setError(limitMessage);
             showWarning(limitMessage);
-            showError('Erro ao gerar relatório. Tente novamente.');
             return;
         }
 
         setIsLoading(true);
         setError(null);
         setReport(null);
+        
         try {
+            logger.info(`Iniciando geração de relatório semanal (${user.weightHistory.length} registros)`, 'ReportsPage');
+            
             const result = await generateWeeklyReport(user);
+            
+            if (!mountedRef.current) return;
+            
+            // Validar se o resultado é válido
+            if (!result || result.trim().length === 0) {
+                throw new Error('O relatório gerado está vazio.');
+            }
+            
             setReport(result);
             
             // Incrementar contador de relatórios
             const updatedUser = incrementReportCount(user);
             setUser(updatedUser);
             
-            if (reportsGeneratedThisWeek === 0) {
-                addPoints(15);
-                showSuccess('Relatório gerado com sucesso! Você ganhou 15 pontos.');
-            } else {
-                showSuccess('Relatório gerado com sucesso!');
+            logger.info(`Relatório gerado com sucesso (${reportsGeneratedThisWeek + 1} relatório${(reportsGeneratedThisWeek + 1) !== 1 ? 's' : ''} esta semana)`, 'ReportsPage');
+            
+            if (mountedRef.current) {
+                if (reportsGeneratedThisWeek === 0) {
+                    addPoints(15);
+                    showSuccess('Relatório gerado com sucesso! Você ganhou 15 pontos. 🎉');
+                } else {
+                    showSuccess('Relatório gerado com sucesso!');
+                }
             }
         } catch (err: any) {
             logger.error('Erro ao gerar relatório', 'ReportsPage', err);
+            
+            if (!mountedRef.current) return;
+            
             const errorMessage = err?.message?.includes('API key') 
                 ? 'Chave de API não configurada. O relatório foi gerado em modo offline.'
-                : t('reports.error.generic');
+                : err?.message || t('reports.error.generic');
             setError(errorMessage);
             showError(errorMessage);
         } finally {
-            setIsLoading(false);
+            if (mountedRef.current) {
+                setIsLoading(false);
+            }
         }
     };
 
     const exportPDF = async (nomeRelatorio: string) => {
-        // Exportação de PDF sempre disponível
-
+        if (!mountedRef.current) return;
+        
         if (!reportRef.current) {
-            showError('Erro ao exportar PDF. Tente novamente.');
+            showError('Erro ao exportar PDF. Relatório não encontrado.');
+            return;
+        }
+        
+        if (!report) {
+            showError('Nenhum relatório para exportar. Gere um relatório primeiro.');
             return;
         }
 
+        setIsExporting(true);
+        
         try {
             const { default: html2pdf } = await import('html2pdf.js');
             const dataFormatada = new Date().toISOString().split('T')[0];
@@ -143,10 +189,20 @@ const ReportsPage: React.FC = () => {
                 })
                 .from(reportRef.current)
                 .save();
-            showSuccess('PDF exportado com sucesso!');
+            
+            if (mountedRef.current) {
+                logger.info('PDF exportado com sucesso', 'ReportsPage');
+                showSuccess('PDF exportado com sucesso! 📄');
+            }
         } catch (error) {
             logger.error('Erro ao exportar PDF', 'ReportsPage', error);
-            showError('Erro ao exportar PDF. Tente novamente.');
+            if (mountedRef.current) {
+                showError('Erro ao exportar PDF. Tente novamente.');
+            }
+        } finally {
+            if (mountedRef.current) {
+                setIsExporting(false);
+            }
         }
     };
 
@@ -168,10 +224,33 @@ const ReportsPage: React.FC = () => {
                 </Alert>
             ) : report ? (
                 <>
-                    <div className="flex justify-end mb-4">
-                        <Button variant="secondary" onClick={() => exportPDF(REPORT_NAME)}>
-                            Exportar PDF
-                        </Button>
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="text-sm text-slate-600 dark:text-slate-400">
+                            {reportsGeneratedThisWeek > 0 && (
+                                <span>
+                                    Relatórios gerados esta semana: <strong>{reportsGeneratedThisWeek}</strong>
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            <Button 
+                                variant="secondary" 
+                                onClick={handleGenerateReport}
+                                disabled={isLoading || !canGenerateReport}
+                                size="sm"
+                            >
+                                <SparklesIcon className="w-4 h-4 mr-2" />
+                                Re-gerar
+                            </Button>
+                            <Button 
+                                variant="secondary" 
+                                onClick={() => exportPDF(REPORT_NAME)}
+                                disabled={isExporting}
+                                size="sm"
+                            >
+                                {isExporting ? 'Exportando...' : 'Exportar PDF'}
+                            </Button>
+                        </div>
                     </div>
                     <Card>
                         <div
@@ -286,31 +365,75 @@ const ReportsPage: React.FC = () => {
                 </>
             ) : (
                 <Card>
-                    <div className="flex flex-col items-center justify-center h-96 p-6 text-center">
-                        <ChartBarIcon className="w-16 h-16 text-primary-500" />
+                    <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center">
+                        <ChartBarIcon className="w-16 h-16 text-primary-500 mb-4" />
                         <h2 className="mt-4 text-2xl font-bold text-slate-800 dark:text-slate-100">
                             {t('reports.initial.title')}
                         </h2>
-                        <p className="mt-2 mb-6 max-w-md text-slate-500 dark:text-slate-400">
+                        <p className="mt-2 mb-4 max-w-md text-slate-600 dark:text-slate-400">
                             {t('reports.initial.description')}
                         </p>
-                        {canGenerateReport ? (
-                            <Button onClick={handleGenerateReport} className="w-full max-w-xs" size="lg">
+                        
+                        {/* Informações sobre dados necessários */}
+                        {user.weightHistory.length === 0 && (
+                            <Alert type="warning" className="max-w-md mb-4">
+                                <p className="text-sm">
+                                    <strong>Dados insuficientes:</strong> Adicione pelo menos um registro de peso na página de <strong>Análise de Progresso</strong> para gerar um relatório.
+                                </p>
+                            </Alert>
+                        )}
+                        
+                        {/* Informações sobre limites */}
+                        {user.weightHistory.length > 0 && !canGenerateReport && (
+                            <div className="w-full max-w-md space-y-4 mb-4">
+                                <Alert type="info" title={t('reports.limit.title')}>
+                                    <p className="text-sm mb-2">{t('reports.limit.description')}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        Relatórios gerados esta semana: <strong>{reportsGeneratedThisWeek}</strong>
+                                    </p>
+                                </Alert>
+                            </div>
+                        )}
+                        
+                        {/* Informações sobre dados disponíveis */}
+                        {user.weightHistory.length > 0 && canGenerateReport && (
+                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-md mb-4">
+                                <p className="text-sm text-blue-800 dark:text-blue-300">
+                                    <strong>Dados disponíveis:</strong> Você tem <strong>{user.weightHistory.length}</strong> registro{user.weightHistory.length !== 1 ? 's' : ''} de peso para análise.
+                                </p>
+                            </div>
+                        )}
+                        
+                        {canGenerateReport && user.weightHistory.length > 0 ? (
+                            <Button 
+                                onClick={handleGenerateReport} 
+                                disabled={isLoading || user.weightHistory.length === 0}
+                                className="w-full max-w-xs" 
+                                size="lg"
+                            >
                                 <SparklesIcon className="-ml-1 mr-2 h-5 w-5" />
-                                {t('reports.initial.button')}
+                                {isLoading ? 'Gerando Relatório...' : t('reports.initial.button')}
                             </Button>
                         ) : (
                             <div className="w-full max-w-md space-y-4">
-                                <Alert type="info" title={t('reports.limit.title')}>
-                                    <p>{t('reports.limit.description')}</p>
-                                </Alert>
+                                {!canGenerateReport && (
+                                    <Alert type="info" title={t('reports.limit.title')}>
+                                        <p className="text-sm">{t('reports.limit.description')}</p>
+                                        {reportsGeneratedThisWeek > 0 && (
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                                                Você já gerou {reportsGeneratedThisWeek} relatório{reportsGeneratedThisWeek !== 1 ? 's' : ''} esta semana.
+                                            </p>
+                                        )}
+                                    </Alert>
+                                )}
                                 <Button
                                     onClick={handleGenerateReport}
-                                    className="w-full bg-primary-500 hover:bg-primary-600 text-white"
+                                    disabled={isLoading || user.weightHistory.length === 0}
+                                    className="w-full bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                                     size="lg"
                                 >
                                     <SparklesIcon className="-ml-1 mr-2 h-5 w-5" />
-                                    {t('reports.initial.button')}
+                                    {isLoading ? 'Gerando Relatório...' : user.weightHistory.length === 0 ? 'Adicione dados primeiro' : t('reports.initial.button')}
                                 </Button>
                             </div>
                         )}
