@@ -21,7 +21,7 @@ import {
 } from '../services/databaseService';
 import { logger } from '../utils/logger';
 import type { WellnessPlan, WorkoutDay } from '../types';
-import { logger } from '../utils/logger';
+import { useToast } from '../components/ui/Toast';
 
 const WellnessPlanSkeleton = () => (
     <div className="space-y-8">
@@ -61,6 +61,7 @@ const WellnessPlanSkeleton = () => (
  */
 const WellnessPlanPage: React.FC = () => {
     const { user } = useUser();
+    const { showSuccess, showError } = useToast();
     const [plan, setPlan] = useState<WellnessPlan | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -93,23 +94,67 @@ const WellnessPlanPage: React.FC = () => {
      * Gera um novo plano de treino usando IA
      */
     const handleGeneratePlan = async () => {
+        // Verificar se o usuário está definido
+        if (!user) {
+            const errorMsg = 'É necessário estar logado para gerar um plano de treino.';
+            setError(errorMsg);
+            showError(errorMsg);
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         setPlan(null);
         setCompletedWorkouts(new Set()); // Resetar progresso ao gerar novo plano
         
         try {
+            logger.info('Iniciando geração de plano de treino', 'WellnessPlanPage', { userId: user.id, objetivo: user.objetivo });
+            
             const result = await generateWellnessPlan(user);
+            
+            // Validar se o resultado é válido
+            if (!result) {
+                throw new Error('O resultado da geração do plano está vazio.');
+            }
+
+            // Validar estrutura básica do plano
+            if (!result.plano_treino_semanal || !Array.isArray(result.plano_treino_semanal) || result.plano_treino_semanal.length === 0) {
+                throw new Error('O plano gerado não possui treinos válidos.');
+            }
+
+            logger.info('Plano gerado com sucesso', 'WellnessPlanPage', { 
+                dias: result.plano_treino_semanal.length,
+                suplementos: result.recomendacoes_suplementos?.length || 0
+            });
+            
             setPlan(result);
             
             // Salvar no banco de dados
-            await saveWellnessPlan(result);
-            await clearCompletedWorkouts(); // Resetar progresso
-            setCompletedWorkouts(new Set());
+            try {
+                await saveWellnessPlan(result);
+                logger.info('Plano salvo no banco de dados', 'WellnessPlanPage');
+            } catch (saveError) {
+                logger.warn('Erro ao salvar plano no banco de dados, mas plano foi gerado', 'WellnessPlanPage', saveError);
+                // Não bloquear se o salvamento falhar, o plano ainda é exibido
+            }
+
+            // Resetar progresso
+            try {
+                await clearCompletedWorkouts();
+                setCompletedWorkouts(new Set());
+            } catch (clearError) {
+                logger.warn('Erro ao limpar progresso, mas plano foi gerado', 'WellnessPlanPage', clearError);
+                // Não bloquear se limpar progresso falhar
+            }
+
+            // Mostrar feedback de sucesso
+            showSuccess('Plano de treino gerado com sucesso! 🎉');
+            
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro ao gerar o plano de treino. Tente novamente.';
             logger.error('Erro ao gerar plano de treino', 'WellnessPlanPage', err);
             setError(errorMessage);
+            showError(errorMessage);
         } finally {
             setIsLoading(false);
         }
