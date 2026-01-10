@@ -21,6 +21,7 @@ import { Alert } from '../components/ui/Alert';
 import type { GymBranding, Gym } from '../types';
 import { getCompanyByUserId, type Company } from '../services/companyService';
 import { logger } from '../utils/logger';
+import { NotificationSettings } from '../components/NotificationSettings';
 
 const SettingsPage: React.FC = () => {
     const { user } = useUser();
@@ -1156,6 +1157,9 @@ const SettingsPage: React.FC = () => {
                     </div>
                 </Card>
             )}
+
+            {/* Seção de Notificações */}
+            <NotificationSettings />
 
             {/* Seção de Excluir Conta */}
             <Card>

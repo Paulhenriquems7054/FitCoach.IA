@@ -51,14 +51,14 @@ const ReportsPage: React.FC = () => {
         mountedRef.current = true;
         
         if (mountedRef.current) {
-            setUser(prevUser => {
-                const updatedUser = checkAndResetLimits(prevUser);
-                // Só atualizar se realmente mudou
-                if (JSON.stringify(updatedUser.usageLimits) !== JSON.stringify(prevUser.usageLimits)) {
-                    return updatedUser;
-                }
-                return prevUser;
-            });
+        setUser(prevUser => {
+            const updatedUser = checkAndResetLimits(prevUser);
+            // Só atualizar se realmente mudou
+            if (JSON.stringify(updatedUser.usageLimits) !== JSON.stringify(prevUser.usageLimits)) {
+                return updatedUser;
+            }
+            return prevUser;
+        });
         }
         
         return () => {
@@ -136,11 +136,11 @@ const ReportsPage: React.FC = () => {
             logger.info(`Relatório gerado com sucesso (${reportsGeneratedThisWeek + 1} relatório${(reportsGeneratedThisWeek + 1) !== 1 ? 's' : ''} esta semana)`, 'ReportsPage');
             
             if (mountedRef.current) {
-                if (reportsGeneratedThisWeek === 0) {
-                    addPoints(15);
+            if (reportsGeneratedThisWeek === 0) {
+                addPoints(15);
                     showSuccess('Relatório gerado com sucesso! Você ganhou 15 pontos. 🎉');
-                } else {
-                    showSuccess('Relatório gerado com sucesso!');
+            } else {
+                showSuccess('Relatório gerado com sucesso!');
                 }
             }
         } catch (err: any) {
@@ -155,14 +155,14 @@ const ReportsPage: React.FC = () => {
             showError(errorMessage);
         } finally {
             if (mountedRef.current) {
-                setIsLoading(false);
+            setIsLoading(false);
             }
         }
     };
 
     const exportPDF = async (nomeRelatorio: string) => {
         if (!mountedRef.current) return;
-        
+
         if (!reportRef.current) {
             showError('Erro ao exportar PDF. Relatório não encontrado.');
             return;
@@ -174,7 +174,7 @@ const ReportsPage: React.FC = () => {
         }
 
         setIsExporting(true);
-        
+
         try {
             const { default: html2pdf } = await import('html2pdf.js');
             const dataFormatada = new Date().toISOString().split('T')[0];
@@ -197,7 +197,7 @@ const ReportsPage: React.FC = () => {
         } catch (error) {
             logger.error('Erro ao exportar PDF', 'ReportsPage', error);
             if (mountedRef.current) {
-                showError('Erro ao exportar PDF. Tente novamente.');
+            showError('Erro ao exportar PDF. Tente novamente.');
             }
         } finally {
             if (mountedRef.current) {
@@ -249,7 +249,7 @@ const ReportsPage: React.FC = () => {
                                 size="sm"
                             >
                                 {isExporting ? 'Exportando...' : 'Exportar PDF'}
-                            </Button>
+                        </Button>
                         </div>
                     </div>
                     <Card>
@@ -417,14 +417,14 @@ const ReportsPage: React.FC = () => {
                         ) : (
                             <div className="w-full max-w-md space-y-4">
                                 {!canGenerateReport && (
-                                    <Alert type="info" title={t('reports.limit.title')}>
+                                <Alert type="info" title={t('reports.limit.title')}>
                                         <p className="text-sm">{t('reports.limit.description')}</p>
                                         {reportsGeneratedThisWeek > 0 && (
                                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                                                 Você já gerou {reportsGeneratedThisWeek} relatório{reportsGeneratedThisWeek !== 1 ? 's' : ''} esta semana.
                                             </p>
                                         )}
-                                    </Alert>
+                                </Alert>
                                 )}
                                 <Button
                                     onClick={handleGenerateReport}

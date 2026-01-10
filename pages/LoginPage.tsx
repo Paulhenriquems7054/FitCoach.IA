@@ -896,12 +896,21 @@ const LoginPage: React.FC = () => {
                 
                 if (masterCodeValidation.isValid && masterCodeValidation.company) {
                     // Vincular usuário à academia via código mestre
-                    const linkResult = await linkUserToCompanyByMasterCode(signupCouponCode.trim().toUpperCase(), userId);
+                    // Passar o email para permitir verificação automática de admin
+                    const linkResult = await linkUserToCompanyByMasterCode(
+                        signupCouponCode.trim().toUpperCase(), 
+                        userId,
+                        sanitizedEmail // Passar email para verificação de admin
+                    );
                     if (!linkResult.success) {
                         logger.warn('Erro ao vincular via código mestre', 'LoginPage', { error: linkResult.error });
                         // Não bloquear o cadastro se falhar vincular
                     } else {
-                        logger.info(`Usuário ${userId} vinculado à academia ${linkResult.companyId} via master_code`, 'LoginPage');
+                        if (linkResult.isAdmin) {
+                            logger.info(`Usuário ${userId} vinculado à academia ${linkResult.companyId} via master_code como ADMINISTRADOR`, 'LoginPage');
+                        } else {
+                            logger.info(`Usuário ${userId} vinculado à academia ${linkResult.companyId} via master_code como ALUNO`, 'LoginPage');
+                        }
                     }
                 } else if (couponPlan) {
                     // Se não for código mestre, tentar aplicar cupom

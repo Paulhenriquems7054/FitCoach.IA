@@ -20,6 +20,9 @@ import { WandIcon } from '../icons/WandIcon';
 import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
 import { UsersIcon } from '../icons/UsersIcon';
 import { KeyIcon } from '../icons/KeyIcon';
+import { CalendarIcon } from '../icons/CalendarIcon';
+import { ChatBubbleIcon } from '../icons/ChatBubbleIcon';
+import { UserGroupIcon } from '../icons/UserGroupIcon';
 
 interface SidebarProps {
   open: boolean;
@@ -80,6 +83,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     '/generator',
     '/smart-meal',
     '/analyzer',
+    '/calendar',
+    '/community',
+    '/group-workouts',
     '/perfil',
   ];
 
@@ -108,6 +114,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
         { name: t('sidebar.planGenerator'), href: '#/generator', icon: SparklesIcon },
         { name: t('sidebar.smartMeal'), href: '#/smart-meal', icon: WandIcon },
         { name: t('sidebar.plateAnalyzer'), href: '#/analyzer', icon: CameraIcon },
+        { name: 'Calendário', href: '#/calendar', icon: CalendarIcon },
+        { name: 'Comunidade', href: '#/community', icon: ChatBubbleIcon },
+        { name: 'Treinos em Grupo', href: '#/group-workouts', icon: UserGroupIcon },
         { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon },
         { name: 'Controle de Academias e Assinaturas', href: '#/admin-dashboard', icon: ChartBarIcon },
       ];
@@ -121,6 +130,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
         { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
         { name: 'Criar Planos de Treino', href: '#/trainer-workout', icon: HeartIcon, show: permissions.canViewStudents },
         { name: 'Biblioteca de Exercícios', href: '#/biblioteca', icon: BookOpenIcon },
+        { name: 'Calendário', href: '#/calendar', icon: CalendarIcon },
+        { name: 'Comunidade', href: '#/community', icon: ChatBubbleIcon },
+        { name: 'Treinos em Grupo', href: '#/group-workouts', icon: UserGroupIcon },
       ].filter(item => item.show !== false);
     }
     
@@ -130,6 +142,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
         { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
         { name: 'Criar Planos de Treino', href: '#/trainer-workout', icon: HeartIcon, show: permissions.canViewStudents },
         { name: 'Biblioteca de Exercícios', href: '#/biblioteca', icon: BookOpenIcon },
+        { name: 'Calendário', href: '#/calendar', icon: CalendarIcon },
+        { name: 'Comunidade', href: '#/community', icon: ChatBubbleIcon },
+        { name: 'Treinos em Grupo', href: '#/group-workouts', icon: UserGroupIcon },
       ].filter(item => item.show !== false);
     }
 
@@ -144,6 +159,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
       { name: t('sidebar.planGenerator'), href: '#/generator', icon: SparklesIcon },
       { name: t('sidebar.smartMeal'), href: '#/smart-meal', icon: WandIcon },
       { name: t('sidebar.plateAnalyzer'), href: '#/analyzer', icon: CameraIcon },
+      { name: 'Calendário', href: '#/calendar', icon: CalendarIcon },
+      { name: 'Comunidade', href: '#/community', icon: ChatBubbleIcon },
+      { name: 'Treinos em Grupo', href: '#/group-workouts', icon: UserGroupIcon },
       { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
     ];
 

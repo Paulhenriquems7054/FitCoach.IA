@@ -104,8 +104,8 @@ const SmartMealPage: React.FC = () => {
             showError(errorMessage);
         } finally {
             if (mountedRef.current) {
-                setIsLoading(false);
-            }
+            setIsLoading(false);
+        }
         }
     };
     
@@ -129,10 +129,10 @@ const SmartMealPage: React.FC = () => {
                 <div className="p-4 sm:p-6">
                     <form onSubmit={handleSearch} className="space-y-3">
                         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                            <input
-                                type="text"
-                                value={food}
-                                onChange={e => setFood(e.target.value)}
+                        <input
+                            type="text"
+                            value={food}
+                            onChange={e => setFood(e.target.value)}
                                 placeholder="Ex: Pão francês com manteiga, batata frita, refrigerante..."
                                 className="flex-1 block w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 disabled={isLoading}
@@ -157,9 +157,9 @@ const SmartMealPage: React.FC = () => {
                                     className="w-full sm:w-auto text-sm sm:text-base flex-1 sm:flex-none"
                                     disabled={!food.trim() || isLoading}
                                 >
-                                   <SparklesIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                           <SparklesIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                                     {isLoading ? 'Buscando...' : 'Sugerir Troca'}
-                                </Button>
+                        </Button>
                             </div>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400">

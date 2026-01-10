@@ -39,13 +39,13 @@ export const SimpleGifDisplay: React.FC<SimpleGifDisplayProps> = ({
   // Inicializar com URL local primeiro
   React.useEffect(() => {
     // Log para debug (sempre, não apenas em DEV)
-    console.log('[SimpleGifDisplay] 📍 Caminho recebido:', src);
-    console.log('[SimpleGifDisplay] 🔗 URLs disponíveis:', {
-      local: gifUrls.local,
-      cdn: gifUrls.cdn,
-      primary: gifUrls.primary,
+      console.log('[SimpleGifDisplay] 📍 Caminho recebido:', src);
+      console.log('[SimpleGifDisplay] 🔗 URLs disponíveis:', {
+        local: gifUrls.local,
+        cdn: gifUrls.cdn,
+        primary: gifUrls.primary,
       cdnBaseUrl: getGifCdnBaseUrl(),
-    });
+      });
     
     // Começar com URL local
     setActualSrc(gifUrls.primary);

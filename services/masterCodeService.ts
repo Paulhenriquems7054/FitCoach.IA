@@ -90,11 +90,19 @@ export async function validateMasterCode(
 /**
  * Vincula um usuário a uma academia usando o código mestre
  * Esta função deve ser chamada APÓS criar o usuário no Supabase
+ * 
+ * IMPORTANTE: Se o email do usuário corresponder ao email do owner da empresa,
+ * o usuário será automaticamente promovido a administrador (gym_role: 'admin')
+ * 
+ * @param masterCode - Código mestre da academia
+ * @param userId - ID do usuário no Supabase
+ * @param userEmail - Email do usuário (opcional, será buscado automaticamente se não fornecido)
  */
 export async function linkUserToCompanyByMasterCode(
     masterCode: string,
-    userId: string
-): Promise<{ success: boolean; companyId?: string; error?: string }> {
+    userId: string,
+    userEmail?: string
+): Promise<{ success: boolean; companyId?: string; error?: string; isAdmin?: boolean }> {
     try {
         const validation = await validateMasterCode(masterCode);
 
@@ -107,12 +115,63 @@ export async function linkUserToCompanyByMasterCode(
 
         const supabase = getSupabaseClient();
 
-        // Atualizar usuário com gym_id e gym_role
+        // Buscar informações completas da empresa para obter o email do owner
+        const { data: companyData, error: companyError } = await supabase
+            .from('companies')
+            .select('email, owner_id')
+            .eq('id', validation.company.id)
+            .single();
+
+        if (companyError || !companyData) {
+            logger.warn('Erro ao buscar dados completos da empresa, continuando...', 'masterCodeService', companyError);
+        }
+
+        // Buscar email do usuário
+        let finalUserEmail: string | null = userEmail ? userEmail.toLowerCase().trim() : null;
+        
+        // Se email não foi fornecido, tentar buscar do auth.getUser()
+        if (!finalUserEmail) {
+            try {
+                const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+                if (authUser && authUser.id === userId && authUser.email) {
+                    finalUserEmail = authUser.email.toLowerCase().trim();
+                    logger.debug(`Email do usuário obtido via auth.getUser(): ${finalUserEmail}`, 'masterCodeService');
+                } else if (authError) {
+                    logger.debug(`Erro ao obter usuário via auth.getUser(): ${authError.message}`, 'masterCodeService');
+                }
+            } catch (authErr) {
+                logger.debug('Exceção ao obter email via auth.getUser()', 'masterCodeService', authErr);
+            }
+        } else {
+            logger.debug(`Email do usuário fornecido como parâmetro: ${finalUserEmail}`, 'masterCodeService');
+        }
+
+        // Determinar se o usuário deve ser admin
+        // Verifica se o email corresponde ao email da empresa OU se o userId corresponde ao owner_id
+        let gymRole: 'student' | 'admin' = 'student';
+        let isAdmin = false;
+
+        if (companyData) {
+            const companyEmail = companyData.email?.toLowerCase().trim();
+            const isOwnerEmail = finalUserEmail && companyEmail && finalUserEmail === companyEmail;
+            const isOwnerId = companyData.owner_id && companyData.owner_id === userId;
+
+            if (isOwnerEmail || isOwnerId) {
+                gymRole = 'admin';
+                isAdmin = true;
+                logger.info(
+                    `Usuário ${userId} (${finalUserEmail || 'email não encontrado'}) identificado como owner da academia ${validation.company.id}. Promovendo a admin.`,
+                    'masterCodeService'
+                );
+            }
+        }
+
+        // Atualizar usuário com gym_id e gym_role (admin ou student)
         const { error: updateError } = await supabase
             .from('users')
             .update({
                 gym_id: validation.company.id,
-                gym_role: 'student',
+                gym_role: gymRole,
                 is_gym_managed: true,
                 subscription_status: 'active',
                 plan_type: validation.company.planType,
@@ -127,29 +186,47 @@ export async function linkUserToCompanyByMasterCode(
             };
         }
 
-        // Criar licença (company_license)
-        const { error: licenseError } = await supabase
-            .from('company_licenses')
-            .insert({
-                company_id: validation.company.id,
-                user_id: userId,
-                status: 'active',
-                activated_at: new Date().toISOString(),
-            });
+        // Criar licença (company_license) - apenas se não for admin
+        // Admins não precisam de licença, pois são owners
+        if (!isAdmin) {
+            const { error: licenseError } = await supabase
+                .from('company_licenses')
+                .insert({
+                    company_id: validation.company.id,
+                    user_id: userId,
+                    status: 'active',
+                    activated_at: new Date().toISOString(),
+                });
 
-        if (licenseError) {
-            logger.warn('Erro ao criar licença (continuando)', 'masterCodeService', licenseError);
-            // Não bloquear se falhar criar licença, o usuário já foi vinculado
+            if (licenseError) {
+                logger.warn('Erro ao criar licença (continuando)', 'masterCodeService', licenseError);
+                // Não bloquear se falhar criar licença, o usuário já foi vinculado
+            }
+        } else {
+            // Se for admin, atualizar o owner_id da empresa se ainda não estiver definido
+            if (companyData && !companyData.owner_id) {
+                const { error: updateOwnerError } = await supabase
+                    .from('companies')
+                    .update({ owner_id: userId })
+                    .eq('id', validation.company.id);
+
+                if (updateOwnerError) {
+                    logger.warn('Erro ao atualizar owner_id da empresa', 'masterCodeService', updateOwnerError);
+                } else {
+                    logger.info(`owner_id da empresa ${validation.company.id} atualizado para ${userId}`, 'masterCodeService');
+                }
+            }
         }
 
         logger.info(
-            `Usuário ${userId} vinculado à academia ${validation.company.id} via master_code`,
+            `Usuário ${userId} vinculado à academia ${validation.company.id} via master_code como ${gymRole}`,
             'masterCodeService'
         );
 
         return {
             success: true,
             companyId: validation.company.id,
+            isAdmin,
         };
     } catch (error) {
         logger.error('Erro ao vincular usuário à academia', 'masterCodeService', error);

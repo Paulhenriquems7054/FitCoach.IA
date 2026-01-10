@@ -116,7 +116,7 @@ const ChallengesPage: React.FC = () => {
                                     <div className="p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <h3 className="font-semibold text-sm sm:text-base">{challenge.title}</h3>
+                                            <h3 className="font-semibold text-sm sm:text-base">{challenge.title}</h3>
                                                 {isCompleted && <CheckCircleIcon className="w-5 h-5 text-green-600 dark:text-green-400" />}
                                             </div>
                                             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{challenge.description}</p>
@@ -159,7 +159,7 @@ const ChallengesPage: React.FC = () => {
                                      <div className="p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                                          <div className="flex-1 min-w-0">
                                              <div className="flex items-center gap-2 mb-1">
-                                                 <h3 className="font-semibold text-sm sm:text-base">{challenge.title}</h3>
+                                             <h3 className="font-semibold text-sm sm:text-base">{challenge.title}</h3>
                                                  {isCompleted && <CheckCircleIcon className="w-5 h-5 text-green-600 dark:text-green-400" />}
                                              </div>
                                              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{challenge.description}</p>

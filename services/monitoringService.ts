@@ -1,225 +1,250 @@
 /**
- * Serviço de Monitoramento
- * 
- * Coleta métricas e estatísticas do sistema
+ * Serviço de Monitoramento e Observabilidade
+ * Sentry, Grafana, alertas
  */
 
-import { getSupabaseClient } from './supabaseService';
 import { logger } from '../utils/logger';
 
-export interface SystemMetrics {
-  totalUsers: number;
-  totalGyms: number;
-  activeSubscriptions: number;
-  expiredSubscriptions: number;
-  totalWeightEntries: number;
-  totalChatMessages: number;
-  gymsByPlan: Record<string, number>;
-  usersByRole: Record<string, number>;
+export interface ErrorEvent {
+  id: string;
+  message: string;
+  stack?: string;
+  url?: string;
+  userAgent?: string;
+  userId?: string;
+  timestamp: string;
+  level: 'error' | 'warning' | 'info';
+  context?: Record<string, any>;
 }
 
-/**
- * Coleta métricas gerais do sistema
- */
-export async function getSystemMetrics(): Promise<SystemMetrics> {
-  try {
-    const supabase = getSupabaseClient();
+export interface PerformanceMetric {
+  name: string;
+  value: number;
+  unit: string;
+  timestamp: string;
+  tags?: Record<string, string>;
+}
 
-    // Total de usuários
-    const { count: totalUsers } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true });
+export interface Alert {
+  id: string;
+  type: 'error' | 'performance' | 'security' | 'usage';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  message: string;
+  timestamp: string;
+  resolved: boolean;
+}
 
-    // Total de academias
-    const { count: totalGyms } = await supabase
-      .from('companies')
-      .select('*', { count: 'exact', head: true });
+class MonitoringService {
+  private errors: ErrorEvent[] = [];
+  private metrics: PerformanceMetric[] = [];
+  private alerts: Alert[] = [];
 
-    // Assinaturas ativas
-    const { count: activeSubscriptions } = await supabase
-      .from('user_subscriptions')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'active');
-
-    // Assinaturas expiradas
-    const { count: expiredSubscriptions } = await supabase
-      .from('user_subscriptions')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'expired');
-
-    // Total de registros de peso
-    const { count: totalWeightEntries } = await supabase
-      .from('weight_history')
-      .select('*', { count: 'exact', head: true });
-
-    // Total de mensagens
-    const { count: totalChatMessages } = await supabase
-      .from('chat_messages')
-      .select('*', { count: 'exact', head: true });
-
-    // Academias por plano
-    const { data: gymsByPlanData } = await supabase
-      .from('companies')
-      .select('plan_type');
-
-    const gymsByPlan: Record<string, number> = {};
-    if (gymsByPlanData) {
-      gymsByPlanData.forEach(gym => {
-        const plan = gym.plan_type || 'unknown';
-        gymsByPlan[plan] = (gymsByPlan[plan] || 0) + 1;
-      });
+  /**
+   * Inicializa Sentry (se disponível)
+   */
+  async initializeSentry(dsn?: string): Promise<void> {
+    try {
+      // Em produção, inicializar Sentry SDK
+      if (dsn && typeof (window as any).Sentry !== 'undefined') {
+        (window as any).Sentry.init({
+          dsn,
+          environment: process.env.NODE_ENV || 'development',
+          tracesSampleRate: 1.0,
+        });
+        logger.info('Sentry inicializado', 'monitoringService');
+      }
+    } catch (error) {
+      logger.warn('Erro ao inicializar Sentry', 'monitoringService', error);
     }
+  }
 
-    // Usuários por role
-    const { data: usersByRoleData } = await supabase
-      .from('users')
-      .select('gym_role');
-
-    const usersByRole: Record<string, number> = {};
-    if (usersByRoleData) {
-      usersByRoleData.forEach(user => {
-        const role = user.gym_role || 'none';
-        usersByRole[role] = (usersByRole[role] || 0) + 1;
-      });
-    }
-
-    return {
-      totalUsers: totalUsers || 0,
-      totalGyms: totalGyms || 0,
-      activeSubscriptions: activeSubscriptions || 0,
-      expiredSubscriptions: expiredSubscriptions || 0,
-      totalWeightEntries: totalWeightEntries || 0,
-      totalChatMessages: totalChatMessages || 0,
-      gymsByPlan,
-      usersByRole,
+  /**
+   * Captura erro
+   */
+  captureError(error: Error, context?: Record<string, any>): void {
+    const errorEvent: ErrorEvent = {
+      id: `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      message: error.message,
+      stack: error.stack,
+      url: window.location.href,
+      userAgent: navigator.userAgent,
+      timestamp: new Date().toISOString(),
+      level: 'error',
+      context,
     };
-  } catch (error) {
-    logger.error('Erro ao coletar métricas', 'monitoringService', error);
-    throw error;
+
+    this.errors.push(errorEvent);
+    
+    // Manter apenas últimos 1000 erros
+    if (this.errors.length > 1000) {
+      this.errors = this.errors.slice(-1000);
+    }
+
+    // Enviar para Sentry (se disponível)
+    if (typeof (window as any).Sentry !== 'undefined') {
+      (window as any).Sentry.captureException(error, { extra: context });
+    }
+
+    logger.error(error.message, 'monitoringService', error);
+    this.checkForAlerts('error', errorEvent);
+  }
+
+  /**
+   * Registra métrica de performance
+   */
+  recordMetric(name: string, value: number, unit: string = 'ms', tags?: Record<string, string>): void {
+    const metric: PerformanceMetric = {
+      name,
+      value,
+      unit,
+      timestamp: new Date().toISOString(),
+      tags,
+    };
+
+    this.metrics.push(metric);
+
+    // Manter apenas últimos 5000 métricas
+    if (this.metrics.length > 5000) {
+      this.metrics = this.metrics.slice(-5000);
+    }
+
+    // Enviar para Grafana (em produção via API)
+    this.sendMetricToGrafana(metric);
+  }
+
+  /**
+   * Envia métrica para Grafana
+   */
+  private sendMetricToGrafana(metric: PerformanceMetric): void {
+    // Em produção, enviar via API para Grafana
+    // fetch('/api/metrics', { method: 'POST', body: JSON.stringify(metric) });
+  }
+
+  /**
+   * Verifica se deve criar alerta
+   */
+  private checkForAlerts(type: Alert['type'], data: any): void {
+    // Regras de alerta
+    if (type === 'error') {
+      const recentErrors = this.errors.filter(
+        e => new Date(e.timestamp).getTime() > Date.now() - 60000 // Último minuto
+      );
+
+      if (recentErrors.length >= 10) {
+        this.createAlert({
+          type: 'error',
+          severity: 'high',
+          message: `Muitos erros detectados: ${recentErrors.length} erros no último minuto`,
+        });
+      }
+    }
+
+    if (type === 'performance') {
+      const slowMetrics = this.metrics.filter(
+        m => m.name.includes('render') && m.value > 1000
+      );
+
+      if (slowMetrics.length >= 5) {
+        this.createAlert({
+          type: 'performance',
+          severity: 'medium',
+          message: 'Performance degradada detectada',
+        });
+      }
+    }
+  }
+
+  /**
+   * Cria alerta
+   */
+  createAlert(alert: Omit<Alert, 'id' | 'timestamp' | 'resolved'>): void {
+    const newAlert: Alert = {
+      ...alert,
+      id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date().toISOString(),
+      resolved: false,
+    };
+
+    this.alerts.push(newAlert);
+
+    // Notificar administradores (em produção)
+    this.notifyAdmins(newAlert);
+
+    logger.warn(`Alerta criado: ${newAlert.message}`, 'monitoringService');
+  }
+
+  /**
+   * Notifica administradores
+   */
+  private notifyAdmins(alert: Alert): void {
+    // Em produção, enviar notificação via email/Slack/etc
+    if (alert.severity === 'critical') {
+      // Enviar notificação imediata
+    }
+  }
+
+  /**
+   * Resolve alerta
+   */
+  resolveAlert(alertId: string): boolean {
+    const alert = this.alerts.find(a => a.id === alertId);
+    if (alert) {
+      alert.resolved = true;
+      logger.info(`Alerta resolvido: ${alertId}`, 'monitoringService');
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Obtém erros recentes
+   */
+  getRecentErrors(limit: number = 50): ErrorEvent[] {
+    return this.errors.slice(-limit);
+  }
+
+  /**
+   * Obtém métricas
+   */
+  getMetrics(name?: string, limit: number = 100): PerformanceMetric[] {
+    let filtered = this.metrics;
+    if (name) {
+      filtered = filtered.filter(m => m.name === name);
+    }
+    return filtered.slice(-limit);
+  }
+
+  /**
+   * Obtém alertas ativos
+   */
+  getActiveAlerts(): Alert[] {
+    return this.alerts.filter(a => !a.resolved);
   }
 }
 
-/**
- * Coleta métricas de uma academia específica
- */
-export async function getGymMetrics(gymId: string): Promise<{
-  totalStudents: number;
-  totalTrainers: number;
-  activeLicenses: number;
-  totalWeightEntries: number;
-  totalChatMessages: number;
-}> {
-  try {
-    const supabase = getSupabaseClient();
+// Instância singleton
+export const monitoringService = new MonitoringService();
 
-    // Alunos
-    const { count: totalStudents } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .eq('gym_id', gymId)
-      .eq('gym_role', 'student');
+// Inicializar automaticamente
+if (typeof window !== 'undefined') {
+  monitoringService.initializeSentry().catch(error => {
+    logger.error('Erro ao inicializar monitoramento', 'monitoringService', error);
+  });
 
-    // Treinadores
-    const { count: totalTrainers } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .eq('gym_id', gymId)
-      .eq('gym_role', 'trainer');
+  // Capturar erros globais
+  window.addEventListener('error', (event) => {
+    monitoringService.captureError(event.error || new Error(event.message), {
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+    });
+  });
 
-    // Licenças ativas
-    const { count: activeLicenses } = await supabase
-      .from('company_licenses')
-      .select('*', { count: 'exact', head: true })
-      .eq('company_id', gymId)
-      .eq('status', 'active');
-
-    // Dados de peso
-    const { count: totalWeightEntries } = await supabase
-      .from('weight_history')
-      .select('*', { count: 'exact', head: true })
-      .eq('gym_id', gymId);
-
-    // Mensagens
-    const { count: totalChatMessages } = await supabase
-      .from('chat_messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('gym_id', gymId);
-
-    return {
-      totalStudents: totalStudents || 0,
-      totalTrainers: totalTrainers || 0,
-      activeLicenses: activeLicenses || 0,
-      totalWeightEntries: totalWeightEntries || 0,
-      totalChatMessages: totalChatMessages || 0,
-    };
-  } catch (error) {
-    logger.error('Erro ao coletar métricas da academia', 'monitoringService', error);
-    throw error;
-  }
+  // Capturar promessas rejeitadas
+  window.addEventListener('unhandledrejection', (event) => {
+    monitoringService.captureError(
+      new Error(event.reason?.message || 'Unhandled Promise Rejection'),
+      { reason: event.reason }
+    );
+  });
 }
-
-/**
- * Verifica saúde do sistema
- */
-export async function checkSystemHealth(): Promise<{
-  healthy: boolean;
-  issues: string[];
-}> {
-  const issues: string[] = [];
-
-  try {
-    const supabase = getSupabaseClient();
-
-    // Verificar conexão com Supabase
-    const { error: connectionError } = await supabase
-      .from('users')
-      .select('id')
-      .limit(1);
-
-    if (connectionError) {
-      issues.push(`Erro de conexão: ${connectionError.message}`);
-    }
-
-    // Verificar se há assinaturas expiradas que não foram revogadas
-    const { data: expiredNotRevoked } = await supabase
-      .from('user_subscriptions')
-      .select('id')
-      .eq('status', 'active')
-      .lt('current_period_end', new Date().toISOString())
-      .limit(1);
-
-    if (expiredNotRevoked && expiredNotRevoked.length > 0) {
-      issues.push('Há assinaturas expiradas que não foram revogadas');
-    }
-
-    // Verificar se há academias canceladas com alunos ativos
-    const { data: cancelledGymsWithActiveStudents } = await supabase
-      .from('users')
-      .select('id')
-      .eq('access_blocked', false)
-      .not('gym_id', 'is', null)
-      .in('gym_id', 
-        supabase
-          .from('companies')
-          .select('id')
-          .eq('status', 'cancelled')
-      )
-      .limit(1);
-
-    if (cancelledGymsWithActiveStudents && cancelledGymsWithActiveStudents.length > 0) {
-      issues.push('Há academias canceladas com alunos ainda ativos');
-    }
-
-    return {
-      healthy: issues.length === 0,
-      issues,
-    };
-  } catch (error: any) {
-    issues.push(`Erro ao verificar saúde: ${error.message}`);
-    return {
-      healthy: false,
-      issues,
-    };
-  }
-}
-

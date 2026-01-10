@@ -41,20 +41,20 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onI
         }
         
         // Validação de tamanho
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            if (file.size > 5 * 1024 * 1024) { // 5MB limit
             setError('A imagem é muito grande. O limite é 5MB. Tente comprimir a imagem.');
-            return;
-        }
+                return;
+            }
         
-        try {
-            const base64String = await toBase64(file);
-            const base64Data = base64String.split(',')[1];
+            try {
+                const base64String = await toBase64(file);
+                const base64Data = base64String.split(',')[1];
             
             if (!mountedRef.current) return;
             
-            setPreview(base64String);
-            onImageUpload(base64Data, file.type);
-        } catch (err) {
+                setPreview(base64String);
+                onImageUpload(base64Data, file.type);
+            } catch (err) {
             if (!mountedRef.current) return;
             console.error('Erro ao processar imagem:', err);
             setError('Não foi possível processar a imagem. Tente novamente com outra imagem.');
@@ -130,17 +130,17 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onI
                 </div>
             ) : (
                 <>
-                    <div
-                        {...getRootProps()}
+                <div
+                    {...getRootProps()}
                         className={`flex flex-col items-center justify-center w-full min-h-[200px] sm:min-h-[256px] border-2 border-dashed rounded-lg cursor-pointer transition-colors touch-manipulation
-                        ${isDragActive ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-primary-400 dark:hover:border-primary-600 bg-slate-50 dark:bg-slate-800/30 active:bg-primary-50 dark:active:bg-primary-900/20'}`}
-                    >
-                        <input {...getInputProps()} />
+                        ${isDragActive ? 'border-slate-500 bg-slate-100 dark:bg-slate-700/30' : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 bg-slate-50 dark:bg-slate-800/30 active:bg-slate-100 dark:active:bg-slate-700/30'}`}
+                >
+                    <input {...getInputProps()} />
                         <div className="flex flex-col items-center justify-center pt-5 pb-6 px-4 text-center">
-                            <CameraIcon className="w-10 h-10 sm:w-12 sm:h-12 mb-3 text-primary-500 dark:text-primary-400" />
+                            <CameraIcon className="w-10 h-10 sm:w-12 sm:h-12 mb-3 text-slate-500 dark:text-slate-400" />
                             <p className="mb-2 text-sm sm:text-base text-slate-700 dark:text-slate-300 font-medium">
-                                <span className="text-primary-600 dark:text-primary-400">Toque para tirar foto</span> ou escolher da galeria
-                            </p>
+                                <span className="text-slate-900 dark:text-slate-100">Toque para tirar foto</span> ou escolher da galeria
+                        </p>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
                                 PNG, JPG ou WEBP (máx. 5MB)
                             </p>
@@ -150,7 +150,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onI
                     <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="mt-3 w-full py-3 px-4 bg-primary-500 hover:bg-primary-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 touch-manipulation active:bg-primary-700"
+                        className="mt-3 w-full py-3 px-4 bg-slate-600 hover:bg-slate-700 dark:bg-slate-500 dark:hover:bg-slate-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 touch-manipulation active:bg-slate-800 dark:active:bg-slate-700"
                         aria-label="Abrir câmera"
                     >
                         <div className="flex items-center justify-center gap-2">

@@ -1,14 +1,12 @@
 /**
- * Capacitor Configuration
- * 
- * Configuração do Capacitor para empacotamento do app como aplicativo nativo
- * Suporta: Android, iOS, Electron (Desktop)
+ * Configuração do Capacitor para App Nativo
+ * iOS/Android builds, notificações nativas, recursos nativos
  */
 
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.fitcoach.ia',
+  appId: 'io.fitcoach.ia',
   appName: 'FitCoach.IA',
   webDir: 'dist',
   server: {
@@ -19,16 +17,30 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,
-      backgroundColor: '#1A4D2E',
+      backgroundColor: '#10b981',
       androidSplashResourceName: 'splash',
       androidScaleType: 'CENTER_CROP',
-      showSpinner: false,
+      showSpinner: true,
+      androidSpinnerStyle: 'large',
       iosSpinnerStyle: 'small',
-      spinnerColor: '#F5F1E8',
+      spinnerColor: '#ffffff',
+    },
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
+    LocalNotifications: {
+      smallIcon: 'ic_stat_icon_config_sample',
+      iconColor: '#10b981',
+      sound: 'beep.wav',
+    },
+    App: {
+      urlOpen: {
+        enabled: true,
+      },
     },
     StatusBar: {
       style: 'dark',
-      backgroundColor: '#1A4D2E',
+      backgroundColor: '#ffffff',
     },
     Keyboard: {
       resize: 'body',
@@ -36,18 +48,6 @@ const config: CapacitorConfig = {
       resizeOnFullScreen: true,
     },
   },
-  android: {
-    buildOptions: {
-      keystorePath: undefined,
-      keystoreAlias: undefined,
-    },
-    allowMixedContent: true,
-  },
-  ios: {
-    scheme: 'FitCoach.IA',
-    contentInset: 'automatic',
-  },
 };
 
 export default config;
-

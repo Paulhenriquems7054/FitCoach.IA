@@ -43,7 +43,7 @@ const PrivacyPage: React.FC = () => {
         // Criar/atualizar sessão atual
         createOrUpdateSession().then(() => {
             if (mountedRef.current) {
-                loadSessions();
+            loadSessions();
             }
         }).catch((error) => {
             console.error('Erro ao criar/atualizar sessão:', error);
@@ -148,11 +148,11 @@ const PrivacyPage: React.FC = () => {
     const handleEndSession = async (sessionId: string) => {
         if (!mountedRef.current) return;
         try {
-            endSession(sessionId);
+        endSession(sessionId);
             await loadSessions();
-            logActivity('Sessão encerrada', 'security', { sessionId });
+        logActivity('Sessão encerrada', 'security', { sessionId });
             if (mountedRef.current) {
-                showSuccess('Sessão encerrada com sucesso');
+        showSuccess('Sessão encerrada com sucesso');
             }
         } catch (error) {
             console.error('Erro ao encerrar sessão:', error);
@@ -168,11 +168,11 @@ const PrivacyPage: React.FC = () => {
             return;
         }
         try {
-            endAllOtherSessions();
+        endAllOtherSessions();
             await loadSessions();
             logActivity('Todas as outras sessões encerradas', 'security', {});
             if (mountedRef.current) {
-                showSuccess('Todas as outras sessões foram encerradas');
+        showSuccess('Todas as outras sessões foram encerradas');
             }
         } catch (error) {
             console.error('Erro ao encerrar sessões:', error);
@@ -207,44 +207,44 @@ const PrivacyPage: React.FC = () => {
         
         setIsDeleting(true);
         try {
-            if (deleteOption === 'anonymize') {
+        if (deleteOption === 'anonymize') {
                 const result = await anonymizeUserData(user);
                 if (result.success) {
                     logActivity('Dados anonimizados', 'security');
                     if (mountedRef.current) {
-                        showSuccess('Dados anonimizados com sucesso');
-                        setShowDeleteConfirm(false);
+                    showSuccess('Dados anonimizados com sucesso');
+                    setShowDeleteConfirm(false);
                         // Aguardar um pouco antes de redirecionar
                         setTimeout(() => {
-                            window.location.hash = '#/presentation';
-                            window.location.reload();
+                    window.location.hash = '#/presentation';
+                    window.location.reload();
                         }, 1000);
                     }
                 } else {
                     if (mountedRef.current) {
-                        showError(result.error || 'Erro ao anonimizar dados');
-                    }
+                    showError(result.error || 'Erro ao anonimizar dados');
                 }
-            } else {
+            }
+        } else {
                 const result = await deleteUserAccount();
                 if (result.success) {
                     logActivity('Conta excluída permanentemente', 'security');
                     if (mountedRef.current) {
-                        showSuccess('Conta excluída com sucesso');
-                        setShowDeleteConfirm(false);
+                    showSuccess('Conta excluída com sucesso');
+                    setShowDeleteConfirm(false);
                         // Aguardar um pouco antes de redirecionar
                         setTimeout(() => {
-                            window.location.hash = '#/login';
-                            window.location.reload();
+                    window.location.hash = '#/login';
+                    window.location.reload();
                         }, 1000);
                     }
                 } else {
                     if (mountedRef.current) {
-                        showError(result.error || 'Erro ao excluir conta');
+                    showError(result.error || 'Erro ao excluir conta');
                     }
                 }
-            }
-        } catch (error) {
+                }
+            } catch (error) {
             console.error('Erro ao processar exclusão/anonimização:', error);
             if (mountedRef.current) {
                 showError(deleteOption === 'anonymize' ? 'Erro ao anonimizar dados' : 'Erro ao excluir conta');
@@ -335,18 +335,18 @@ const PrivacyPage: React.FC = () => {
                                             <div className="flex items-center justify-between mb-1">
                                                 <label className="text-sm font-medium text-slate-900 dark:text-slate-100 cursor-pointer flex-1">
                                                     {permissionInfo.title}
-                                                </label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handlePermissionChange(key as keyof typeof permissions)}
-                                                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 ${value ? 'bg-primary-600' : 'bg-gray-200 dark:bg-slate-700'}`}
-                                                    role="switch"
-                                                    aria-checked={value}
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => handlePermissionChange(key as keyof typeof permissions)}
+                                            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 ${value ? 'bg-primary-600' : 'bg-gray-200 dark:bg-slate-700'}`}
+                                            role="switch"
+                                            aria-checked={value}
                                                     aria-label={`${permissionInfo.title} - ${value ? 'Ativado' : 'Desativado'}`}
-                                                >
-                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${value ? 'translate-x-4' : 'translate-x-0'}`}></span>
-                                                </button>
-                                            </div>
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${value ? 'translate-x-4' : 'translate-x-0'}`}></span>
+                                        </button>
+                                    </div>
                                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                                                 {permissionInfo.desc}
                                             </p>
@@ -634,13 +634,13 @@ const PrivacyPage: React.FC = () => {
                                             </label>
                                         </div>
                                         <div className="flex gap-2">
-                                        <Button
-                                            onClick={handleDeleteAccount}
+                                            <Button
+                                                onClick={handleDeleteAccount}
                                             disabled={isDeleting}
                                             className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
+                                            >
                                             {isDeleting ? 'Processando...' : 'Confirmar'}
-                                        </Button>
+                                            </Button>
                                             <Button
                                                 onClick={() => setShowDeleteConfirm(false)}
                                                 variant="secondary"

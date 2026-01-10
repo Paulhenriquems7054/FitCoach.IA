@@ -91,7 +91,7 @@ const WellnessPlanPage: React.FC = () => {
                 // Carregar treinos concluídos
                 const completed = await getCompletedWorkouts();
                 if (mountedRef.current) {
-                    setCompletedWorkouts(completed);
+                setCompletedWorkouts(completed);
                 }
             } catch (e) {
                 logger.warn('Erro ao carregar dados do banco de dados', 'WellnessPlanPage', e);
@@ -221,12 +221,12 @@ const WellnessPlanPage: React.FC = () => {
             logger.info(`Plano gerado com sucesso (${result.plano_treino_semanal.length} dias, ${result.recomendacoes_suplementos?.length || 0} suplementos)`, 'WellnessPlanPage');
             
             if (mountedRef.current) {
-                setPlan(result);
+            setPlan(result);
             }
             
             // Salvar no banco de dados
             try {
-                await saveWellnessPlan(result);
+            await saveWellnessPlan(result);
                 if (mountedRef.current) {
                     logger.info('Plano salvo no banco de dados', 'WellnessPlanPage');
                 }
@@ -239,7 +239,7 @@ const WellnessPlanPage: React.FC = () => {
             try {
                 await clearCompletedWorkouts();
                 if (mountedRef.current) {
-                    setCompletedWorkouts(new Set());
+            setCompletedWorkouts(new Set());
                 }
             } catch (clearError) {
                 logger.warn('Erro ao limpar progresso, mas plano foi gerado', 'WellnessPlanPage', clearError);
@@ -260,7 +260,7 @@ const WellnessPlanPage: React.FC = () => {
             showError(errorMessage);
         } finally {
             if (mountedRef.current) {
-                setIsLoading(false);
+            setIsLoading(false);
             }
         }
     };
@@ -420,54 +420,54 @@ const WellnessPlanPage: React.FC = () => {
                                     </Alert>
                                 )}
                                 
-                                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
-                                    <div className="flex-1 min-w-0">
-                                        <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-2">
-                                            Meu Plano Semanal
-                                        </h2>
-                                        {plan.data_geracao && (
-                                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
+                                <div className="flex-1 min-w-0">
+                                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-2">
+                                        Meu Plano Semanal
+                                    </h2>
+                                    {plan.data_geracao && (
+                                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                                                 Gerado em {new Date(plan.data_geracao).toLocaleDateString('pt-BR')} • Objetivo: <strong>{getGoalLabel(user.objetivo)}</strong>
-                                            </p>
-                                        )}
-                                        {progress.total > 0 && (
-                                            <div className="mt-3">
-                                                <div className="flex items-center justify-between text-xs sm:text-sm mb-2">
-                                                    <span className="text-slate-600 dark:text-slate-400">
-                                                        Progresso da semana
-                                                    </span>
-                                                    <span className="font-semibold text-primary-600 dark:text-primary-400 whitespace-nowrap ml-2">
-                                                        {progress.completed}/{progress.total} treinos
-                                                    </span>
-                                                </div>
-                                                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 sm:h-3">
-                                                    <div
-                                                        className="bg-primary-500 h-2 sm:h-3 rounded-full transition-all duration-300"
-                                                        style={{ width: `${progress.percentage}%` }}
-                                                    />
-                                                </div>
+                                        </p>
+                                    )}
+                                    {progress.total > 0 && (
+                                        <div className="mt-3">
+                                            <div className="flex items-center justify-between text-xs sm:text-sm mb-2">
+                                                <span className="text-slate-600 dark:text-slate-400">
+                                                    Progresso da semana
+                                                </span>
+                                                <span className="font-semibold text-primary-600 dark:text-primary-400 whitespace-nowrap ml-2">
+                                                    {progress.completed}/{progress.total} treinos
+                                                </span>
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full md:w-auto">
-                                        <Button
-                                            onClick={() => setIsEditing(true)}
-                                            variant="secondary"
-                                            size="sm"
-                                            className="w-full sm:w-auto text-xs sm:text-sm"
-                                        >
-                                            ✏️ Editar Plano
-                                        </Button>
-                                        <Button
-                                            onClick={handleGeneratePlan}
-                                            variant="secondary"
-                                            size="sm"
-                                            className="w-full sm:w-auto text-xs sm:text-sm"
+                                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 sm:h-3">
+                                                <div
+                                                    className="bg-primary-500 h-2 sm:h-3 rounded-full transition-all duration-300"
+                                                    style={{ width: `${progress.percentage}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full md:w-auto">
+                                    <Button
+                                        onClick={() => setIsEditing(true)}
+                                        variant="secondary"
+                                        size="sm"
+                                        className="w-full sm:w-auto text-xs sm:text-sm"
+                                    >
+                                        ✏️ Editar Plano
+                                    </Button>
+                                    <Button
+                                        onClick={handleGeneratePlan}
+                                        variant="secondary"
+                                        size="sm"
+                                        className="w-full sm:w-auto text-xs sm:text-sm"
                                             disabled={isLoading}
-                                        >
-                                            <SparklesIcon className="w-4 h-4 mr-2" />
+                                    >
+                                        <SparklesIcon className="w-4 h-4 mr-2" />
                                             {isLoading ? 'Gerando...' : 'Gerar Novo Plano'}
-                                        </Button>
+                                    </Button>
                                     </div>
                                 </div>
                             </div>

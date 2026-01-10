@@ -1165,7 +1165,7 @@ const StudentManagementPage: React.FC = () => {
 
             {/* Método Principal: Convites */}
             {permissions.canCreateStudents && (currentUser?.gymId || getGymId()) && (
-                <Card className="mb-6 bg-gradient-to-br from-primary-50 to-emerald-50 dark:from-primary-900/20 dark:to-emerald-900/20 border-2 border-primary-200 dark:border-primary-800">
+                <Card className="mb-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/30 dark:to-slate-900/30 border-2 border-slate-200 dark:border-slate-700">
                     <div className="p-6">
                         <div className="flex items-start gap-3 mb-4">
                             <div className="flex-shrink-0">
@@ -1177,7 +1177,7 @@ const StudentManagementPage: React.FC = () => {
                                 </h2>
                                 <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
                                     Gere links de convite para que alunos, treinadores e recepcionistas façam seu próprio cadastro. 
-                                    <strong className="text-primary-600 dark:text-primary-400"> Recomendado para a maioria dos casos.</strong>
+                                    <strong className="text-slate-900 dark:text-slate-100"> Recomendado para a maioria dos casos.</strong>
                                 </p>
                                 <div className="flex flex-wrap gap-3">
                                     <Button
@@ -1246,14 +1246,14 @@ const StudentManagementPage: React.FC = () => {
                             </div>
                         </div>
                         {(inviteStudentLink || invitePersonalLink) && (
-                            <div className="mt-4 p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg border border-emerald-200 dark:border-emerald-700 space-y-3">
+                            <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 space-y-3">
                                 {inviteStudentLink && (
                                     <div>
-                                        <p className="font-semibold text-emerald-900 dark:text-emerald-100 mb-1">
+                                        <p className="font-semibold text-slate-900 dark:text-slate-100 mb-1">
                                             ✅ Convite para Aluno gerado:
                                         </p>
                                         <div className="flex items-center gap-2">
-                                            <p className="break-all text-sm text-emerald-800 dark:text-emerald-200 flex-1 bg-white dark:bg-slate-800 p-2 rounded border border-emerald-300 dark:border-emerald-600">
+                                            <p className="break-all text-sm text-slate-800 dark:text-slate-200 flex-1 bg-white dark:bg-slate-800 p-2 rounded border border-slate-300 dark:border-slate-600">
                                                 {inviteStudentLink}
                                             </p>
                                             <Button
@@ -1274,11 +1274,11 @@ const StudentManagementPage: React.FC = () => {
                                 )}
                                 {invitePersonalLink && (
                                     <div>
-                                        <p className="font-semibold text-emerald-900 dark:text-emerald-100 mb-1">
+                                        <p className="font-semibold text-slate-900 dark:text-slate-100 mb-1">
                                             ✅ Convite para Personal gerado:
                                         </p>
                                         <div className="flex items-center gap-2">
-                                            <p className="break-all text-sm text-emerald-800 dark:text-emerald-200 flex-1 bg-white dark:bg-slate-800 p-2 rounded border border-emerald-300 dark:border-emerald-600">
+                                            <p className="break-all text-sm text-slate-800 dark:text-slate-200 flex-1 bg-white dark:bg-slate-800 p-2 rounded border border-slate-300 dark:border-slate-600">
                                                 {invitePersonalLink}
                                             </p>
                                             <Button
@@ -1297,7 +1297,7 @@ const StudentManagementPage: React.FC = () => {
                                         </div>
                                     </div>
                                 )}
-                                <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
+                                <p className="text-xs text-slate-700 dark:text-slate-300 mt-2">
                                     💬 Envie estes links por WhatsApp, e-mail ou mostre como QR Code para que alunos e profissionais se cadastrem já vinculados à sua academia.
                                 </p>
                                 {(currentUser.gymId || getGymId()) && (

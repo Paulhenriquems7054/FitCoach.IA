@@ -59,6 +59,9 @@ const SubscriptionStatusScreen = lazy(() => import('./pages/SubscriptionStatusSc
 const ChangePlanPage = lazy(() => import('./pages/ChangePlanPage'));
 const CreateDefaultUsersPage = lazy(() => import('./pages/CreateDefaultUsersPage'));
 const StudentAiPlansPage = lazy(() => import('./pages/StudentAiPlansPage'));
+const CalendarPage = lazy(() => import('./pages/CalendarPage'));
+const CommunityPage = lazy(() => import('./pages/CommunityPage'));
+const GroupWorkoutsPage = lazy(() => import('./pages/GroupWorkoutsPage'));
 const Onboarding = lazy(() => import('./components/Onboarding'));
 
 // Componente de loading
@@ -162,6 +165,7 @@ const App: React.FC = () => {
     const lastRedirectHashRef = useRef<string>('');
     const loginCheckRef = useRef(false);
     const lastLogKeyRef = useRef<string>('');
+    const initializationCompletedRef = useRef(false);
 
     // Rotas públicas (não requerem autenticação)
     const publicRoutes = ['/premium', '/presentation', '/login', '/landing'];
@@ -217,7 +221,7 @@ const App: React.FC = () => {
                 // Verificar se usuário está realmente logado (apenas uma vez)
                 const checkLogin = async () => {
                     // Evitar múltiplas execuções
-                    if (loginCheckRef.current || isInitialized) {
+                    if (loginCheckRef.current || initializationCompletedRef.current) {
                         return;
                     }
                     
@@ -225,8 +229,9 @@ const App: React.FC = () => {
                     
                     // Timeout de segurança - garantir que sempre inicialize após 3 segundos
                     const safetyTimeout = setTimeout(() => {
-                        if (!isInitialized) {
+                        if (!initializationCompletedRef.current) {
                             console.warn('[App] Timeout de segurança: forçando inicialização após 3s');
+                            initializationCompletedRef.current = true;
                             setIsLoggedIn(false);
                             setIsInitialized(true);
                         }
@@ -256,6 +261,7 @@ const App: React.FC = () => {
                                 
                                 if (isOnLoginPage || isEmptyHash) {
                                     console.log('[App] Hash vazio ou na página de login, não fazer login automático');
+                                    initializationCompletedRef.current = true;
                                     setIsLoggedIn(false);
                                     setIsInitialized(true);
                                     clearTimeout(safetyTimeout);
@@ -287,6 +293,7 @@ const App: React.FC = () => {
                                             }
                                             return updatedUser;
                                         });
+                                        initializationCompletedRef.current = true;
                                         setIsLoggedIn(true);
                                         setIsInitialized(true);
                                         clearTimeout(safetyTimeout);
@@ -315,7 +322,10 @@ const App: React.FC = () => {
                         setIsLoggedIn(false);
                     } finally {
                         clearTimeout(safetyTimeout);
-                        setIsInitialized(true);
+                        if (!initializationCompletedRef.current) {
+                            initializationCompletedRef.current = true;
+                            setIsInitialized(true);
+                        }
                         console.log('[App] Inicialização concluída');
                     }
                 };
@@ -852,6 +862,9 @@ const App: React.FC = () => {
             case '/subscription-status': return <SubscriptionStatusScreen />;
             case '/change-plan': return <ChangePlanPage />;
             case '/create-default-users': return <CreateDefaultUsersPage />;
+            case '/calendar': return <CalendarPage />;
+            case '/community': return <CommunityPage />;
+            case '/group-workouts': return <GroupWorkoutsPage />;
             case '/':
             default:
                 // Se for desenvolvedor, sempre mostrar admin-dashboard
