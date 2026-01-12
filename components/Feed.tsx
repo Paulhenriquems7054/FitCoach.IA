@@ -56,20 +56,20 @@ export const Feed: React.FC = () => {
     <div className="space-y-6">
       {/* Criar Post */}
       <Card>
-        <div className="p-4">
-          <div className="flex items-center gap-3">
+        <div className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="flex-1">
               <input
                 type="text"
                 placeholder="O que você está pensando?"
                 onClick={handleCreatePost}
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white cursor-pointer"
+                className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white cursor-pointer"
                 readOnly
               />
             </div>
-            <Button onClick={handleCreatePost}>
-              <PlusIcon className="w-5 h-5 mr-2" />
-              Criar Post
+            <Button onClick={handleCreatePost} className="w-full sm:w-auto">
+              <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+              <span className="text-sm sm:text-base">Criar Post</span>
             </Button>
           </div>
         </div>

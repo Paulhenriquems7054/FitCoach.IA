@@ -52,49 +52,49 @@ const CommunityPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+    <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 max-w-7xl">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
           Comunidade
         </h1>
-        <p className="text-slate-600 dark:text-slate-400">
+        <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
           Conecte-se com outros usuários, compartilhe seu progresso e motive-se!
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 border-b border-slate-200 dark:border-slate-700">
-        <div className="flex gap-4">
+      <div className="mb-6 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+        <div className="flex gap-2 sm:gap-4 min-w-max sm:min-w-0">
           <button
             onClick={() => setActiveTab('feed')}
             className={`
-              px-4 py-2 font-medium border-b-2 transition-colors
+              px-3 sm:px-4 py-2 text-sm sm:text-base font-medium border-b-2 transition-colors whitespace-nowrap
               ${activeTab === 'feed'
                 ? 'border-slate-600 text-slate-900 dark:text-slate-100'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }
             `}
           >
-            <ChatBubbleIcon className="w-5 h-5 inline mr-2" />
+            <ChatBubbleIcon className="w-4 h-4 sm:w-5 sm:h-5 inline mr-1 sm:mr-2" />
             Feed
           </button>
           <button
             onClick={() => setActiveTab('groups')}
             className={`
-              px-4 py-2 font-medium border-b-2 transition-colors
+              px-3 sm:px-4 py-2 text-sm sm:text-base font-medium border-b-2 transition-colors whitespace-nowrap
               ${activeTab === 'groups'
                 ? 'border-slate-600 text-slate-900 dark:text-slate-100'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }
             `}
           >
-            <UsersIcon className="w-5 h-5 inline mr-2" />
+            <UsersIcon className="w-4 h-4 sm:w-5 sm:h-5 inline mr-1 sm:mr-2" />
             Grupos
           </button>
           <button
             onClick={() => setActiveTab('discover')}
             className={`
-              px-4 py-2 font-medium border-b-2 transition-colors
+              px-3 sm:px-4 py-2 text-sm sm:text-base font-medium border-b-2 transition-colors whitespace-nowrap
               ${activeTab === 'discover'
                 ? 'border-slate-600 text-slate-900 dark:text-slate-100'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'

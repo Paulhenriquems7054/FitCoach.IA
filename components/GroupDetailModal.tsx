@@ -88,16 +88,17 @@ export const GroupDetailModal: React.FC<GroupDetailModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="lg">
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white truncate pr-2">
             {group.name}
           </h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 -mr-1 flex-shrink-0"
+            aria-label="Fechar"
           >
-            <XIcon className="w-6 h-6" />
+            <XIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
@@ -115,27 +116,27 @@ export const GroupDetailModal: React.FC<GroupDetailModalProps> = ({
             </div>
 
             {/* Estatísticas */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                <UsersIcon className="w-6 h-6 mx-auto mb-2 text-slate-500 dark:text-slate-400" />
-                <div className="text-2xl font-bold text-slate-900 dark:text-white">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
+              <div className="text-center p-3 sm:p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-2 text-slate-500 dark:text-slate-400" />
+                <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
                   {group.members.length}
                   {group.maxMembers && `/${group.maxMembers}`}
                 </div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">Membros</div>
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Membros</div>
               </div>
-              <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                <TrophyIcon className="w-6 h-6 mx-auto mb-2 text-slate-500 dark:text-slate-400" />
-                <div className="text-2xl font-bold text-slate-900 dark:text-white">
+              <div className="text-center p-3 sm:p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <TrophyIcon className="w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-2 text-slate-500 dark:text-slate-400" />
+                <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
                   {group.challenges.length}
                 </div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">Desafios</div>
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Desafios</div>
               </div>
-              <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                <div className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              <div className="text-center p-3 sm:p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-2">
                   {group.workouts.length}
                 </div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">Treinos</div>
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Treinos</div>
               </div>
             </div>
 

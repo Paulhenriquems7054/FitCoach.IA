@@ -61,16 +61,17 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="md">
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
             Criar Grupo de Treino
           </h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 -mr-1"
+            aria-label="Fechar"
           >
-            <XIcon className="w-6 h-6" />
+            <XIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
@@ -85,7 +86,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+              className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               placeholder="Ex: Grupo de Corrida Matinal"
             />
           </div>
@@ -99,7 +100,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+              className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white resize-none"
               placeholder="Descreva o objetivo do grupo..."
             />
           </div>
@@ -112,7 +113,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value as Group['category'])}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+              className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
             >
               <option value="general">Geral</option>
               <option value="weight-loss">Perda de Peso</option>
@@ -138,19 +139,19 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           </div>
 
           {/* Botões */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-3 pt-4">
             <Button
               type="button"
               variant="secondary"
               onClick={onClose}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               Cancelar
             </Button>
             <Button
               type="submit"
               disabled={isCreating || !name.trim()}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               {isCreating ? 'Criando...' : 'Criar Grupo'}
             </Button>

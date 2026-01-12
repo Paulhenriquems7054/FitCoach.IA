@@ -86,7 +86,7 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   return (
     <Card>
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
         {/* Cabeçalho */}
         <div className="flex items-start gap-3">
           <Avatar
@@ -165,17 +165,18 @@ export const PostCard: React.FC<PostCardProps> = ({
         </div>
 
         {/* Ações */}
-        <div className="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
           <Button
             variant="ghost"
             onClick={handleLike}
             disabled={isLiking}
             className={`
-              flex-1 ${isLiked ? 'text-red-600 dark:text-red-400' : ''}
+              flex-1 sm:flex-1 ${isLiked ? 'text-red-600 dark:text-red-400' : ''}
             `}
+            size="sm"
           >
-            <HeartIcon className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
-            <span className="ml-2">Curtir</span>
+            <HeartIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${isLiked ? 'fill-current' : ''}`} />
+            <span className="ml-1 sm:ml-2 text-xs sm:text-sm">Curtir</span>
           </Button>
           <Button
             variant="ghost"
@@ -183,18 +184,20 @@ export const PostCard: React.FC<PostCardProps> = ({
               setIsCommentModalOpen(true);
               onComment?.(post.id);
             }}
-            className="flex-1"
+            className="flex-1 sm:flex-1"
+            size="sm"
           >
-            <ChatBubbleIcon className="w-5 h-5" />
-            <span className="ml-2">Comentar</span>
+            <ChatBubbleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="ml-1 sm:ml-2 text-xs sm:text-sm">Comentar</span>
           </Button>
           <Button
             variant="ghost"
             onClick={handleShare}
-            className="flex-1"
+            className="flex-1 sm:flex-1"
+            size="sm"
           >
-            <ShareIcon className="w-5 h-5" />
-            <span className="ml-2">Compartilhar</span>
+            <ShareIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="ml-1 sm:ml-2 text-xs sm:text-sm">Compartilhar</span>
           </Button>
         </div>
 

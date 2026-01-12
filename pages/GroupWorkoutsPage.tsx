@@ -91,29 +91,29 @@ const GroupWorkoutsPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+    <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 max-w-7xl">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
               Treinos em Grupo
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
               Participe de grupos, complete desafios e competa com outros usuários!
             </p>
           </div>
-          <Button onClick={() => setIsCreatingGroup(true)}>
+          <Button onClick={() => setIsCreatingGroup(true)} className="w-full sm:w-auto">
             <PlusIcon className="w-5 h-5 mr-2" />
             Criar Grupo
           </Button>
         </div>
 
         {/* Filtros */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-2">
           <button
             onClick={() => setFilter('my')}
             className={`
-              px-4 py-2 rounded-lg text-sm font-medium transition-colors
+              px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
               ${filter === 'my'
                 ? 'bg-slate-600 text-white dark:bg-slate-500'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
@@ -125,7 +125,7 @@ const GroupWorkoutsPage: React.FC = () => {
           <button
             onClick={() => setFilter('public')}
             className={`
-              px-4 py-2 rounded-lg text-sm font-medium transition-colors
+              px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
               ${filter === 'public'
                 ? 'bg-slate-600 text-white dark:bg-slate-500'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
@@ -137,7 +137,7 @@ const GroupWorkoutsPage: React.FC = () => {
           <button
             onClick={() => setFilter('all')}
             className={`
-              px-4 py-2 rounded-lg text-sm font-medium transition-colors
+              px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
               ${filter === 'all'
                 ? 'bg-slate-600 text-white dark:bg-slate-500'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'

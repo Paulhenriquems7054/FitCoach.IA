@@ -86,21 +86,22 @@ export const CommentModal: React.FC<CommentModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="lg">
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
             Comentários ({comments.length})
           </h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 -mr-1"
+            aria-label="Fechar"
           >
-            <XIcon className="w-6 h-6" />
+            <XIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
         {/* Lista de Comentários */}
-        <div className="space-y-4 max-h-96 overflow-y-auto mb-4">
+        <div className="space-y-4 max-h-[60vh] sm:max-h-96 overflow-y-auto mb-4">
           {comments.length === 0 ? (
             <p className="text-center text-slate-500 dark:text-slate-400 py-8">
               Nenhum comentário ainda. Seja o primeiro a comentar!
@@ -144,24 +145,27 @@ export const CommentModal: React.FC<CommentModalProps> = ({
 
         {/* Formulário de Novo Comentário */}
         {user && (
-          <form onSubmit={handleSubmit} className="flex gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <Avatar
-              photoUrl={user.photoUrl}
-              name={user.nome}
-              size="sm"
-            />
-            <div className="flex-1 flex gap-2">
+          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div className="hidden sm:block">
+              <Avatar
+                photoUrl={user.photoUrl}
+                name={user.nome}
+                size="sm"
+              />
+            </div>
+            <div className="flex-1 flex gap-2 flex-col sm:flex-row">
               <input
                 type="text"
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Adicione um comentário..."
-                className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className="flex-1 px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
               <Button
                 type="submit"
                 disabled={isSubmitting || !newComment.trim()}
                 size="sm"
+                className="w-full sm:w-auto"
               >
                 {isSubmitting ? 'Enviando...' : 'Enviar'}
               </Button>

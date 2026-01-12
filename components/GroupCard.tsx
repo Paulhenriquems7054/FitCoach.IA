@@ -34,11 +34,11 @@ export const GroupCard: React.FC<GroupCardProps> = ({
 
   return (
     <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={onClick}>
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
         {/* Cabeçalho */}
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-3 sm:gap-4">
           {group.imageUrl && (
-            <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-lg overflow-hidden flex-shrink-0">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-slate-200 dark:bg-slate-700 rounded-lg overflow-hidden flex-shrink-0">
               <img
                 src={group.imageUrl}
                 alt={group.name}
@@ -48,11 +48,11 @@ export const GroupCard: React.FC<GroupCardProps> = ({
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-1 truncate">
                   {group.name}
                 </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
                   {group.description}
                 </p>
               </div>
@@ -66,12 +66,12 @@ export const GroupCard: React.FC<GroupCardProps> = ({
         </div>
 
         {/* Estatísticas */}
-        <div className="grid grid-cols-3 gap-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 border-t border-slate-200 dark:border-slate-700">
           <div className="text-center">
             <div className="flex items-center justify-center gap-1 text-slate-600 dark:text-slate-400 mb-1">
               <UsersIcon className="w-4 h-4" />
             </div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">
+            <div className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
               {group.members.length}
               {group.maxMembers && `/${group.maxMembers}`}
             </div>
@@ -81,9 +81,9 @@ export const GroupCard: React.FC<GroupCardProps> = ({
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-1 text-slate-600 dark:text-slate-400 mb-1">
-              <TrophyIcon className="w-4 h-4" />
+              <TrophyIcon className="w-3 h-3 sm:w-4 sm:h-4" />
             </div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">
+            <div className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
               {group.challenges.length}
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400">
@@ -91,7 +91,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
             </div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">
+            <div className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
               {group.workouts.length}
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400">
