@@ -92,14 +92,50 @@ export async function criarRecarga(
       return { success: false, error: 'Erro ao criar recarga' };
     }
 
-    // TODO: Integrar com Cakto/Stripe para gerar checkout URL
-    // Por enquanto, retornar apenas o ID da recarga
-    // const checkoutUrl = await gerarCheckoutUrl(data.id, recargaInfo);
+    // NOVO MODELO: Integrar com Cakto para gerar checkout URL
+    try {
+      const { getCaktoCheckoutUrl } = await import('./caktoService');
+      
+      // Mapear tipo de recarga para nome do plano na Cakto
+      const planoMapping: Record<TipoRecarga, string> = {
+        'FitVoice20': 'FitVoice20',
+        'FitVoice60': 'FitVoice60',
+        'FitVoice120': 'FitVoice120',
+      };
+      
+      const planName = planoMapping[tipoRecarga];
+      if (planName) {
+        const checkoutUrl = getCaktoCheckoutUrl(planName);
+        
+        // Atualizar recarga com checkout_id
+        if (checkoutUrl && checkoutUrl !== '#') {
+          // Extrair checkout ID da URL
+          const checkoutIdMatch = checkoutUrl.match(/pay\.cakto\.com\.br\/([^/?]+)/);
+          const checkoutId = checkoutIdMatch ? checkoutIdMatch[1] : null;
+          
+          if (checkoutId) {
+            await supabase
+              .from('recargas')
+              .update({ cakto_checkout_id: checkoutId })
+              .eq('id', data.id);
+          }
+          
+          return {
+            success: true,
+            recargaId: data.id,
+            checkoutUrl: checkoutUrl
+          };
+        }
+      }
+    } catch (error) {
+      logger.warn('Erro ao gerar checkout URL da Cakto, retornando apenas recargaId', 'recargaService', error);
+    }
     
+    // Fallback: retornar apenas ID se não conseguir gerar checkout URL
     return {
       success: true,
       recargaId: data.id,
-      checkoutUrl: undefined // TODO: Implementar integração de pagamento
+      checkoutUrl: undefined // Usuário precisará configurar checkout IDs na Cakto primeiro
     };
   } catch (error) {
     logger.error('Erro fatal ao criar recarga', 'recargaService', error);

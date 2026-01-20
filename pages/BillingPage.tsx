@@ -6,6 +6,7 @@ import { useUser } from '../context/UserContext';
 // Router navigation via window.location.hash
 import { supabase } from '../services/supabaseClient';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
+import { LimitesUsageIndicator } from '../components/LimitesUsageIndicator';
 
 interface Invoice {
   id: string;
@@ -309,7 +310,10 @@ const BillingPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Coluna Principal - Uso e Relatórios */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Indicador de Uso - Mostrar sempre se houver plano */}
+          {/* NOVO MODELO: Indicador de Limites (substitui ou complementa UsageIndicator) */}
+          <LimitesUsageIndicator />
+
+          {/* Indicador de Uso Antigo (manter para compatibilidade) */}
           {plan && <UsageIndicator />}
 
           {/* Relatório de Gastos */}

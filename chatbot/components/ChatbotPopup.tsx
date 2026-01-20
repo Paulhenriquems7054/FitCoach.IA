@@ -26,6 +26,7 @@ import { useSubscription } from '../../hooks/useSubscription';
 import { VoiceMinutesCounter } from '../../components/VoiceMinutesCounter';
 import { AiAccessGate } from '../../components/AiAccessGate';
 import { useUser } from '../../context/UserContext';
+import { RecargaModal } from '../../components/RecargaModal';
 
 const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> => {
   return new Promise((resolve, reject) => {
@@ -68,6 +69,7 @@ const ChatbotPopup: React.FC = () => {
   const [isTranscribing, setIsTranscribing] = useState(false); // State for transcription to input
   const [isAudioLoading, setIsAudioLoading] = useState(false); // General audio session loading
   const [showLimitModal, setShowLimitModal] = useState(false); // Modal para bloqueio de voz
+  const [showRecargaModal, setShowRecargaModal] = useState(false); // Modal para recarga de voz
   const [loadingAudioIndex, setLoadingAudioIndex] = useState<number | null>(null);
   const [playbackState, setPlaybackState] = useState<{ index: number; status: 'playing' | 'paused' } | null>(null);
   const [isThinkingMode, setIsThinkingMode] = useState(false);
@@ -75,6 +77,7 @@ const ChatbotPopup: React.FC = () => {
   const [isMapsEnabled, setIsMapsEnabled] = useState(false); // State for Maps toggle
   const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0].value);
   const [selectedPersonality, setSelectedPersonality] = useState(Object.keys(PERSONALITY_OPTIONS)[0]);
+  const [minutosRestantesVoz, setMinutosRestantesVoz] = useState(0); // Para passar ao modal
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -760,7 +763,24 @@ const ChatbotPopup: React.FC = () => {
         onMinutesExhausted={() => {
           stopLiveAudioSession();
           setIsRecording(false);
+          // Abrir modal de recarga quando minutos acabarem
+          const remainingMinutes = getRemainingMinutes();
+          setMinutosRestantesVoz(Math.max(0, remainingMinutes));
+          setShowRecargaModal(true);
           showError('Seus minutos de voz acabaram. Recarregue para continuar.');
+        }}
+      />
+      
+      {/* NOVO MODELO: Modal de Recarga de Voz */}
+      <RecargaModal
+        isOpen={showRecargaModal}
+        onClose={() => setShowRecargaModal(false)}
+        minutosRestantes={minutosRestantesVoz}
+        onRecargaCriada={(recargaId) => {
+          logger.info(`Recarga criada: ${recargaId}`, 'ChatbotPopup');
+          // Fechar modal após recarga criada
+          setShowRecargaModal(false);
+          // O modal já fecha automaticamente após abrir checkout
         }}
       />
       {!isOpen && (

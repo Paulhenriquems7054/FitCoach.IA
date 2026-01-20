@@ -1,0 +1,72 @@
+==========================================
+CHECKOUT IDs - COPIAR DA CAKTO
+==========================================
+
+INSTRUÇÕES:
+1. Abra cada produto na Cakto
+2. Copie o link de checkout (URL completa)
+3. O Checkout ID é a parte final da URL após: https://pay.cakto.com.br/
+4. Cole abaixo:
+
+==========================================
+RECARGAS FITVOICE
+==========================================
+
+FitVoice 20 (R$ 5,00)
+Link completo: https://pay.cakto.com.br/__________________
+Checkout ID: __________________
+
+
+FitVoice 60 (R$ 12,90)
+Link completo: https://pay.cakto.com.br/__________________
+Checkout ID: __________________
+
+
+FitVoice 120 (R$ 19,90)
+Link completo: https://pay.cakto.com.br/__________________
+Checkout ID: __________________
+
+
+==========================================
+PLANOS FITCOACH
+==========================================
+
+FitCoach 50 (R$ 299,90)
+Link completo: https://pay.cakto.com.br/__________________
+Checkout ID: __________________
+
+
+FitCoach 100 (R$ 549,90)
+Link completo: https://pay.cakto.com.br/__________________
+Checkout ID: __________________
+
+
+FitCoach 200 (R$ 999,90)
+Link completo: https://pay.cakto.com.br/__________________
+Checkout ID: __________________
+
+
+FitCoach 400 (R$ 1.799,90)
+Link completo: https://pay.cakto.com.br/__________________
+Checkout ID: __________________
+
+
+FitCoach 500 (?)
+Link completo: https://pay.cakto.com.br/__________________
+Checkout ID: __________________ (se existir)
+
+
+==========================================
+APÓS PREENCHER:
+==========================================
+Envie os Checkout IDs e eu atualizo o código automaticamente!
+
+Formato de resposta:
+FitVoice20: abc123_456789
+FitVoice60: def456_789012
+FitVoice120: ghi789_012345
+FitCoach50: jkl012_345678
+FitCoach100: mno345_678901
+FitCoach200: pqr678_901234
+FitCoach400: stu901_234567
+FitCoach500: vwx234_567890 (se existir)

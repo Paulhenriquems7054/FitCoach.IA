@@ -1193,14 +1193,13 @@ const LoginPage: React.FC = () => {
                                             is_anonymized: false,
                                             role: 'user',
                                             plan_type: 'free',
-                                            subscription_status: 'trial',
-                                            voice_daily_limit_seconds: 300,
+                                            subscription_status: 'active', // Status inicial (modo demo será ativado depois)
+                                            voice_daily_limit_seconds: 0, // Será definido pelo modo demo
                                             voice_used_today_seconds: 0,
                                             voice_balance_upsell: 0,
                                             text_msg_count_today: 0,
-                                            trial_start_date: new Date().toISOString(),
-                                            trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 dias
-                                            expiry_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+                                            // NOVO MODELO: Trial removido - modo demo será ativado via deveAtivarModoDemo
+                                            expiry_date: null, // Não usar mais expiry_date para trial
                                         })
                                         .select()
                                         .single();
@@ -1630,26 +1629,7 @@ const LoginPage: React.FC = () => {
                             <p className="text-xs text-slate-700 dark:text-slate-300 mt-3 mb-2 leading-relaxed break-words">
                                 Se você recebeu um código da sua academia, comece por aqui para liberar seu acesso premium.
                             </p>
-                            {/* Botão "Testar Grátis" apenas para usuários individuais (B2C), não para alunos (B2B2C via convite) */}
-                            {/* Sempre renderizar, mas ocultar quando há inviteInfo válido */}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowSignup(true);
-                                    setSignupStep(2); // Ir direto para etapa 2 (cadastro)
-                                    setSignupCouponCode(''); // Garantir que não há cupom
-                                    setCouponValidated(false);
-                                }}
-                                className="w-full mt-2 text-center text-sm font-semibold text-primary-900 dark:text-primary-300 hover:text-primary-950 dark:hover:text-primary-200 underline decoration-2 underline-offset-2 py-2.5 px-3 transition-all bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700 border border-primary-200/50 dark:border-primary-800/50 rounded-md cursor-pointer"
-                                style={{ 
-                                    minHeight: '44px', 
-                                    display: inviteInfo ? 'none' : 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center' 
-                                }}
-                            >
-                                Não tem código? Testar Grátis por 3 dias
-                            </button>
+                            {/* NOVO MODELO: Trial removido - modo demo será ativado automaticamente para novos usuários não vinculados a academias */}
                             {/* Mensagem informativa para alunos que vêm via convite */}
                             {inviteInfo && inviteInfo.invitedRole === 'student' && (
                                 <p className="mt-3 text-xs text-slate-600 dark:text-slate-400 text-center">

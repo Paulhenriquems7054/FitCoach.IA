@@ -16,14 +16,18 @@ interface RecargaModalProps {
   onClose: () => void;
   minutosRestantes?: number;
   onRecargaCriada?: (recargaId: string) => void;
+  onRecarregarCriada?: (recargaId: string) => void; // Alias para compatibilidade
 }
 
 export function RecargaModal({
   isOpen,
   onClose,
   minutosRestantes = 0,
-  onRecargaCriada
+  onRecargaCriada,
+  onRecarregarCriada
 }: RecargaModalProps) {
+  // Usar onRecargaCriada ou onRecarregarCriada (alias)
+  const handleRecargaCriada = onRecargaCriada || onRecarregarCriada;
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,17 +57,30 @@ export function RecargaModal({
         return;
       }
 
-      // TODO: Redirecionar para checkout (Cakto/Stripe)
-      // Por enquanto, apenas notificar
-      if (resultado.checkoutUrl) {
-        window.open(resultado.checkoutUrl, '_blank');
-      } else if (resultado.recargaId) {
-        // Simular abertura de checkout
-        alert(`Recarga criada! ID: ${resultado.recargaId}\n\nRedirecionando para pagamento...`);
-        // TODO: Implementar redirecionamento real para checkout
-        if (onRecargaCriada) {
-          onRecargaCriada(resultado.recargaId);
+      // NOVO MODELO: Redirecionar para checkout Cakto
+      if (resultado.checkoutUrl && resultado.checkoutUrl !== '#') {
+        // Abrir checkout da Cakto em nova aba
+        const win = window.open(resultado.checkoutUrl, '_blank', 'noopener,noreferrer');
+        if (!win) {
+          setError('Seu navegador bloqueou a janela de pagamento. Verifique o bloqueador de popups.');
+          return;
         }
+        
+        // Notificar sucesso
+        if (handleRecargaCriada && resultado.recargaId) {
+          handleRecargaCriada(resultado.recargaId);
+        }
+        
+        // Fechar modal após abrir checkout
+        onClose();
+      } else if (resultado.recargaId) {
+        // Checkout URL não configurado ainda
+        setError('Checkout não configurado. Por favor, configure os produtos FitVoice na Cakto e atualize os Checkout IDs no código.');
+        logger.warn('Checkout URL não disponível para recarga', 'RecargaModal', { recargaId: resultado.recargaId });
+        // Não fechar modal - usuário precisa ver o erro
+      } else {
+        setError('Erro ao criar recarga. Tente novamente.');
+        // Não fechar modal - usuário precisa ver o erro
       }
 
       // Fechar modal após sucesso

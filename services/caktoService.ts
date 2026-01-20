@@ -22,10 +22,22 @@ const CAKTO_CHECKOUT_IDS: Record<string, string> = {
   'personal_team_5': '3dgheuc_666289',
   'personal_team_15': '3etp85e_666303',
   
-  // Recargas
+  // Recargas antigas (manter para compatibilidade)
   'recharge_turbo': 'ihfy8cz_668443',
   'recharge_voice_bank': 'hhxugxb_668446',
   'recharge_pass_livre': 'trszqtv_668453',
+  
+  // Recargas FitVoice - ✅ CONFIGURADOS
+  'FitVoice20': 'ihfy8cz_668443',      // ✅ 20 min - R$ 5,00
+  'FitVoice60': 'hhxugxb_668446',      // ✅ 60 min - R$ 12,90
+  'FitVoice120': '3smg99n_693764',     // ✅ 120 min - R$ 19,90
+  
+  // Planos FitCoach - ✅ CONFIGURADOS
+  'FitCoach50': 'cemyp2n_668537',      // ✅ R$ 299,90 - 50 alunos
+  'FitCoach100': 'vi6djzq_668541',     // ✅ R$ 549,90 - 100 alunos
+  'FitCoach200': '3b2kpwc_671196',     // ✅ R$ 999,90 - 200 alunos
+  'FitCoach400': '3dis6ds_668546',     // ✅ R$ 1.799,90 - 400 alunos
+  'FitCoach500': 'SEU_CHECKOUT_ID_AQUI',     // ⚠️ 500 alunos (não mencionado pelo usuário)
 };
 
 /**

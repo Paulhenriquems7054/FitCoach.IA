@@ -206,14 +206,19 @@ export function LimitesUsageIndicator({ onRecarregarVoz }: LimitesUsageIndicator
         isOpen={showRecargaModal}
         onClose={() => setShowRecargaModal(false)}
         minutosRestantes={infoUso.voz.restante}
-        onRecarregarCriada={(recargaId) => {
-          console.log('Recarga criada:', recargaId);
+        onRecargaCriada={(recargaId) => {
+          logger.info('Recarga criada', 'LimitesUsageIndicator', { recargaId });
           // Atualizar info de uso após recarga criada
           setTimeout(() => {
             if (user?.id) {
-              obterInfoUsoAluno(user.id as string).then(setInfoUso);
+              obterInfoUsoAluno(user.id as string).then(setInfoUso).catch(err => {
+                logger.warn('Erro ao atualizar info de uso após recarga', 'LimitesUsageIndicator', err);
+              });
             }
           }, 1000);
+          if (onRecarregarVoz) {
+            onRecarregarVoz();
+          }
         }}
       />
     </div>
