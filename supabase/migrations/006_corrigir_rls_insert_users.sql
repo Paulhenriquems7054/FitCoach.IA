@@ -20,71 +20,152 @@ CREATE POLICY "Users can insert own profile"
     );
 
 -- ============================================================================
--- VERIFICAR E CORRIGIR FUNÇÃO RPC
+-- CRIAR OU RECRIAR FUNÇÃO RPC COM SECURITY DEFINER
 -- ============================================================================
 
--- Verificar se a função existe e tem SECURITY DEFINER
-DO $$
+-- Remover TODAS as versões existentes da função (com diferentes assinaturas)
+-- Isso garante que não haverá conflito ao criar a nova versão
+DO $$ 
 DECLARE
-    func_exists BOOLEAN;
-    has_security_definer BOOLEAN;
+    func_sig TEXT;
 BEGIN
-    -- Verificar se função existe
-    SELECT EXISTS (
-        SELECT 1
-        FROM pg_proc
+    -- Encontrar e remover todas as funções com este nome
+    FOR func_sig IN 
+        SELECT pg_get_function_identity_arguments(oid)
+        FROM pg_proc 
         WHERE proname = 'insert_user_profile_after_signup'
         AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
-    ) INTO func_exists;
-    
-    IF func_exists THEN
-        -- Verificar se tem SECURITY DEFINER
-        SELECT prosecdef INTO has_security_definer
-        FROM pg_proc
-        WHERE proname = 'insert_user_profile_after_signup'
-        AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');
-        
-        IF NOT has_security_definer THEN
-            RAISE WARNING 'Função existe mas não tem SECURITY DEFINER. Recrie a função com SECURITY DEFINER.';
-        ELSE
-            RAISE NOTICE '✅ Função existe e tem SECURITY DEFINER';
-        END IF;
-    ELSE
-        RAISE WARNING 'Função insert_user_profile_after_signup não existe. Execute migration_criar_funcao_insert_user_profile.sql primeiro.';
-    END IF;
+    LOOP
+        EXECUTE format('DROP FUNCTION IF EXISTS public.insert_user_profile_after_signup(%s) CASCADE', func_sig);
+    END LOOP;
 END $$;
 
--- ============================================================================
--- RECRIAR FUNÇÃO RPC COM SECURITY DEFINER (se necessário)
--- ============================================================================
-
--- Verificar se a função precisa ser recriada
-DO $$
+-- Criar a função RPC com SECURITY DEFINER
+CREATE OR REPLACE FUNCTION public.insert_user_profile_after_signup(
+    p_user_id UUID,
+    p_nome TEXT,
+    p_username TEXT,
+    p_plan_type TEXT DEFAULT 'free',
+    p_subscription_status TEXT DEFAULT 'active',
+    p_user_data JSONB DEFAULT '{}'::JSONB,
+    p_email TEXT DEFAULT NULL,
+    p_voice_daily_limit_seconds INTEGER DEFAULT 900,
+    p_expiry_date TIMESTAMPTZ DEFAULT NULL
+)
+RETURNS TABLE(result_id UUID, result_nome TEXT, result_username TEXT) AS $$
 DECLARE
-    func_has_definer BOOLEAN;
+    inserted_id UUID;
+    inserted_nome TEXT;
+    inserted_username TEXT;
+    auth_user_exists BOOLEAN;
 BEGIN
-    SELECT prosecdef INTO func_has_definer
-    FROM pg_proc
-    WHERE proname = 'insert_user_profile_after_signup'
-    AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');
+    -- Verificar se o usuário existe em auth.users antes de inserir
+    -- Isso previne erro de foreign key constraint se o signup ainda não foi commitado
+    SELECT EXISTS(SELECT 1 FROM auth.users WHERE id = p_user_id) INTO auth_user_exists;
     
-    IF NOT func_has_definer THEN
-        RAISE WARNING 'Função não tem SECURITY DEFINER. Execute migration_criar_funcao_insert_user_profile.sql para recriar.';
+    IF NOT auth_user_exists THEN
+        RAISE EXCEPTION 'Usuário com ID % não existe em auth.users. Aguarde a conclusão do cadastro antes de criar o perfil.', p_user_id;
     END IF;
-END $$;
+    
+    -- Inserir perfil do usuário
+    -- Esta função usa SECURITY DEFINER para bypass RLS
+    INSERT INTO public.users (
+        id,
+        nome,
+        username,
+        email,
+        plan_type,
+        subscription_status,
+        expiry_date,
+        idade,
+        genero,
+        peso,
+        altura,
+        objetivo,
+        points,
+        discipline_score,
+        completed_challenge_ids,
+        is_anonymized,
+        role,
+        voice_daily_limit_seconds,
+        voice_used_today_seconds,
+        voice_balance_upsell,
+        text_msg_count_today,
+        created_at,
+        updated_at
+    ) VALUES (
+        p_user_id,
+        p_nome,
+        p_username,
+        p_email,
+        p_plan_type::TEXT,  -- plan_type é TEXT com CHECK constraint
+        p_subscription_status::TEXT,  -- subscription_status é TEXT com CHECK constraint
+        p_expiry_date,
+        COALESCE((p_user_data->>'idade')::INTEGER, 0),
+        COALESCE((p_user_data->>'genero')::TEXT, 'Masculino'),
+        COALESCE((p_user_data->>'peso')::NUMERIC, 0),
+        COALESCE((p_user_data->>'altura')::NUMERIC, 0),
+        COALESCE((p_user_data->>'objetivo')::TEXT, 'perder peso'),
+        COALESCE((p_user_data->>'points')::INTEGER, 0),
+        COALESCE((p_user_data->>'disciplineScore')::INTEGER, 0),
+        CASE 
+            WHEN p_user_data->>'completedChallengeIds' IS NULL OR p_user_data->>'completedChallengeIds' = '[]' OR p_user_data->>'completedChallengeIds' = '' THEN ARRAY[]::TEXT[]
+            WHEN jsonb_typeof(p_user_data->'completedChallengeIds') = 'array' THEN 
+                ARRAY(SELECT jsonb_array_elements_text(p_user_data->'completedChallengeIds'))
+            ELSE ARRAY[]::TEXT[]
+        END,
+        COALESCE((p_user_data->>'isAnonymized')::BOOLEAN, false),
+        COALESCE((p_user_data->>'role')::TEXT, 'user'),
+        p_voice_daily_limit_seconds,
+        0,  -- voice_used_today_seconds
+        0,  -- voice_balance_upsell
+        0,  -- text_msg_count_today
+        NOW(),
+        NOW()
+    )
+    ON CONFLICT (id) DO NOTHING
+    RETURNING 
+        public.users.id,
+        public.users.nome,
+        public.users.username
+    INTO inserted_id, inserted_nome, inserted_username;
+    
+    -- Retornar os valores
+    RETURN QUERY SELECT inserted_id, inserted_nome, inserted_username;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
 -- GARANTIR PERMISSÕES NA FUNÇÃO
 -- ============================================================================
 
--- Garantir que a função tem permissões para anon e authenticated
+-- Permitir que usuários autenticados executem a função
 GRANT EXECUTE ON FUNCTION public.insert_user_profile_after_signup(
     UUID, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, INTEGER, TIMESTAMPTZ
 ) TO authenticated;
 
+-- Permitir que usuários anônimos executem a função (necessário durante signup)
 GRANT EXECUTE ON FUNCTION public.insert_user_profile_after_signup(
     UUID, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, INTEGER, TIMESTAMPTZ
 ) TO anon;
+
+-- ============================================================================
+-- COMENTÁRIOS
+-- ============================================================================
+
+COMMENT ON FUNCTION public.insert_user_profile_after_signup IS 
+'Insere perfil de usuário após signup. Usa SECURITY DEFINER para bypass RLS. 
+Útil quando confirmação de email está habilitada e a sessão não está disponível imediatamente após signup.
+Parâmetros:
+- p_user_id: UUID do usuário (deve corresponder a auth.uid())
+- p_nome: Nome do usuário
+- p_username: Nome de usuário único
+- p_plan_type: Tipo de plano (default: free)
+- p_subscription_status: Status da assinatura (default: active)
+- p_user_data: JSONB com dados adicionais (idade, genero, peso, altura, objetivo, points, disciplineScore, completedChallengeIds, isAnonymized, role)
+- p_email: Email do usuário (opcional)
+- p_voice_daily_limit_seconds: Limite diário de voz em segundos (default: 900)
+- p_expiry_date: Data de expiração do plano (opcional)';
 
 -- ============================================================================
 -- VERIFICAÇÃO FINAL
@@ -111,10 +192,11 @@ BEGIN
     AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');
     
     -- Verificar função
-    SELECT prosecdef INTO function_has_definer
+    SELECT COALESCE(prosecdef, false) INTO function_has_definer
     FROM pg_proc
     WHERE proname = 'insert_user_profile_after_signup'
-    AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');
+    AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+    LIMIT 1;
     
     RAISE NOTICE '========================================';
     RAISE NOTICE 'Verificação de Configuração RLS';
