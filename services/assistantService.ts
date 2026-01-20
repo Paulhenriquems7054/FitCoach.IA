@@ -464,30 +464,30 @@ export async function analyzeImageWithAssistant(
   onNewChunk: (chunk: string) => void,
   onError: (error: string) => void,
 ): Promise<void> {
-  // Verificar acesso à IA antes de analisar (B2B2C guard)
+  // NOVO MODELO: Verificar acesso à IA antes de analisar (verificação de limites de academia + modo demo)
+  let currentUserForImage: any = null;
   try {
-    const user = await getUserFromStorage();
-    if (user) {
-      const { assertAiAccessOrThrow } = await import('./aiAccessService');
-      await assertAiAccessOrThrow(user, 'vision');
+    currentUserForImage = await getUserFromStorage();
+    if (currentUserForImage) {
+      const { assertNovoAiAccessOrThrow } = await import('./novoAiAccessService');
+      await assertNovoAiAccessOrThrow(currentUserForImage, 'vision');
       
-      // Verificar limites de trial para análise de foto
-      const { canUsePhotoAnalysis, recordTrialPhotoAnalysis } = await import('./trialLimitsService');
-      const photoCheck = await canUsePhotoAnalysis(user);
-      if (!photoCheck.allowed) {
-        onError(photoCheck.message || 'Limite de análise de prato atingido no trial. Assine um plano para continuar.');
-        return;
-      }
-      
-      // Registrar uso após análise bem-sucedida (será chamado no final)
-      // Por enquanto, apenas verificamos
+      // Removido: Verificação de trial (substituída por verificação de limites)
+      // A verificação de limites já está feita no assertNovoAiAccessOrThrow
     }
   } catch (error: any) {
     if (error?.code === 'AI_ACCESS_DENIED') {
-      onError('Seu acesso à IA está bloqueado. Assine um plano para continuar usando.');
+      // Mensagem específica baseada no motivo
+      const mensagem = error.message || 
+        (error.reason === 'limite_excedido' 
+          ? 'Você atingiu o limite da sua conta. Adquira recarga FitVoice.' 
+          : error.reason === 'demo_expirado'
+          ? 'Você atingiu o limite da sua conta. Adquira recarga FitVoice ou vincule-se a uma academia.'
+          : 'Seu acesso à IA está bloqueado. Vincule-se a uma academia ou adquira recarga FitVoice.');
+      onError(mensagem);
       return;
     }
-    logger.warn('Erro ao verificar acesso à IA', 'assistantService', error);
+    logger.warn('Erro ao verificar acesso à IA para análise de imagem', 'assistantService', error);
   }
 
   // Verificar se API key está disponível e válida
@@ -559,15 +559,39 @@ export async function analyzeImageWithAssistant(
     if (response.text) {
       onNewChunk(response.text);
       
-      // Trackar uso de IA para métricas B2B2C
+      // NOVO MODELO: Consumir uso após análise bem-sucedida
       try {
-        const user = await getUserFromStorage();
-        if (user) {
+        if (currentUserForImage?.id) {
+          const { consumirUsoAposChamada } = await import('./novoAiAccessService');
+          await consumirUsoAposChamada(currentUserForImage.id as string, 'vision', 1);
+        }
+      } catch (error) {
+        logger.warn('Erro ao consumir uso após análise de imagem', 'assistantService', error);
+        // Não bloquear usuário se consumo falhar, mas logar erro
+      }
+      
+      // Trackar uso de IA para métricas B2B2C (manter para compatibilidade)
+      try {
+        if (currentUserForImage) {
           const { trackAiUsage } = await import('./aiMetricsService');
-          await trackAiUsage(user.id as any, 'vision', 1, user.academyId || undefined);
+          await trackAiUsage(currentUserForImage.id as any, 'vision', 1, currentUserForImage.academyId || undefined);
         }
       } catch (error) {
         logger.warn('Erro ao trackar uso de visão', 'assistantService', error);
+      }
+
+      // Trackar para sistema de billing (manter para compatibilidade)
+      try {
+        const { trackBillingOperation, estimateOperationCost } = await import('./billingTrackerService');
+        const estimatedTokens = Math.ceil((response.text?.length || 0) / 4) + 1000; // +1000 para processamento de imagem
+        const estimatedCost = estimateOperationCost('image_analysis', estimatedTokens);
+        await trackBillingOperation({
+          operationType: 'image_analysis',
+          tokensUsed: estimatedTokens,
+          estimatedCost
+        });
+      } catch (error) {
+        logger.warn('Erro ao trackar billing para análise de imagem', 'assistantService', error);
       }
     } else {
       onError('Não recebemos uma análise da IA.');

@@ -1,0 +1,275 @@
+{
+  "name": "Processador de Fila de Email",
+  "description": "Processa emails pendentes a cada 5 minutos. Envia via SendGrid/Mailgun e atualiza status.",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtTime": "every 5 minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [100, 300],
+      "name": "Cron: A cada 5 minutos",
+      "id": "node-cron-5min"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  eq.id,\n  eq.user_id,\n  eq.recipient_email,\n  eq.template_id,\n  eq.variables,\n  eq.priority,\n  eq.retry_count,\n  et.subject,\n  et.html_template,\n  et.category\nFROM email_queue eq\nJOIN email_templates et ON eq.template_id = et.id\nWHERE eq.status = 'pending'\nAND eq.scheduled_for <= NOW()\nAND eq.retry_count < eq.max_retries\nORDER BY eq.priority DESC, eq.created_at ASC\nLIMIT 50"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [300, 300],
+      "name": "Query: Buscar Emails Pendentes",
+      "id": "node-query-pending-emails"
+    },
+    {
+      "parameters": {
+        "loopOver": "items"
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [500, 300],
+      "name": "Loop: Para Cada Email",
+      "id": "node-loop-emails"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.sendgrid.com/v3/mail/send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SENDGRID_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParametersJson": "{\n  \"personalizations\": [\n    {\n      \"to\": [\n        {\n          \"email\": \"{{ $json.recipient_email }}\"\n        }\n      ]\n    }\n  ],\n  \"from\": {\n    \"email\": \"noreply@fitcoach.com\",\n    \"name\": \"FitCoach.IA\"\n  },\n  \"subject\": \"{{ $json.subject }}\",\n  \"content\": [\n    {\n      \"type\": \"text/html\",\n      \"value\": \"{{ $json.html_template }}\"\n    }\n  ],\n  \"tracking_settings\": {\n    \"open_tracking\": {\n      \"enable\": true\n    },\n    \"click_tracking\": {\n      \"enable\": true\n    }\n  }\n}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [700, 300],
+      "name": "SendGrid: Enviar Email",
+      "id": "node-sendgrid-send"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "{{ $json.statusCode }}",
+            "operator": {
+              "type": "number",
+              "operation": "eq"
+            },
+            "rightValue": 202,
+            "typeLeft": "computed",
+            "typeRight": "static"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "name": "Condicional: Email Enviado?",
+      "id": "node-condition-send-success"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE email_queue\nSET \n  status = 'sent',\n  sent_at = NOW(),\n  updated_at = NOW()\nWHERE id = '{{ $json.id }}'"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1050, 150],
+      "name": "Query: Marcar como Enviado",
+      "id": "node-update-sent"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE email_queue\nSET \n  status = 'failed',\n  error_message = '{{ $json.body.errors[0].message || \"SendGrid error\" }}',\n  retry_count = retry_count + 1,\n  updated_at = NOW()\nWHERE id = '{{ $json.id }}'"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1050, 450],
+      "name": "Query: Marcar como Falha",
+      "id": "node-update-failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mailgun.net/v3/{{ $env.MAILGUN_DOMAIN }}/messages",
+        "authentication": "basicAuth",
+        "basicAuthType": "httpBasicAuth",
+        "basicAuthUsername": "api",
+        "basicAuthPassword": "{{ $env.MAILGUN_API_KEY }}",
+        "sendBody": true,
+        "bodyParametersJson": "{\n  \"from\": \"FitCoach.IA <noreply@fitcoach.com>\",\n  \"to\": \"{{ $json.recipient_email }}\",\n  \"subject\": \"{{ $json.subject }}\",\n  \"html\": \"{{ $json.html_template }}\",\n  \"o:tracking\": \"yes\",\n  \"o:tracking-clicks\": \"yes\"\n}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [700, 600],
+      "name": "Mailgun: Enviar Email (Fallback)",
+      "id": "node-mailgun-send"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO email_queue (user_id, recipient_email, template_id, type, status, error_message)\nSELECT \n  u.id,\n  u.email,\n  et.id,\n  'retry',\n  'pending',\n  'Marcado para retry automático'\nFROM email_queue eq\nJOIN auth.users u ON eq.user_id = u.id\nJOIN email_templates et ON eq.template_id = et.id\nWHERE eq.status = 'failed'\nAND eq.retry_count < eq.max_retries\nAND eq.updated_at < NOW() - INTERVAL '1 hour'"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1200, 300],
+      "name": "Query: Agendar Retry",
+      "id": "node-schedule-retry"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,\n  COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,\n  COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending\nFROM email_queue\nWHERE created_at >= NOW() - INTERVAL '24 hours'"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1350, 300],
+      "name": "Query: Log de Estatísticas",
+      "id": "node-log-stats"
+    },
+    {
+      "parameters": {
+        "documentId": "email_processor",
+        "operation": "update",
+        "dataToUpdate": {
+          "lastRun": "{{ now() }}",
+          "emailsSent": "{{ $json.sent }}",
+          "emailsFailed": "{{ $json.failed }}",
+          "emailsPending": "{{ $json.pending }}"
+        }
+      },
+      "type": "n8n-nodes-base.firebaseRealtimeDatabase",
+      "typeVersion": 1,
+      "position": [1500, 300],
+      "name": "Firebase: Log de Execução",
+      "id": "node-firebase-log"
+    }
+  ],
+  "connections": {
+    "node-cron-5min": {
+      "main": [
+        [
+          {
+            "node": "node-query-pending-emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-query-pending-emails": {
+      "main": [
+        [
+          {
+            "node": "node-loop-emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-loop-emails": {
+      "main": [
+        [
+          {
+            "node": "node-sendgrid-send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-sendgrid-send": {
+      "main": [
+        [
+          {
+            "node": "node-condition-send-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-condition-send-success": {
+      "main": [
+        [
+          {
+            "node": "node-update-sent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "node-update-failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-update-sent": {
+      "main": [
+        [
+          {
+            "node": "node-schedule-retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-update-failed": {
+      "main": [
+        [
+          {
+            "node": "node-schedule-retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-schedule-retry": {
+      "main": [
+        [
+          {
+            "node": "node-log-stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-log-stats": {
+      "main": [
+        [
+          {
+            "node": "node-firebase-log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

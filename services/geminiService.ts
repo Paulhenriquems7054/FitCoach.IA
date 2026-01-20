@@ -141,26 +141,28 @@ const buildMealPlanPrompt = (user: User, language: 'pt' | 'en' | 'es'): string =
 };
 
 export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' = 'pt'): Promise<GeminiMealPlanResponse | null> => {
-    // Verificar acesso à IA antes de gerar plano (B2B2C guard)
+    // NOVO MODELO: Verificar acesso à IA antes de gerar plano (verificação de limites de academia + modo demo)
     try {
-        const { assertAiAccessOrThrow } = await import('./aiAccessService');
-        await assertAiAccessOrThrow(user, 'plan');
+        const { assertNovoAiAccessOrThrow } = await import('./novoAiAccessService');
+        await assertNovoAiAccessOrThrow(user, 'plan');
         
-        // Verificar limites de trial para geração de plano alimentar
-        const { canUseMealPlan, recordTrialMealPlan } = await import('./trialLimitsService');
-        const mealPlanCheck = await canUseMealPlan(user);
-        if (!mealPlanCheck.allowed) {
-            throw new Error(mealPlanCheck.message || 'Limite de geração de plano alimentar atingido no trial. Assine um plano para continuar.');
-        }
+        // Removido: Verificação de trial (substituída por verificação de limites)
+        // A verificação de limites já está feita no assertNovoAiAccessOrThrow
     } catch (error: any) {
         if (error?.code === 'AI_ACCESS_DENIED') {
             logger.warn('Acesso à IA negado para geração de plano', 'geminiService', error);
-            throw new Error('Seu acesso à IA está bloqueado. Assine um plano para continuar usando.');
+            // Mensagem específica baseada no motivo
+            const mensagem = error.message || 
+              (error.reason === 'limite_excedido' 
+                ? 'Você atingiu o limite da sua conta. Adquira recarga FitVoice.' 
+                : error.reason === 'demo_expirado'
+                ? 'Você atingiu o limite da sua conta. Adquira recarga FitVoice ou vincule-se a uma academia.'
+                : 'Seu acesso à IA está bloqueado. Vincule-se a uma academia ou adquira recarga FitVoice.');
+            throw new Error(mensagem);
         }
-        if (error?.message?.includes('Limite de geração')) {
-            throw error; // Re-throw para manter a mensagem específica
-        }
-        logger.warn('Erro ao verificar acesso à IA', 'geminiService', error);
+        logger.warn('Erro ao verificar acesso à IA para geração de plano', 'geminiService', error);
+        // Re-throw outros erros
+        throw error;
     }
 
     // SEMPRE priorizar modo offline/local para app 100% offline
@@ -234,17 +236,18 @@ export const generateMealPlan = async (user: User, language: 'pt' | 'en' | 'es' 
             sessionStorage.setItem('lastMealPlan', JSON.stringify(localResponse));
         }
         
-        // Registrar uso de plano alimentar no trial
+        // NOVO MODELO: Consumir uso após geração bem-sucedida
         try {
-            if (user && user.id) {
-                const { recordTrialMealPlan } = await import('./trialLimitsService');
-                await recordTrialMealPlan(user.id as string);
+            if (user?.id) {
+                const { consumirUsoAposChamada } = await import('./novoAiAccessService');
+                await consumirUsoAposChamada(user.id as string, 'plan', 1);
             }
         } catch (error) {
-            logger.warn('Erro ao registrar plano alimentar no trial', 'geminiService', error);
+            logger.warn('Erro ao consumir uso após geração de plano alimentar', 'geminiService', error);
+            // Não bloquear usuário se consumo falhar, mas logar erro
         }
         
-        // Trackar uso de IA para métricas B2B2C
+        // Trackar uso de IA para métricas B2B2C (manter para compatibilidade)
         try {
             const { trackAiUsage } = await import('./aiMetricsService');
             await trackAiUsage(user.id as any, 'plan', 1, user.academyId || undefined);

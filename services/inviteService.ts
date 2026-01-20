@@ -172,33 +172,32 @@ export async function acceptInvite(code: string, userId: string): Promise<void> 
     // Continuar para atualizar dados se necessário
   }
 
-  // ESTRATÉGIA: Alunos recebem trial de 3 dias de IA grátis
-  const now = new Date();
+  // NOVO MODELO: Alunos vinculados à academia usam limites do plano da academia
+  // Não recebem trial/demo - os limites vêm do plano contratado pela academia
   const updateData: any = {
     academy_id: academyId,
     tenant_role: invitedRole,
+    // Vincular aluno à academia (tabela companies)
+    academias_id: academyId, // Campo para novo modelo
   };
 
   if (invitedRole === 'student') {
-    // Alunos recebem trial de 3 dias de IA
-    const trialExpiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(); // 3 dias
+    // Alunos vinculados à academia não recebem trial/demo
+    // Os limites são controlados pelo plano da academia (limite_texto, limite_imagem, limite_voz)
+    // Resetar contadores de uso se necessário
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    updateData.periodo_uso_mes = currentMonth;
+    updateData.uso_texto = 0;
+    updateData.uso_imagem = 0;
+    updateData.uso_voz_minutos = 0;
+    updateData.modo_demo = false; // Alunos não usam modo demo
+    updateData.interacoes_demo_usadas = 0;
     
-    updateData.trial_active = true;
-    updateData.trial_expires_at = trialExpiresAt;
-    updateData.ai_subscription_status = 'trial';
-    updateData.ai_trial_start_at = now.toISOString();
-    updateData.ai_trial_end_at = trialExpiresAt;
-    // Limites de uso: trial tem 5 minutos de voz por dia
-    updateData.voice_daily_limit_seconds = 300; // 5 minutos
-    
-    logger.info(`Trial de 3 dias de IA ativado para aluno ${userId} da academia ${academyId}`, 'inviteService');
+    logger.info(`Aluno ${userId} vinculado à academia ${academyId} - usando limites do plano da academia`, 'inviteService');
   } else if (invitedRole === 'personal') {
-    // Personal trainers não recebem trial de IA
-    updateData.trial_active = false;
-    updateData.trial_expires_at = null;
-    updateData.ai_subscription_status = 'none';
-    updateData.ai_trial_start_at = null;
-    updateData.ai_trial_end_at = null;
+    // Personal trainers não têm limites de uso (podem usar livremente se vinculados à academia)
+    updateData.modo_demo = false;
+    updateData.interacoes_demo_usadas = 0;
   }
 
   const { error: userError } = await supabase

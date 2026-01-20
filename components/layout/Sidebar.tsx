@@ -23,6 +23,7 @@ import { KeyIcon } from '../icons/KeyIcon';
 import { CalendarIcon } from '../icons/CalendarIcon';
 import { ChatBubbleIcon } from '../icons/ChatBubbleIcon';
 import { UserGroupIcon } from '../icons/UserGroupIcon';
+import { StarIcon } from '../icons/StarIcon';
 
 interface SidebarProps {
   open: boolean;
@@ -87,6 +88,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     '/community',
     '/group-workouts',
     '/perfil',
+    '/billing',
   ];
 
   // Rotas permitidas para administradores
@@ -118,6 +120,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
         { name: 'Comunidade', href: '#/community', icon: ChatBubbleIcon },
         { name: 'Treinos em Grupo', href: '#/group-workouts', icon: UserGroupIcon },
         { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon },
+        { name: 'Minha Assinatura', href: '#/billing', icon: ChartBarIcon },
         { name: 'Controle de Academias e Assinaturas', href: '#/admin-dashboard', icon: ChartBarIcon },
       ];
     }
@@ -163,6 +166,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
       { name: 'Comunidade', href: '#/community', icon: ChatBubbleIcon },
       { name: 'Treinos em Grupo', href: '#/group-workouts', icon: UserGroupIcon },
       { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
+      { name: 'Minha Assinatura', href: '#/billing', icon: ChartBarIcon },
+      { name: 'Planos', href: '#/plans', icon: StarIcon },
     ];
 
     return items.filter(item => {

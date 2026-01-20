@@ -1,0 +1,259 @@
+{
+  "name": "Análise IA de Gastos Semanais",
+  "description": "Analisa padrões de gasto com Gemini IA e gera recomendações personalizadas de planos.",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtTime": "10:00",
+              "triggerDayOfWeek": "thursday"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [100, 300],
+      "name": "Cron: Quinta-feira 10:00",
+      "id": "node-cron-weekly"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT DISTINCT user_id FROM spending_logs\nWHERE created_at >= NOW() - INTERVAL '7 days'\nAND user_id NOT IN (\n  SELECT user_id FROM spending_analysis \n  WHERE period_month = DATE_TRUNC('month', CURRENT_DATE)\n)"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [300, 300],
+      "name": "Query: Usuários com Gasto (últimos 7 dias)",
+      "id": "node-query-users-with-spending"
+    },
+    {
+      "parameters": {
+        "loopOver": "items"
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [500, 300],
+      "name": "Loop: Para Cada Usuário",
+      "id": "node-loop-users"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH spending_data AS (\n  SELECT \n    operation_type,\n    COUNT(*) as count,\n    SUM(estimated_cost) as total_cost,\n    EXTRACT(HOUR FROM created_at) as hour_of_day,\n    EXTRACT(DOW FROM created_at) as day_of_week\n  FROM spending_logs\n  WHERE user_id = '{{ $json.user_id }}'\n  AND created_at >= NOW() - INTERVAL '7 days'\n  GROUP BY operation_type, hour_of_day, day_of_week\n)\nSELECT \n  '{{ $json.user_id }}'::uuid as user_id,\n  CURRENT_DATE as analysis_date,\n  (\n    SELECT json_object_agg(operation_type, count) \n    FROM spending_data\n  ) as operation_breakdown,\n  (\n    SELECT json_object_agg(hour_of_day, total_cost) \n    FROM spending_data \n    WHERE hour_of_day IS NOT NULL\n  ) as hourly_distribution,\n  (\n    SELECT COALESCE(SUM(total_cost), 0) \n    FROM spending_data\n  ) as total_cost,\n  (\n    SELECT COUNT(*) \n    FROM spending_logs \n    WHERE user_id = '{{ $json.user_id }}'\n    AND created_at >= NOW() - INTERVAL '7 days'\n  ) as total_requests"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "name": "Query: Agregar Dados de Gasto",
+      "id": "node-aggregate-spending"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "queryParametersJson": "{\n  \"key\": \"{{ $env.GEMINI_API_KEY }}\"\n}",
+        "sendBody": true,
+        "bodyParametersJson": "{\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"Você é um analista financeiro de IA. Analise estes dados de gasto de usuário e gere insights e recomendações:\\n\\nDados: {{$json | json}}\\n\\nResponda em JSON com:\\n1. insight: string resumida (máx 200 caracteres) sobre padrão de uso\\n2. recommendation: string com recomendação de otimização (máx 300 caracteres)\\n3. predicted_monthly_cost: número previsto para o mês\\n4. saving_opportunity: número de economia com mudança de plano\\n\\nResponda APENAS o JSON, sem markdown ou explicação adicional.\"\n        }\n      ]\n    }\n  ]\n}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "name": "Gemini AI: Análise de Gasto",
+      "id": "node-gemini-analysis"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO spending_analysis (\n  user_id,\n  period_month,\n  total_cost,\n  total_requests,\n  usage_pattern,\n  ai_insights,\n  ai_recommendations,\n  predicted_monthly_cost,\n  saving_opportunity,\n  generated_at\n) VALUES (\n  '{{ $json.user_id }}',\n  DATE_TRUNC('month', CURRENT_DATE)::date,\n  {{ $json.total_cost }},\n  {{ $json.total_requests }},\n  '{{ json.stringify($json.operation_breakdown) }}'::jsonb,\n  '{{ $json.content[0].parts[0].text.match(/\\\"insight\\\":\\s*\\\"([^\\\"]*)\\\"/)?.[1] || \"Análise em processamento\" }}',\n  '{{ $json.content[0].parts[0].text.match(/\\\"recommendation\\\":\\s*\\\"([^\\\"]*)\\\"/)?.[1] || \"Recomendação em processamento\" }}',\n  {{ $json.content[0].parts[0].text.match(/\\\"predicted_monthly_cost\\\":\\s*(\\d+\\.?\\d*)/)?.[1] || $json.total_cost * 4 }},\n  {{ $json.content[0].parts[0].text.match(/\\\"saving_opportunity\\\":\\s*(\\d+\\.?\\d*)/)?.[1] || 0 }},\n  NOW()\n)\nRETURNING *"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 300],
+      "name": "Query: Inserir Análise",
+      "id": "node-insert-analysis"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM email_templates WHERE name = 'monthly_report' LIMIT 1"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "name": "Query: Buscar Template Email",
+      "id": "node-query-email-template"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT u.email, u.user_metadata->>'name' as name\nFROM auth.users u\nWHERE u.id = '{{ $json.user_id }}'"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1250, 450],
+      "name": "Query: Buscar Email do Usuário",
+      "id": "node-query-user-email"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO email_queue (\n  user_id,\n  recipient_email,\n  template_id,\n  type,\n  priority,\n  variables,\n  status,\n  scheduled_for\n) VALUES (\n  '{{ $json.user_id }}',\n  '{{ $json.email }}',\n  '{{ $json.id }}',\n  'monthly_report',\n  2,\n  '{{ json.stringify({\n    month: \"Janeiro 2026\",\n    total_requests: $json.total_requests,\n    cost: ($json.total_cost || 0).toFixed(2),\n    savings: ($json.saving_opportunity || 0).toFixed(2),\n    ai_insight: $json.ai_insights,\n    recommendation: $json.ai_recommendations,\n    dashboard_url: \"https://fitcoach.com/dashboard\"\n  }) }}'::jsonb,\n  'pending',\n  NOW()\n)\nRETURNING *"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1400, 300],
+      "name": "Query: Adicionar à Fila de Email",
+      "id": "node-insert-email-queue"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) as analysis_count, AVG(predicted_monthly_cost) as avg_predicted_cost\nFROM spending_analysis\nWHERE period_month = DATE_TRUNC('month', CURRENT_DATE)"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1550, 300],
+      "name": "Query: Estatísticas da Execução",
+      "id": "node-stats"
+    },
+    {
+      "parameters": {
+        "documentId": "spending_analysis",
+        "operation": "update",
+        "dataToUpdate": {
+          "lastRun": "{{ now() }}",
+          "analysisCount": "{{ $json.analysis_count }}",
+          "avgPredictedCost": "{{ $json.avg_predicted_cost }}"
+        }
+      },
+      "type": "n8n-nodes-base.firebaseRealtimeDatabase",
+      "typeVersion": 1,
+      "position": [1700, 300],
+      "name": "Firebase: Log de Execução",
+      "id": "node-firebase-log"
+    }
+  ],
+  "connections": {
+    "node-cron-weekly": {
+      "main": [
+        [
+          {
+            "node": "node-query-users-with-spending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-query-users-with-spending": {
+      "main": [
+        [
+          {
+            "node": "node-loop-users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-loop-users": {
+      "main": [
+        [
+          {
+            "node": "node-aggregate-spending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-aggregate-spending": {
+      "main": [
+        [
+          {
+            "node": "node-gemini-analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-gemini-analysis": {
+      "main": [
+        [
+          {
+            "node": "node-insert-analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-insert-analysis": {
+      "main": [
+        [
+          {
+            "node": "node-query-email-template",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "node-query-user-email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-query-email-template": {
+      "main": [
+        [
+          {
+            "node": "node-insert-email-queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-query-user-email": {
+      "main": [
+        [
+          {
+            "node": "node-insert-email-queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-insert-email-queue": {
+      "main": [
+        [
+          {
+            "node": "node-stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-stats": {
+      "main": [
+        [
+          {
+            "node": "node-firebase-log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

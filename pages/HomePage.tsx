@@ -17,6 +17,7 @@ import { UsersIcon } from '../components/icons/UsersIcon';
 import { ChartBarIcon } from '../components/icons/ChartBarIcon';
 import { TrialCounter } from '../components/TrialCounter';
 import { TrialExpiredBanner } from '../components/TrialExpiredBanner';
+import { UsageIndicator } from '../hooks/useSpendingTracker';
 
 const QuickActionCard: React.FC<{ href: string; title: string; description: string; icon: React.ElementType }> = ({ href, title, description, icon: Icon }) => (
     <a href={href} className="block group">
@@ -187,6 +188,9 @@ const HomePage: React.FC = () => {
                 <Dashboard summary={null} />
             </div>
             <div className="space-y-6">
+                {/* Indicador de Uso do Plano */}
+                <UsageIndicator />
+                
                 <Card>
                     <div className="p-6">
                         <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">

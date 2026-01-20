@@ -929,27 +929,22 @@ const LoginPage: React.FC = () => {
             if (isReferredUser) {
                 try {
                     const now = new Date();
-                    const trialExpiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(); // 3 dias
-                    
-                    const { error: trialError } = await supabase
-                        .from('users')
-                        .update({
-                            trial_active: true,
-                            trial_expires_at: trialExpiresAt,
-                            ai_subscription_status: 'trial',
-                            ai_trial_start_at: now.toISOString(),
-                            ai_trial_end_at: trialExpiresAt,
-                            voice_daily_limit_seconds: 300, // 5 minutos por dia durante trial
-                        })
-                        .eq('id', userId);
-                    
-                    if (trialError) {
-                        logger.warn('Erro ao ativar trial para usuário indicado', 'LoginPage', trialError);
-                    } else {
-                        logger.info(`Trial de 3 dias ativado para usuário indicado ${userId}`, 'LoginPage');
+                    // NOVO MODELO: Ativar modo demo (3 interações) apenas se não vinculado a academia
+                    // Trial de 3 dias foi removido - substituído por modo demo
+                    try {
+                        const { deveAtivarModoDemo } = await import('../services/novoAiAccessService');
+                        const { getUser } = await import('../services/databaseService');
+                        const userData = await getUser();
+                        
+                        if (userData) {
+                            await deveAtivarModoDemo(userData);
+                            logger.info(`Modo demo ativado para novo usuário ${userId}`, 'LoginPage');
+                        }
+                    } catch (err) {
+                        logger.warn('Erro ao ativar modo demo para usuário indicado', 'LoginPage', err);
                     }
                 } catch (err) {
-                    logger.warn('Erro ao processar trial para usuário indicado', 'LoginPage', err);
+                    logger.warn('Erro ao processar modo demo para usuário indicado', 'LoginPage', err);
                 }
             }
 

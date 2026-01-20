@@ -165,18 +165,26 @@ export async function sendMessageToGemini(
   currentSystemInstruction: string = PERSONALITY_OPTIONS[DEFAULT_PERSONALITY_KEY],
 ): Promise<void> {
   try {
-    // Verificar acesso à IA antes de fazer chamada (B2B2C guard)
+    // NOVO MODELO: Verificar acesso à IA antes de fazer chamada (verificação de limites de academia + modo demo)
+    let currentUser: any = null;
     try {
       const { getUser } = await import('../../services/databaseService');
-      const { assertAiAccessOrThrow } = await import('../../services/aiAccessService');
-      const user = await getUser();
-      if (user) {
-        await assertAiAccessOrThrow(user, 'chat');
+      const { assertNovoAiAccessOrThrow } = await import('../../services/novoAiAccessService');
+      currentUser = await getUser();
+      if (currentUser) {
+        await assertNovoAiAccessOrThrow(currentUser, 'chat');
       }
     } catch (error: any) {
       if (error?.code === 'AI_ACCESS_DENIED') {
         logger.warn('Acesso à IA negado para chat', 'chatbot/geminiService', error);
-        onError('Seu acesso à IA está bloqueado. Ative um plano para continuar usando.');
+        // Mensagem específica baseada no motivo
+        const mensagem = error.message || 
+          (error.reason === 'limite_excedido' 
+            ? 'Você atingiu o limite da sua conta. Adquira recarga FitVoice.' 
+            : error.reason === 'demo_expirado'
+            ? 'Você atingiu o limite da sua conta. Adquira recarga FitVoice ou vincule-se a uma academia.'
+            : 'Seu acesso à IA está bloqueado. Vincule-se a uma academia ou adquira recarga FitVoice.');
+        onError(mensagem);
         return;
       }
       logger.warn('Erro ao verificar acesso à IA', 'chatbot/geminiService', error);
@@ -221,16 +229,40 @@ export async function sendMessageToGemini(
       onNewChunk(chunk);
     }
     
-    // Trackar uso de IA para métricas B2B2C
+    // NOVO MODELO: Consumir uso após chamada bem-sucedida
     try {
-      const { getUser } = await import('../../services/databaseService');
-      const user = await getUser();
-      if (user) {
+      if (currentUser?.id) {
+        const { consumirUsoAposChamada } = await import('../../services/novoAiAccessService');
+        await consumirUsoAposChamada(currentUser.id as string, 'chat', 1);
+      }
+    } catch (error) {
+      logger.warn('Erro ao consumir uso após chamada de chat', 'chatbot/geminiService', error);
+      // Não bloquear usuário se consumo falhar, mas logar erro
+    }
+
+    // Trackar uso de IA para métricas B2B2C (manter para compatibilidade)
+    try {
+      if (currentUser) {
         const { trackAiUsage } = await import('../../services/aiMetricsService');
-        await trackAiUsage(user.id as any, 'chat', 1, user.academyId || undefined);
+        await trackAiUsage(currentUser.id as any, 'chat', 1, currentUser.academyId || undefined);
       }
     } catch (error) {
       logger.warn('Erro ao trackar uso de chat', 'chatbot/geminiService', error);
+    }
+
+    // Trackar para sistema de billing (manter para compatibilidade)
+    try {
+      const { trackBillingOperation, estimateOperationCost } = await import('../../services/billingTrackerService');
+      // Estimar tokens (aproximado baseado no tamanho da resposta)
+      const estimatedTokens = Math.ceil(fullText.length / 4); // ~4 chars por token
+      const estimatedCost = estimateOperationCost('text_analysis', estimatedTokens);
+      await trackBillingOperation({
+        operationType: 'text_analysis',
+        tokensUsed: estimatedTokens,
+        estimatedCost
+      });
+    } catch (error) {
+      logger.warn('Erro ao trackar billing para chat', 'chatbot/geminiService', error);
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -355,6 +387,31 @@ export async function processImageWithGemini(
     return;
   }
 
+  // NOVO MODELO: Verificar acesso à IA antes de processar imagem
+  let currentUser: any = null;
+  try {
+    const { getUser } = await import('../../services/databaseService');
+    const { assertNovoAiAccessOrThrow } = await import('../../services/novoAiAccessService');
+    currentUser = await getUser();
+    if (currentUser) {
+      await assertNovoAiAccessOrThrow(currentUser, 'vision');
+    }
+  } catch (error: any) {
+    if (error?.code === 'AI_ACCESS_DENIED') {
+      logger.warn('Acesso à IA negado para análise de imagem', 'chatbot/geminiService', error);
+      // Mensagem específica baseada no motivo
+      const mensagem = error.message || 
+        (error.reason === 'limite_excedido' 
+          ? 'Você atingiu o limite da sua conta. Adquira recarga FitVoice.' 
+          : error.reason === 'demo_expirado'
+          ? 'Você atingiu o limite da sua conta. Adquira recarga FitVoice ou vincule-se a uma academia.'
+          : 'Seu acesso à IA está bloqueado. Vincule-se a uma academia ou adquira recarga FitVoice.');
+      onError(mensagem);
+      return;
+    }
+    logger.warn('Erro ao verificar acesso à IA para análise de imagem', 'chatbot/geminiService', error);
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: model,
@@ -378,16 +435,40 @@ export async function processImageWithGemini(
       if (response.text) {
         onNewChunk(response.text);
         
-        // Trackar uso de IA para métricas B2B2C
+        // NOVO MODELO: Consumir uso após análise bem-sucedida
         try {
-          const { getUser } = await import('../../services/databaseService');
-          const user = await getUser();
-          if (user) {
+          if (currentUser?.id) {
+            const { consumirUsoAposChamada } = await import('../../services/novoAiAccessService');
+            await consumirUsoAposChamada(currentUser.id as string, 'vision', 1);
+          }
+        } catch (error) {
+          logger.warn('Erro ao consumir uso após análise de imagem', 'chatbot/geminiService', error);
+          // Não bloquear usuário se consumo falhar, mas logar erro
+        }
+        
+        // Trackar uso de IA para métricas B2B2C (manter para compatibilidade)
+        try {
+          if (currentUser) {
             const { trackAiUsage } = await import('../../services/aiMetricsService');
-            await trackAiUsage(user.id as any, 'vision', 1, user.academyId || undefined);
+            await trackAiUsage(currentUser.id as any, 'vision', 1, currentUser.academyId || undefined);
           }
         } catch (error) {
           logger.warn('Erro ao trackar uso de visão', 'chatbot/geminiService', error);
+        }
+
+        // Trackar para sistema de billing (manter para compatibilidade)
+        try {
+          const { trackBillingOperation, estimateOperationCost } = await import('../../services/billingTrackerService');
+          // Estimar tokens baseado na resposta (imagens geralmente usam mais tokens)
+          const estimatedTokens = Math.ceil((response.text?.length || 0) / 4) + 1000; // +1000 para processamento de imagem
+          const estimatedCost = estimateOperationCost('image_analysis', estimatedTokens);
+          await trackBillingOperation({
+            operationType: 'image_analysis',
+            tokensUsed: estimatedTokens,
+            estimatedCost
+          });
+        } catch (error) {
+          logger.warn('Erro ao trackar billing para análise de imagem', 'chatbot/geminiService', error);
         }
       } else {
         onError("No text response from image analysis.");
@@ -499,42 +580,34 @@ export async function startLiveAudioSession(
   onVolumeLevel?: (level: number) => void, // Callback para medidor de volume (0-100)
   getIsMicMuted?: () => boolean, // Função para obter estado do mute dinamicamente
 ): Promise<void> {
-  // Verificar acesso à IA antes de iniciar sessão de voz (B2B2C guard)
+  // NOVO MODELO: Verificar acesso à IA antes de iniciar sessão de voz (verificação de limites de academia + modo demo)
+  let currentUserForVoice: any = null;
   try {
     const { getUser } = await import('../../services/databaseService');
-    const { assertAiAccessOrThrow } = await import('../../services/aiAccessService');
-    const user = await getUser();
-    if (user) {
-      await assertAiAccessOrThrow(user, 'voice');
+    const { assertNovoAiAccessOrThrow } = await import('../../services/novoAiAccessService');
+    currentUserForVoice = await getUser();
+    if (currentUserForVoice) {
+      await assertNovoAiAccessOrThrow(currentUserForVoice, 'voice');
     }
   } catch (error: any) {
     if (error?.code === 'AI_ACCESS_DENIED') {
       logger.warn('Acesso à IA negado para voz', 'chatbot/geminiService', error);
-      onError('Seu acesso à IA está bloqueado. Ative um plano para continuar usando.', false);
+      // Mensagem específica baseada no motivo
+      const mensagem = error.message || 
+        (error.reason === 'limite_excedido' 
+          ? 'Você atingiu o limite de minutos de voz. Recarregue FitVoice.' 
+          : error.reason === 'demo_expirado'
+          ? 'Você atingiu o limite da sua conta. Adquira recarga FitVoice ou vincule-se a uma academia.'
+          : 'Seu acesso à IA está bloqueado. Vincule-se a uma academia ou adquira recarga FitVoice.');
+      onError(mensagem, false);
       return;
     }
-    logger.warn('Erro ao verificar acesso à IA', 'chatbot/geminiService', error);
+    logger.warn('Erro ao verificar acesso à IA para voz', 'chatbot/geminiService', error);
   }
+  
   if (liveAudioSession || sessionPromiseForCleanup) {
     logger.warn("Sessão de áudio ao vivo já ativa ou conectando. Fechando sessão existente para reiniciar com nova configuração.", 'chatbot/geminiService');
     await stopLiveAudioSession(); // Ensure existing session is stopped
-  }
-
-  // Verificar acesso à IA antes de iniciar (B2B2C guard)
-  try {
-    const { getUser } = await import('../../services/databaseService');
-    const { assertAiAccessOrThrow } = await import('../../services/aiAccessService');
-    const currentUser = await getUser();
-    
-    if (currentUser) {
-      await assertAiAccessOrThrow(currentUser, 'voice');
-    }
-  } catch (error: any) {
-    if (error?.code === 'AI_ACCESS_DENIED') {
-      onError('Seu acesso à IA está bloqueado. Assine um plano para continuar usando.', false);
-      return;
-    }
-    logger.warn('Erro ao verificar acesso à IA', 'chatbot/geminiService', error);
   }
 
   // Verificar limite de voz antes de iniciar
@@ -624,6 +697,8 @@ export async function startLiveAudioSession(
   let sessionStartTime = Date.now();
   let lastCheckTime = Date.now();
   const CHECK_INTERVAL = 1000; // Verificar a cada 1 segundo
+  let totalSecondsElapsed = 0; // Total de segundos decorridos na sessão
+  let minutosConsumidos = 0; // Contador de minutos já consumidos na sessão
 
   try {
     const ai = getGeminiClient();
@@ -726,43 +801,64 @@ export async function startLiveAudioSession(
           sessionStartTime = Date.now();
           lastCheckTime = Date.now();
           
-          // Iniciar monitoramento de tempo
+          // NOVO MODELO: Resetar contadores para nova sessão
+          // Variáveis já declaradas no escopo da função acima
+          minutosConsumidos = 0; // Resetar contador de minutos já consumidos na sessão
+          totalSecondsElapsed = 0; // Resetar total de segundos decorridos na sessão
+          
           // Usar variável isDeveloperUser já definida no escopo da função
           monitoringInterval = setInterval(async () => {
             try {
               const elapsed = Math.floor((Date.now() - lastCheckTime) / 1000);
               if (elapsed > 0) {
+                totalSecondsElapsed += elapsed;
+                
                 // Desenvolvedores não precisam verificar limites durante monitoramento
                 if (isDeveloperUser) {
                   lastCheckTime = Date.now();
                   return; // Pular verificação de limites para desenvolvedores
                 }
 
-                const { consumeVoiceSeconds, checkVoiceUsage } = await import('../../services/usageLimitService');
-                
-                // Consumir segundos decorridos
-                const consumeResult = await consumeVoiceSeconds(elapsed);
-                if (!consumeResult.success) {
-                  // Limite atingido, encerrar sessão
-                  logger.warn('Limite de voz atingido, encerrando sessão', 'chatbot/geminiService');
-                  clearInterval(monitoringInterval!);
-                  monitoringInterval = null;
-                  await stopLiveAudioSession();
-                  onError('Limite diário atingido. Gerencie sua conta em nosso site.', false);
-                  onSessionEndedUnexpectedly();
-                  return;
-                }
-                
-                // Verificar se ainda há saldo
-                const status = await checkVoiceUsage();
-                if (!status.canUse) {
-                  logger.warn('Limite de voz atingido, encerrando sessão', 'chatbot/geminiService');
-                  clearInterval(monitoringInterval!);
-                  monitoringInterval = null;
-                  await stopLiveAudioSession();
-                  onError('Limite diário atingido. Gerencie sua conta em nosso site.', false);
-                  onSessionEndedUnexpectedly();
-                  return;
+                // NOVO MODELO: Consumir minutos a cada minuto completo
+                const minutosAtuais = Math.floor(totalSecondsElapsed / 60);
+                if (minutosAtuais > minutosConsumidos && currentUserForVoice?.id) {
+                  try {
+                    const { consumirUsoAposChamada } = await import('../../services/novoAiAccessService');
+                    const minutosParaConsumir = minutosAtuais - minutosConsumidos;
+                    await consumirUsoAposChamada(currentUserForVoice.id as string, 'voice', minutosParaConsumir);
+                    minutosConsumidos = minutosAtuais;
+                    logger.debug(`Consumidos ${minutosParaConsumir} minutos de voz (total: ${minutosConsumidos} min)`, 'chatbot/geminiService');
+                  } catch (error) {
+                    logger.error('Erro ao consumir minutos de voz durante sessão', 'chatbot/geminiService', error);
+                    // Verificar se é erro de limite excedido
+                    if (error && typeof error === 'object' && 'code' in error && error.code === 'AI_ACCESS_DENIED') {
+                      // Limite atingido, encerrar sessão
+                      logger.warn('Limite de voz atingido durante sessão, encerrando', 'chatbot/geminiService');
+                      clearInterval(monitoringInterval!);
+                      monitoringInterval = null;
+                      await stopLiveAudioSession();
+                      onError('Você atingiu o limite de minutos de voz. Recarregue FitVoice para continuar.', false);
+                      onSessionEndedUnexpectedly();
+                      return;
+                    }
+                  }
+                  
+                  // Verificar se ainda tem acesso (pode ter excedido após consumo)
+                  try {
+                    const { assertNovoAiAccessOrThrow } = await import('../../services/novoAiAccessService');
+                    await assertNovoAiAccessOrThrow(currentUserForVoice, 'voice');
+                  } catch (accessError: any) {
+                    if (accessError?.code === 'AI_ACCESS_DENIED') {
+                      logger.warn('Acesso negado após consumo, encerrando sessão', 'chatbot/geminiService');
+                      clearInterval(monitoringInterval!);
+                      monitoringInterval = null;
+                      await stopLiveAudioSession();
+                      const mensagem = accessError.message || 'Você atingiu o limite de minutos de voz. Recarregue FitVoice.';
+                      onError(mensagem, false);
+                      onSessionEndedUnexpectedly();
+                      return;
+                    }
+                  }
                 }
                 
                 lastCheckTime = Date.now();
@@ -861,29 +957,41 @@ export async function startLiveAudioSession(
             clearInterval(monitoringInterval);
             monitoringInterval = null;
           }
-          // Consumir tempo restante
+          // NOVO MODELO: Consumir tempo restante (minutos finais)
           const elapsed = Math.floor((Date.now() - lastCheckTime) / 1000);
-          if (elapsed > 0) {
-            import('../../services/usageLimitService').then(({ consumeVoiceSeconds }) => {
-              consumeVoiceSeconds(elapsed).catch(err => 
-                logger.warn('Erro ao consumir tempo final', 'chatbot/geminiService', err)
-              );
-            });
+          if (elapsed > 0 && currentUserForVoice?.id) {
+            const totalSeconds = totalSecondsElapsed + elapsed;
+            const minutosFinais = Math.ceil(totalSeconds / 60);
+            const minutosPendentes = minutosFinais - minutosConsumidos;
             
-            // Trackar uso de IA para métricas B2B2C
-            import('../../services/databaseService').then(({ getUser }) => {
-              getUser().then(user => {
-                if (user) {
-                  const minutes = Math.ceil(elapsed / 60);
-                  if (minutes > 0) {
+            if (minutosPendentes > 0 && !isDeveloperUser) {
+              // Usar Promise para não bloquear o callback
+              import('../../services/novoAiAccessService').then(({ consumirUsoAposChamada }) => {
+                consumirUsoAposChamada(currentUserForVoice.id as string, 'voice', minutosPendentes)
+                  .then(() => {
+                    logger.debug(`Consumidos ${minutosPendentes} minutos finais de voz (total da sessão: ${minutosFinais} min)`, 'chatbot/geminiService');
+                  })
+                  .catch((error) => {
+                    logger.warn('Erro ao consumir minutos finais de voz', 'chatbot/geminiService', error);
+                  });
+              }).catch((error) => {
+                logger.warn('Erro ao importar novoAiAccessService', 'chatbot/geminiService', error);
+              });
+            }
+            
+            // Trackar uso de IA para métricas B2B2C (manter para compatibilidade)
+            if (!isDeveloperUser) {
+              import('../../services/databaseService').then(({ getUser }) => {
+                getUser().then(user => {
+                  if (user && minutosFinais > 0) {
                     import('../../services/aiMetricsService').then(({ trackAiUsage }) => {
-                      trackAiUsage(user.id as any, 'voice', minutes, user.academyId || undefined)
+                      trackAiUsage(user.id as any, 'voice', minutosFinais, user.academyId || undefined)
                         .catch(err => logger.warn('Erro ao trackar uso de voz', 'chatbot/geminiService', err));
                     });
                   }
-                }
-              }).catch(err => logger.warn('Erro ao obter usuário para tracking', 'chatbot/geminiService', err));
-            });
+                }).catch(err => logger.warn('Erro ao obter usuário para tracking', 'chatbot/geminiService', err));
+              });
+            }
           }
           stopLiveAudioSession().then(onSessionEndedUnexpectedly);
         },

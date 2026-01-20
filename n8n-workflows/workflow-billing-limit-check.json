@@ -1,0 +1,291 @@
+{
+  "name": "Verificação Diária de Limite de Uso",
+  "description": "Verifica usuários próximos do limite (80%+) e bloqueia quem ultrapassou. Envia alertas automáticos.",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtTime": "00:00"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [100, 300],
+      "name": "Cron: Verificação Diária",
+      "id": "node-cron-daily"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  s.id as subscription_id,\n  s.user_id,\n  u.email,\n  p.name as plan_name,\n  p.requests_per_month,\n  ut.api_calls_total,\n  CEIL((ut.api_calls_total::float / p.requests_per_month) * 100) as usage_percentage,\n  s.current_period_end,\n  u.user_metadata->>'name' as user_name\nFROM subscriptions s\nJOIN plans p ON s.plan_id = p.id\nJOIN usage_tracking ut ON s.user_id = ut.user_id AND ut.period_end >= CURRENT_DATE\nJOIN auth.users u ON s.user_id = u.id\nWHERE s.status = 'active'\nAND ut.api_calls_total >= (p.requests_per_month * 0.8)\nORDER BY usage_percentage DESC"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [300, 300],
+      "name": "Query: Usuários Próximos do Limite",
+      "id": "node-query-limit-users"
+    },
+    {
+      "parameters": {
+        "loopOver": "items"
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [500, 300],
+      "name": "Loop: Para Cada Usuário",
+      "id": "node-loop-users"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "{{ $json.usage_percentage }}",
+            "operator": {
+              "name": "filter.operator.number.greaterEquals",
+              "type": "number",
+              "operation": "gte"
+            },
+            "rightValue": 100,
+            "typeLeft": "computed",
+            "typeRight": "static"
+          },
+          "combinator": "or",
+          "type": "query",
+          "values": [
+            {
+              "id": "condition1",
+              "leftValue": "{{ $json.usage_percentage }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              },
+              "rightValue": 100,
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            {
+              "id": "condition2",
+              "leftValue": "{{ $json.usage_percentage }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              },
+              "rightValue": 80,
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300],
+      "name": "Condicional: 100% ou 80%?",
+      "id": "node-condition-limit-level"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO usage_alerts (user_id, alert_type, alert_data) \nVALUES \n  ('{{ $json.user_id }}', 'usage_100_percent', '{{ json.stringify({usage_percentage: $json.usage_percentage, plan_name: $json.plan_name, requests_per_month: $json.requests_per_month}) }}'::jsonb)\nON CONFLICT DO NOTHING"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [850, 150],
+      "name": "Query: Criar Alert 100%",
+      "id": "node-insert-alert-100"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO usage_alerts (user_id, alert_type, alert_data) \nVALUES \n  ('{{ $json.user_id }}', 'usage_80_percent', '{{ json.stringify({usage_percentage: $json.usage_percentage, plan_name: $json.plan_name, requests_per_month: $json.requests_per_month}) }}'::jsonb)\nON CONFLICT DO NOTHING"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [850, 450],
+      "name": "Query: Criar Alert 80%",
+      "id": "node-insert-alert-80"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM email_templates WHERE name = 'usage_alert_80percent' LIMIT 1"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "name": "Query: Buscar Template Email",
+      "id": "node-query-email-template"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO email_queue (\n  user_id,\n  recipient_email,\n  template_id,\n  type,\n  priority,\n  variables,\n  status,\n  scheduled_for\n) VALUES (\n  '{{ $json.user_id }}',\n  '{{ $json.email }}',\n  '{{ $json.id }}',\n  '{{ $json.usage_percentage }}' >= 100 ? 'usage_100_percent' : 'usage_80_percent',\n  '{{ $json.usage_percentage }}' >= 100 ? 5 : 3,\n  '{{ json.stringify({\n    percentage: $json.usage_percentage,\n    period_start: $json.current_period_start,\n    period_end: $json.current_period_end,\n    used: $json.api_calls_total,\n    limit: $json.requests_per_month,\n    renewal_date: $json.current_period_end,\n    upgrade_url: \"https://fitcoach.com/upgrade?user=\" + $json.user_id\n  }) }}'::jsonb,\n  'pending',\n  NOW()\n)\nRETURNING *"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1200, 300],
+      "name": "Query: Adicionar à Fila de Email",
+      "id": "node-insert-email-queue"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE subscriptions \nSET status = 'expired'\nWHERE user_id = '{{ $json.user_id }}' \nAND status = 'active'\nAND api_calls_total >= requests_per_month"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1050, 150],
+      "name": "Query: Bloquear Acesso (100%)",
+      "id": "node-block-user-access"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) as alert_count \nFROM usage_alerts \nWHERE user_id = '{{ $json.user_id }}' \nAND alert_type = 'usage_80_percent'\nAND created_at >= NOW() - INTERVAL '24 hours'"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1050, 450],
+      "name": "Query: Verificar Alerta Duplicado",
+      "id": "node-check-duplicate-alert"
+    },
+    {
+      "parameters": {
+        "documentId": "{{ $json.user_id }}",
+        "operation": "set",
+        "dataToSet": {
+          "lastAlertAt": "{{ now() }}",
+          "alertType": "{{ $json.usage_percentage >= 100 ? 'limit_exceeded' : 'approaching_limit' }}"
+        }
+      },
+      "type": "n8n-nodes-base.firebaseRealtimeDatabase",
+      "typeVersion": 1,
+      "position": [1350, 300],
+      "name": "Firebase: Log da Ação",
+      "id": "node-firebase-log"
+    }
+  ],
+  "connections": {
+    "node-cron-daily": {
+      "main": [
+        [
+          {
+            "node": "node-query-limit-users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-query-limit-users": {
+      "main": [
+        [
+          {
+            "node": "node-loop-users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-loop-users": {
+      "main": [
+        [
+          {
+            "node": "node-condition-limit-level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-condition-limit-level": {
+      "main": [
+        [
+          {
+            "node": "node-insert-alert-100",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "node-block-user-access",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "node-check-duplicate-alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "node-insert-alert-80",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-insert-alert-100": {
+      "main": [
+        [
+          {
+            "node": "node-query-email-template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-insert-alert-80": {
+      "main": [
+        [
+          {
+            "node": "node-query-email-template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-query-email-template": {
+      "main": [
+        [
+          {
+            "node": "node-insert-email-queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-insert-email-queue": {
+      "main": [
+        [
+          {
+            "node": "node-firebase-log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-check-duplicate-alert": {
+      "main": [
+        [
+          {
+            "node": "node-query-email-template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -62,6 +62,8 @@ const StudentAiPlansPage = lazy(() => import('./pages/StudentAiPlansPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const GroupWorkoutsPage = lazy(() => import('./pages/GroupWorkoutsPage'));
+const BillingPage = lazy(() => import('./pages/BillingPage'));
+const PlansPage = lazy(() => import('./pages/PlansPage'));
 const Onboarding = lazy(() => import('./components/Onboarding'));
 
 // Componente de loading
@@ -657,10 +659,12 @@ const App: React.FC = () => {
     const isAdmin = isLoggedIn && user && (user.gymRole === 'admin' || isDefaultAdmin);
     const isDeveloper = isLoggedIn && user && (user.username === 'Desenvolvedor' || user.username === 'dev123');
 
-    // Se for desenvolvedor, mostrar loader (redirecionamento será feito pelo useEffect)
-    // Permitir '/' (home) para desenvolvedores também
-    if (isDeveloper && normalizedPath !== '/admin-dashboard' && normalizedPath !== '/') {
-        console.log('[App] Bloqueado: Desenvolvedor precisa ir para admin-dashboard');
+    // Se for desenvolvedor, permitir acesso a rotas administrativas e billing
+    // Permitir '/' (home), '/admin-dashboard' e '/billing' para desenvolvedores
+    const developerAllowedRoutes = ['/', '/admin-dashboard', '/billing', '/perfil'];
+    if (isDeveloper && !developerAllowedRoutes.includes(normalizedPath)) {
+        console.log('[App] Bloqueado: Desenvolvedor tentando acessar rota não permitida:', normalizedPath);
+        // Redirecionar para admin-dashboard apenas se não estiver tentando acessar billing ou outras rotas permitidas
         return <PageLoader />;
     }
 
@@ -865,6 +869,8 @@ const App: React.FC = () => {
             case '/calendar': return <CalendarPage />;
             case '/community': return <CommunityPage />;
             case '/group-workouts': return <GroupWorkoutsPage />;
+            case '/billing': return <BillingPage />;
+            case '/plans': return <PlansPage />;
             case '/':
             default:
                 // Se for desenvolvedor, sempre mostrar admin-dashboard
