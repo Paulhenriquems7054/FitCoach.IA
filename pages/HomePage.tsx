@@ -17,6 +17,7 @@ import { UsersIcon } from '../components/icons/UsersIcon';
 import { ChartBarIcon } from '../components/icons/ChartBarIcon';
 import { TrialCounter } from '../components/TrialCounter';
 import { TrialExpiredBanner } from '../components/TrialExpiredBanner';
+import { TesteSemIAExpiradoBanner } from '../components/TesteSemIAExpiradoBanner';
 import { UsageIndicator } from '../hooks/useSpendingTracker';
 
 const QuickActionCard: React.FC<{ href: string; title: string; description: string; icon: React.ElementType }> = ({ href, title, description, icon: Icon }) => (
@@ -169,6 +170,9 @@ const HomePage: React.FC = () => {
         
         {/* Banner de Trial Expirado */}
         <TrialExpiredBanner />
+        
+        {/* Banner de Teste SEM IA Expirado */}
+        <TesteSemIAExpiradoBanner />
         
         {/* Contador de Trial (só aparece se trial estiver ativo) */}
         <TrialCounter />

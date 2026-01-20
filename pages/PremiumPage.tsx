@@ -17,6 +17,7 @@ import { getB2BCodesByBusiness } from '../services/b2bCodeService';
 import { useB2BCodeDetection } from '../hooks/useB2BCodeDetection';
 import { useSubscriptionDetection } from '../hooks/useSubscriptionDetection';
 import { logger } from '../utils/logger';
+import { redirectToSalesPageSameTab, SALES_PAGE_SECTIONS } from '../constants/salesPage';
 
 interface SubscriptionPlan {
     id: string;
@@ -107,6 +108,31 @@ const PremiumPage: React.FC = () => {
         loadB2BCodes();
     }, []);
 
+    // NOVO MODELO: Redirecionar automaticamente para página externa quando não tiver assinatura ativa
+    useEffect(() => {
+        // Aguardar carregamento completo antes de redirecionar
+        if (loading) return;
+        
+        // Se não tem assinatura ativa, redirecionar para página externa
+        if (!activeSubscription) {
+            // Determinar qual seção redirecionar baseado no tipo de usuário
+            let section: keyof typeof SALES_PAGE_SECTIONS = 'HOME';
+            
+            if (isStudent) {
+                section = 'B2C_PRICING'; // Alunos → Planos Individuais COM IA
+            } else if (user?.accountType === 'academy') {
+                section = 'B2B'; // Academias → Planos B2B COM IA
+            } else {
+                section = 'B2C_PRICING'; // Individuais → Planos B2C COM IA
+            }
+            
+            logger.info(`Redirecionando para página de vendas externa: ${section}`, 'PremiumPage');
+            // Redirecionar para página externa na mesma aba
+            redirectToSalesPageSameTab(section);
+            return;
+        }
+    }, [loading, activeSubscription, isStudent, user]);
+
     // Recarregar códigos quando novo código for detectado
     useEffect(() => {
         if (newCode) {
@@ -174,7 +200,7 @@ const PremiumPage: React.FC = () => {
         return 'b2b'; // Academias começam com planos B2B
     };
     
-    const [activePage, setActivePage] = useState<'b2c' | 'b2b' | 'personal' | 'recharge'>(getInitialPage());
+    const [activePage, setActivePage] = useState<'b2c' | 'b2b' | 'b2b_manual' | 'b2c_manual' | 'personal' | 'recharge'>(getInitialPage());
     
     // Separar planos por categoria
     const b2cPlans = useMemo(() => {
@@ -183,6 +209,14 @@ const PremiumPage: React.FC = () => {
     
     const b2bPlans = useMemo(() => {
         return allPlans.filter(p => p.plan_category === 'b2b_platform');
+    }, [allPlans]);
+    
+    const b2bManualPlans = useMemo(() => {
+        return allPlans.filter(p => p.plan_category === 'b2b_manual');
+    }, [allPlans]);
+    
+    const b2cManualPlans = useMemo(() => {
+        return allPlans.filter(p => p.plan_category === 'b2c_manual');
     }, [allPlans]);
     
     const personalPlans = useMemo(() => {
@@ -682,7 +716,7 @@ const PremiumPage: React.FC = () => {
                                             : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                                     }`}
                                 >
-                                    Planos Individuais (IA)
+                                    Planos COM IA
                                 </button>
                                 <button
                                     onClick={() => setActivePage('recharge')}
@@ -697,7 +731,7 @@ const PremiumPage: React.FC = () => {
                             </>
                         ) : (
                             <>
-                                {/* Para academias: mostrar apenas Planos B2B e Personal Trainers */}
+                                {/* Para academias: mostrar Planos B2B COM IA, Planos SEM IA (Economia), Personal Trainers */}
                                 <button
                                     onClick={() => setActivePage('b2b')}
                                     className={`px-4 py-2 rounded-lg font-semibold transition-all ${
@@ -706,7 +740,17 @@ const PremiumPage: React.FC = () => {
                                             : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                                     }`}
                                 >
-                                    Planos para Academias
+                                    Planos COM IA
+                                </button>
+                                <button
+                                    onClick={() => setActivePage('b2b_manual')}
+                                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                                        activePage === 'b2b_manual'
+                                            ? 'bg-green-600 text-white shadow-lg'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    Planos SEM IA (💰 Economia)
                                 </button>
                                 <button
                                     onClick={() => setActivePage('personal')}
@@ -719,6 +763,20 @@ const PremiumPage: React.FC = () => {
                                     Personal Trainers
                                 </button>
                             </>
+                        )}
+                        
+                        {/* Para alunos: adicionar aba de planos manuais individuais */}
+                        {(isStudent || (isReferredUser && isTrialExpired)) && (
+                            <button
+                                onClick={() => setActivePage('b2c_manual')}
+                                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                                    activePage === 'b2c_manual'
+                                        ? 'bg-green-600 text-white shadow-lg'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                }`}
+                            >
+                                Plano SEM IA (💰 Economia)
+                            </button>
                         )}
                     </div>
 
@@ -735,14 +793,19 @@ const PremiumPage: React.FC = () => {
                             )}
                             <div className="text-center mb-6">
                                 <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
-                                    Planos Individuais - Uso da IA
+                                    Planos Individuais - COM IA Embutida
                                 </h2>
-                                <p className="text-slate-600 dark:text-slate-400">
+                                <p className="text-slate-600 dark:text-slate-400 mb-4">
                                     {isStudent 
                                         ? "Escolha o plano ideal para continuar usando todas as funcionalidades de IA após seu período de teste"
                                         : "Escolha o plano ideal para continuar usando todas as funcionalidades de IA"
                                     }
                                 </p>
+                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-2xl mx-auto">
+                                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                                        ✅ <strong>Inclui IA:</strong> Chat, análise de imagens e conversas de voz
+                                    </p>
+                                </div>
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto">
@@ -762,16 +825,21 @@ const PremiumPage: React.FC = () => {
                         </div>
                     )}
 
-                    {/* PLANOS B2B - ACADEMIAS - Apenas para academias */}
+                    {/* PLANOS B2B - ACADEMIAS COM IA - Apenas para academias */}
                     {!isStudent && activePage === 'b2b' && b2bPlans.length > 0 && (
                         <div>
                             <div className="text-center mb-6">
                                 <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
-                                    Planos para Academias
+                                    Planos para Academias - COM IA Embutida
                                 </h2>
-                                <p className="text-slate-600 dark:text-slate-400">
-                                    Ofereça acesso Premium aos seus alunos sem custo adicional para eles
+                                <p className="text-slate-600 dark:text-slate-400 mb-4">
+                                    Ofereça acesso Premium com IA aos seus alunos sem custo adicional para eles
                                 </p>
+                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-2xl mx-auto">
+                                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                                        ✅ <strong>Inclui IA:</strong> Chat, análise de imagens e conversas de voz para todos os alunos
+                                    </p>
+                                </div>
                             </div>
 
                             {/* Seção de Códigos B2B */}
@@ -856,6 +924,78 @@ const PremiumPage: React.FC = () => {
                                         />
                                     );
                                 })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PLANOS B2B MANUAL (SEM IA) - Apenas para academias */}
+                    {!isStudent && activePage === 'b2b_manual' && b2bManualPlans.length > 0 && (
+                        <div>
+                            <div className="text-center mb-6">
+                                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                                    Planos para Academias - SEM IA (Economia)
+                                </h2>
+                                <p className="text-slate-600 dark:text-slate-400 mb-4">
+                                    Gestão completa sem recursos de IA. <strong>Economia de até 61%</strong> comparado aos planos com IA.
+                                </p>
+                                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 max-w-2xl mx-auto mb-4">
+                                    <p className="text-sm text-green-800 dark:text-green-200 font-semibold">
+                                        💰 <strong>Economia:</strong> Preços reduzidos sem IA embutida. Ideal para academias que preferem controle total.
+                                    </p>
+                                </div>
+                                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 max-w-2xl mx-auto">
+                                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                                        ⚠️ <strong>Não inclui:</strong> Chat IA, análise de imagens e conversas de voz. 
+                                        Apenas gestão manual de alunos, treinos e relatórios.
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 items-stretch mt-6">
+                                {b2bManualPlans.map((plan) => (
+                                    <PlanCard
+                                        key={plan.id}
+                                        plan={plan}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PLANOS B2C MANUAL (SEM IA) - Para alunos e usuários individuais */}
+                    {(isStudent || (isReferredUser && isTrialExpired)) && activePage === 'b2c_manual' && b2cManualPlans.length > 0 && (
+                        <div>
+                            <div className="text-center mb-6">
+                                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                                    Plano Manual (Sem IA) - Economia
+                                </h2>
+                                <p className="text-slate-600 dark:text-slate-400 mb-4">
+                                    Acesso ao app sem IA - apenas gestão manual de treinos e nutrição. <strong>Economia de 57%</strong> comparado ao plano com IA.
+                                </p>
+                                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 max-w-2xl mx-auto mb-4">
+                                    <p className="text-sm text-green-800 dark:text-green-200 font-semibold">
+                                        💰 <strong>Economia:</strong> R$ 14,90/mês (vs R$ 34,90 com IA) - Economia de R$ 20/mês
+                                    </p>
+                                </div>
+                                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 max-w-2xl mx-auto">
+                                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                                        ⚠️ <strong>Não inclui:</strong> Chat IA, análise de imagens e conversas de voz. 
+                                        Apenas gestão manual de treinos e nutrição.
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto">
+                                {b2cManualPlans.map((plan) => (
+                                    <div key={plan.id} className="relative">
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-green-600 to-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg z-10">
+                                            ECONOMIA 57%
+                                        </div>
+                                        <PlanCard
+                                            plan={plan}
+                                        />
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}

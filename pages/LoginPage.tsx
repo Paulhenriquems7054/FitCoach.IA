@@ -60,6 +60,8 @@ const LoginPage: React.FC = () => {
     const [inviteCode, setInviteCode] = useState<string | null>(null);
     const [inviteError, setInviteError] = useState<string | null>(null);
     const [inviteInfo, setInviteInfo] = useState<{ academyId: string; invitedRole: 'student' | 'personal' } | null>(null);
+    // NOVO: Escolha de teste (COM IA ou SEM IA) - apenas para novos usuários sem código
+    const [testeComIA, setTesteComIA] = useState<boolean | null>(null);
 
     // Processar token de acesso do email (quando usuário clica no link do email)
     useEffect(() => {
@@ -929,19 +931,40 @@ const LoginPage: React.FC = () => {
             if (isReferredUser) {
                 try {
                     const now = new Date();
-                    // NOVO MODELO: Ativar modo demo (3 interações) apenas se não vinculado a academia
-                    // Trial de 3 dias foi removido - substituído por modo demo
-                    try {
-                        const { deveAtivarModoDemo } = await import('../services/novoAiAccessService');
-                        const { getUser } = await import('../services/databaseService');
-                        const userData = await getUser();
-                        
-                        if (userData) {
-                            await deveAtivarModoDemo(userData);
-                            logger.info(`Modo demo ativado para novo usuário ${userId}`, 'LoginPage');
+                    // NOVO MODELO: Ativar modo demo (3 interações) apenas se escolheu "Testar COM IA"
+                    // Se escolheu "Testar SEM IA", não ativa modo demo
+                    if (testeComIA === true) {
+                        try {
+                            const { deveAtivarModoDemo } = await import('../services/novoAiAccessService');
+                            const { getUser } = await import('../services/databaseService');
+                            const userData = await getUser();
+                            
+                            if (userData) {
+                                await deveAtivarModoDemo(userData);
+                                logger.info(`Modo demo ativado para novo usuário ${userId} (escolheu COM IA)`, 'LoginPage');
+                            }
+                        } catch (err) {
+                            logger.warn('Erro ao ativar modo demo para usuário indicado', 'LoginPage', err);
                         }
-                    } catch (err) {
-                        logger.warn('Erro ao ativar modo demo para usuário indicado', 'LoginPage', err);
+                    } else if (testeComIA === false) {
+                        // Usuário escolheu "SEM IA" - registrar data de início do teste (3 dias)
+                        try {
+                            const supabase = getSupabaseClient();
+                            const { error: updateError } = await supabase
+                                .from('users')
+                                .update({
+                                    teste_sem_ia_inicio: new Date().toISOString()
+                                })
+                                .eq('id', userId);
+                            
+                            if (updateError) {
+                                logger.warn('Erro ao registrar início do teste SEM IA', 'LoginPage', updateError);
+                            } else {
+                                logger.info(`Teste SEM IA iniciado para usuário ${userId} - expira em 3 dias`, 'LoginPage');
+                            }
+                        } catch (err) {
+                            logger.warn('Erro ao processar início do teste SEM IA', 'LoginPage', err);
+                        }
                     }
                 } catch (err) {
                     logger.warn('Erro ao processar modo demo para usuário indicado', 'LoginPage', err);
@@ -1610,24 +1633,37 @@ const LoginPage: React.FC = () => {
                             </Alert>
                         )}
 
-                        {/* Bloco: Primeiro acesso com código de convite */}
+                        {/* Bloco: Primeiro acesso */}
                         <div className="mb-6 p-4 rounded-lg border border-dashed border-slate-300/70 dark:border-slate-600/70 bg-slate-100/50 dark:bg-slate-800/60">
                             <p className="text-sm font-semibold text-primary-800 dark:text-primary-300 mb-3">
                                 Primeiro acesso?
                             </p>
-                            <Button
-                                type="button"
-                                onClick={() => {
-                                    setShowSignup(true);
-                                    setSignupStep(1);
-                                }}
-                                variant="primary"
-                                className="w-full"
-                            >
-                                Inserir Código de Convite
-                            </Button>
+                            <div className="space-y-2">
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowSignup(true);
+                                        setSignupStep(1);
+                                    }}
+                                    variant="primary"
+                                    className="w-full"
+                                >
+                                    Criar Conta
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowSignup(true);
+                                        setSignupStep(1);
+                                    }}
+                                    variant="secondary"
+                                    className="w-full"
+                                >
+                                    Tenho Código de Convite
+                                </Button>
+                            </div>
                             <p className="text-xs text-slate-700 dark:text-slate-300 mt-3 mb-2 leading-relaxed break-words">
-                                Se você recebeu um código da sua academia, comece por aqui para liberar seu acesso premium.
+                                Crie sua conta para testar o app. Se você recebeu um código da sua academia, use o botão acima.
                             </p>
                             {/* NOVO MODELO: Trial removido - modo demo será ativado automaticamente para novos usuários não vinculados a academias */}
                             {/* Mensagem informativa para alunos que vêm via convite */}
@@ -1893,6 +1929,7 @@ const LoginPage: React.FC = () => {
                             setSignupSuccess(null);
                             setCouponValidated(false);
                             setValidatedCouponPlan(null);
+                            setTesteComIA(null);
                             setSignupStep(1);
                                 }}
                                 className="p-1 sm:p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0"
@@ -2108,6 +2145,58 @@ const LoginPage: React.FC = () => {
                                         </div>
                                     </div>
 
+                                    {/* NOVO: Escolha de Teste (apenas se não tem código de convite) */}
+                                    {!signupCouponCode.trim() && (
+                                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                                                Como deseja testar o app? *
+                                            </label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTesteComIA(true)}
+                                                    className={`p-4 rounded-lg border-2 transition-all ${
+                                                        testeComIA === true
+                                                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-md'
+                                                            : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-primary-300 dark:hover:border-primary-600'
+                                                    }`}
+                                                >
+                                                    <div className="text-center">
+                                                        <div className="text-2xl mb-2">🤖</div>
+                                                        <div className="font-semibold text-sm text-slate-900 dark:text-white mb-1">
+                                                            COM IA
+                                                        </div>
+                                                        <div className="text-xs text-slate-600 dark:text-slate-400">
+                                                            3 interações grátis
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTesteComIA(false)}
+                                                    className={`p-4 rounded-lg border-2 transition-all ${
+                                                        testeComIA === false
+                                                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-md'
+                                                            : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-primary-300 dark:hover:border-primary-600'
+                                                    }`}
+                                                >
+                                                    <div className="text-center">
+                                                        <div className="text-2xl mb-2">📝</div>
+                                                        <div className="font-semibold text-sm text-slate-900 dark:text-white mb-1">
+                                                            SEM IA
+                                                        </div>
+                                                        <div className="text-xs text-slate-600 dark:text-slate-400">
+                                                            Apenas gestão manual
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            </div>
+                                            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 text-center">
+                                                Após o teste, você será direcionado para escolher seu plano
+                                            </p>
+                                        </div>
+                                    )}
+
                                     <div className="flex gap-3 pt-2">
                                         <Button
                                             type="button"
@@ -2124,6 +2213,7 @@ const LoginPage: React.FC = () => {
                                                 setSignupSuccess(null);
                                                 setCouponValidated(false);
                                                 setValidatedCouponPlan(null);
+                                                setTesteComIA(null);
                                                 setSignupStep(1);
                                             }}
                                         >
@@ -2133,7 +2223,7 @@ const LoginPage: React.FC = () => {
                                             type="submit"
                                             variant="primary"
                                             className="flex-1"
-                                            disabled={isSigningUp}
+                                            disabled={isSigningUp || (!signupCouponCode.trim() && testeComIA === null)}
                                         >
                                             {isSigningUp ? 'Criando...' : 'Concluir Cadastro'}
                                         </Button>

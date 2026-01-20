@@ -8,6 +8,8 @@ import { useUser } from '../context/UserContext';
 import { obterInfoUsoAluno } from '../services/novoAiAccessService';
 import { logger } from '../utils/logger';
 import { RecargaModal } from './RecargaModal';
+import { redirectToSalesPage } from '../constants/salesPage';
+import { Button } from './ui/Button';
 
 interface LimitesUsageIndicatorProps {
   onRecarregarVoz?: () => void;
@@ -113,12 +115,40 @@ export function LimitesUsageIndicator({ onRecarregarVoz }: LimitesUsageIndicator
         Limites do Plano
       </h3>
 
-      {/* Modo Demo (se ativo) */}
+      {/* Modo Demo (se ativo ou expirado) */}
       {infoUso.modoDemo && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-          <p className="text-xs text-blue-700 dark:text-blue-300">
-            🎁 Modo Demo Ativo: {infoUso.modoDemo.usado} / {infoUso.modoDemo.limite} interações
-          </p>
+        <div className={`rounded-lg p-3 ${
+          infoUso.modoDemo.restante > 0
+            ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+            : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+        }`}>
+          {infoUso.modoDemo.restante > 0 ? (
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              🎁 Modo Demo Ativo: {infoUso.modoDemo.usado} / {infoUso.modoDemo.limite} interações
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-red-700 dark:text-red-300">
+                ⚠️ Demo Expirado: Você usou todas as {infoUso.modoDemo.limite} interações grátis
+              </p>
+              <p className="text-xs text-red-600 dark:text-red-400">
+                Escolha um plano para continuar usando a IA
+              </p>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  const accountType = user?.accountType || 'individual';
+                  const isAcademy = accountType === 'academy';
+                  const section = isAcademy ? 'B2B' : 'B2C_PRICING';
+                  redirectToSalesPage(section);
+                }}
+                className="w-full mt-2"
+              >
+                Ver Planos e Preços →
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

@@ -351,3 +351,37 @@ export async function ativarModoDemo(userId: string): Promise<{ success: boolean
     return { success: false, error: 'Erro ao ativar modo demo' };
   }
 }
+
+/**
+ * Verifica se o teste SEM IA expirou (3 dias)
+ * Retorna true se expirou, false se ainda está ativo
+ */
+export async function verificarTesteSemIAExpirado(userId: string): Promise<{ expirado: boolean; diasRestantes?: number }> {
+  try {
+    const supabase = getSupabaseClient();
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('teste_sem_ia_inicio')
+      .eq('id', userId)
+      .single();
+
+    if (error || !data || !data.teste_sem_ia_inicio) {
+      // Se não tem data de início, não está em teste SEM IA
+      return { expirado: false };
+    }
+
+    const dataInicio = new Date(data.teste_sem_ia_inicio);
+    const agora = new Date();
+    const diasPassados = Math.floor((agora.getTime() - dataInicio.getTime()) / (1000 * 60 * 60 * 24));
+    const diasRestantes = Math.max(0, 3 - diasPassados);
+
+    return {
+      expirado: diasPassados >= 3,
+      diasRestantes: diasRestantes > 0 ? diasRestantes : 0
+    };
+  } catch (error) {
+    logger.error('Erro ao verificar teste SEM IA', 'academiaLimitsService', error);
+    return { expirado: false };
+  }
+}

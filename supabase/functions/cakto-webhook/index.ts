@@ -189,6 +189,28 @@ serve(async (req: Request) => {
         });
         break;
       
+      // B2B Manual - Academias sem IA (plan_category: 'b2b_manual')
+      case "b2b_manual":
+        await handleAcademyManualPlan({ plan, transactionId, amountPaid, customerEmail, body, checkoutId: cleanCheckoutId });
+        await logAuditEvent("academy_manual_plan_activated", {
+          planSlug: plan.name || plan.slug,
+          planCategory: planCategory,
+          transactionId,
+          customerEmail,
+        });
+        break;
+      
+      // B2C Manual - Individuais sem IA (plan_category: 'b2c_manual')
+      case "b2c_manual":
+        await handleB2CManualPlan({ plan, transactionId, amountPaid, customerEmail, body, checkoutId });
+        await logAuditEvent("b2c_manual_plan_activated", {
+          planSlug: plan.name || plan.slug,
+          planCategory: planCategory,
+          transactionId,
+          customerEmail,
+        });
+        break;
+      
       // Personal Trainers (plan_category: 'personal_platform' ou plan_group: 'personal')
       case "personal_platform":
       case "personal":
@@ -948,6 +970,270 @@ FitCoach.IA - Sistema de Gestão para Academias
   } catch (error) {
     console.error("Erro ao enviar email via Resend:", error);
     throw error;
+  }
+}
+
+// ============ HANDLER PARA PLANOS MANUAIS (SEM IA) ============
+
+/**
+ * Processa planos B2B Manual (Academias sem IA)
+ * Cria empresa com limites ZERO para bloquear acesso à IA
+ */
+async function handleAcademyManualPlan(args: {
+  plan: any;
+  transactionId: string;
+  amountPaid: number;
+  customerEmail: string;
+  body: any;
+  checkoutId: string;
+}) {
+  const { plan, transactionId, amountPaid, customerEmail, checkoutId } = args;
+  
+  const cleanCheckoutId = checkoutId.includes('/') 
+    ? checkoutId.split('/').pop()?.split('?')[0] 
+    : checkoutId.split('?')[0];
+
+  try {
+    // 1. Gerar master_code
+    const { data: masterCodeData, error: masterCodeError } = await supabase
+      .rpc('generate_master_code');
+
+    if (masterCodeError || !masterCodeData) {
+      console.error("Erro ao gerar master_code:", masterCodeError);
+      return;
+    }
+
+    const masterCode = masterCodeData as string;
+
+    // 2. Mapear nome do plano
+    const planNameMap: Record<string, string> = {
+      'FitCoachManual50': 'FitCoach Manual 50',
+      'FitCoachManual100': 'FitCoach Manual 100',
+      'FitCoachManual200': 'FitCoach Manual 200',
+      'FitCoachManual300': 'FitCoach Manual 300',
+      'FitCoachManual400': 'FitCoach Manual 400',
+      'FitCoachManual500': 'FitCoach Manual 500',
+      'FitCoachManual600': 'FitCoach Manual 600',
+    };
+    const planSlug = plan.name || plan.slug;
+    const planName = planNameMap[planSlug] || plan.display_name || plan.name;
+
+    // 3. Extrair alunos_max do plano
+    const alunosMax = plan.limits?.maxUsers || 50;
+
+    // 4. Calcular data de expiração
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    // 5. Criar empresa na tabela companies COM LIMITES ZERO (sem IA)
+    const { data: company, error: companyError } = await supabase
+      .from("companies")
+      .insert({
+        name: planName + " - " + customerEmail,
+        email: customerEmail,
+        plan_type: planSlug, // Ex: 'FitCoachManual50'
+        plan_name: planName,
+        plano: planSlug, // Para compatibilidade com enum (se necessário)
+        alunos_max: alunosMax,
+        limite_texto: 0,      // ⚠️ ZERO = SEM IA
+        limite_imagem: 0,     // ⚠️ ZERO = SEM IA
+        limite_voz: 0,        // ⚠️ ZERO = SEM IA
+        master_code: masterCode,
+        status: 'active',
+        payment_status: 'paid',
+        cakto_transaction_id: transactionId,
+        cakto_checkout_id: cleanCheckoutId,
+        monthly_amount: amountPaid,
+        currency: 'BRL',
+        started_at: now.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        next_billing_date: expiresAt.toISOString(),
+      })
+      .select()
+      .single();
+
+    if (companyError || !company) {
+      console.error("Erro ao criar empresa manual:", companyError);
+      return;
+    }
+
+    console.log(`✅ Empresa manual criada: ${company.id} com master_code: ${masterCode}`);
+    console.log(`⚠️ Limites de IA definidos como ZERO (sem acesso à IA)`);
+
+    // 6. Criar gym (se necessário)
+    const { error: gymError } = await supabase
+      .from("gyms")
+      .insert({
+        id: company.id.toString(),
+        name: planName + " - " + customerEmail,
+        email: customerEmail,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (gymError) {
+      console.warn("Gym já existe ou erro ao criar:", gymError);
+    }
+
+    // 7. Criar código de convite padrão
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const { error: inviteError } = await supabase
+      .from("invites")
+      .insert({
+        academy_id: company.id,
+        code: inviteCode,
+        invited_role: 'student',
+        expires_at: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'pending',
+      });
+
+    if (inviteError) {
+      console.warn("Erro ao criar código de convite:", inviteError);
+    }
+
+    // 8. Enviar email de ativação
+    try {
+      await sendActivationEmail({
+        email: customerEmail,
+        masterCode: masterCode,
+        inviteCode: inviteCode,
+        planName: planName,
+      });
+    } catch (emailError) {
+      console.warn("Erro ao enviar email (não crítico):", emailError);
+    }
+
+    console.log(`✅ Plano manual ativado: ${planName} para ${customerEmail}`);
+    console.log(`📧 Código de convite: ${inviteCode}`);
+  } catch (error) {
+    console.error("Erro ao processar plano manual:", error);
+    await logAuditEvent("manual_plan_error", {
+      error: error instanceof Error ? error.message : String(error),
+      customer_email: customerEmail,
+      transaction_id: transactionId,
+    });
+  }
+}
+
+/**
+ * Processa planos B2C Manual (Individuais sem IA)
+ * Cria assinatura sem acesso à IA
+ */
+async function handleB2CManualPlan(args: {
+  plan: any;
+  transactionId: string;
+  amountPaid: number;
+  customerEmail: string;
+  body: any;
+  checkoutId: string;
+}) {
+  const { plan, transactionId, amountPaid, customerEmail, checkoutId } = args;
+  
+  try {
+    // 1. Buscar ou criar usuário pelo email
+    let userId: string | null = null;
+    
+    const { data: userByEmail, error: userEmailError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", customerEmail)
+      .maybeSingle();
+    
+    if (userByEmail && !userEmailError) {
+      userId = userByEmail.id;
+      console.log(`Usuário encontrado pelo email: ${customerEmail} (${userId})`);
+    } else {
+      // Tentar buscar via função RPC se existir
+      const { data: authUser, error: authError } = await supabase
+        .rpc('get_user_id_by_email', { user_email: customerEmail })
+        .maybeSingle();
+      
+      if (authUser && !authError) {
+        userId = authUser.id;
+        console.log(`Usuário encontrado via RPC: ${customerEmail} (${userId})`);
+      }
+    }
+
+    if (!userId) {
+      console.error(`Não foi possível encontrar usuário para email: ${customerEmail}`);
+      return;
+    }
+
+    // 2. Calcular datas do período
+    const now = new Date();
+    const periodStart = now.toISOString();
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+    // 3. Verificar se já existe assinatura ativa
+    const { data: existingSubscription, error: existingError } = await supabase
+      .from("user_subscriptions")
+      .select("*")
+      .eq("user_id", userId)
+      .in("status", ["active", "trialing"])
+      .maybeSingle();
+
+    let subscription;
+    
+    if (existingSubscription && !existingError) {
+      // Atualizar assinatura existente
+      const { data: updated, error: updateError } = await supabase
+        .from("user_subscriptions")
+        .update({
+          plan_slug: plan.name || plan.slug,
+          status: "active",
+          current_period_start: periodStart,
+          current_period_end: periodEnd.toISOString(),
+          billing_cycle: 'monthly',
+          payment_method_id: transactionId,
+          payment_provider: 'cakto',
+          updated_at: now.toISOString(),
+        })
+        .eq("id", existingSubscription.id)
+        .select()
+        .single();
+
+      if (updateError || !updated) {
+        console.error("Erro ao atualizar assinatura manual:", updateError);
+        return;
+      }
+      subscription = updated;
+      console.log(`✅ Assinatura manual atualizada: ${subscription.id}`);
+    } else {
+      // Criar nova assinatura
+      const { data: created, error: createError } = await supabase
+        .from("user_subscriptions")
+        .insert({
+          user_id: userId,
+          user_email: customerEmail,
+          plan_slug: plan.name || plan.slug,
+          status: "active",
+          current_period_start: periodStart,
+          current_period_end: periodEnd.toISOString(),
+          billing_cycle: 'monthly',
+          payment_method_id: transactionId,
+          payment_provider: 'cakto',
+        })
+        .select()
+        .single();
+
+      if (createError || !created) {
+        console.error("Erro ao criar assinatura manual:", createError);
+        return;
+      }
+      subscription = created;
+      console.log(`✅ Assinatura manual B2C criada: ${subscription.id}`);
+    }
+
+    console.log(`⚠️ Plano manual B2C ativado - usuário NÃO terá acesso à IA`);
+  } catch (error) {
+    console.error("Erro ao processar plano manual B2C:", error);
+    await logAuditEvent("b2c_manual_plan_error", {
+      error: error instanceof Error ? error.message : String(error),
+      customer_email: customerEmail,
+      transaction_id: transactionId,
+    });
   }
 }
 

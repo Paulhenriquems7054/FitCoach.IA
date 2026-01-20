@@ -15,6 +15,8 @@ import { authService } from './services/supabaseService';
 import { Logo } from './components/Logo';
 import { Gender } from './types';
 import { getAccountType } from './utils/accountType';
+import { redirectToSalesPage, SALES_PAGE_SECTIONS } from './constants/salesPage';
+import { verificarTesteSemIAExpirado } from './services/academiaLimitsService';
 
 // Função auxiliar para normalizar path do hash
 const normalizePath = (hash: string) => {
@@ -365,12 +367,40 @@ const App: React.FC = () => {
                             allowedRoutes.push('/gym-admin');
                         }
                         
-                        // Se não está em rota permitida, redirecionar para premium
+                        // Se não está em rota permitida, redirecionar para página de vendas externa
                         if (!allowedRoutes.includes(currentPath) && !currentPath.startsWith('/gym-admin')) {
-                            console.log('[App] Trial expirado, redirecionando para premium...');
-                            window.location.hash = '#/premium';
+                            console.log('[App] Trial expirado, redirecionando para página de vendas externa...');
+                            // Determinar seção baseado no tipo de conta
+                            const section = accountType === 'academy' ? 'B2B' : 'B2C_PRICING';
+                            redirectToSalesPage(section);
                             return;
                         }
+                    }
+                }
+                
+                // NOVO: Verificar se teste SEM IA expirou (3 dias)
+                const userId = (updatedUser as any)?.id;
+                if (!isStudent && updatedUser.subscriptionStatus !== 'expired' && userId) {
+                    try {
+                        const testeStatus = await verificarTesteSemIAExpirado(userId);
+                        if (testeStatus.expirado) {
+                            const currentPath = normalizePath(window.location.hash);
+                            const accountType = updatedUser.accountType || 'individual';
+                            const allowedRoutes = ['/premium', '/admin-dashboard'];
+                            if (accountType === 'academy') {
+                                allowedRoutes.push('/gym-admin');
+                            }
+                            
+                            // Se não está em rota permitida, redirecionar para página de vendas externa
+                            if (!allowedRoutes.includes(currentPath) && !currentPath.startsWith('/gym-admin')) {
+                                console.log('[App] Teste SEM IA expirado, redirecionando para página de vendas externa...');
+                                const section = accountType === 'academy' ? 'B2B' : 'B2C_PRICING';
+                                redirectToSalesPage(section);
+                                return;
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('[App] Erro ao verificar teste SEM IA:', error);
                     }
                 }
                 
@@ -726,10 +756,12 @@ const App: React.FC = () => {
                     allowedRoutes.push('/admin-dashboard', '/gym-admin');
                 }
                 
-                // Se não está em rota permitida, redirecionar para premium
+                // Se não está em rota permitida, redirecionar para página de vendas externa
                 if (!allowedRoutes.includes(normalizedPath) && !normalizedPath.startsWith('/gym-admin')) {
-                    console.log('[App] Trial expirado, bloqueando acesso a:', normalizedPath);
-                    window.location.hash = '#/premium';
+                    console.log('[App] Trial expirado, redirecionando para página de vendas externa...');
+                    // Determinar seção baseado no tipo de conta
+                    const section = accountType === 'academy' ? 'B2B' : 'B2C_PRICING';
+                    redirectToSalesPage(section);
                     return <PageLoader />;
                 }
             }

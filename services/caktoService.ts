@@ -38,6 +38,18 @@ const CAKTO_CHECKOUT_IDS: Record<string, string> = {
   'FitCoach200': '3b2kpwc_671196',     // ✅ R$ 999,90 - 200 alunos
   'FitCoach400': '3dis6ds_668546',     // ✅ R$ 1.799,90 - 400 alunos
   'FitCoach500': 'SEU_CHECKOUT_ID_AQUI',     // ⚠️ 500 alunos (não mencionado pelo usuário)
+  
+  // Planos B2B Manual (sem IA) - ⚠️ SUBSTITUIR pelos IDs reais da Cakto
+  'FitCoachManual50': 'SEU_CHECKOUT_ID_AQUI',   // ⚠️ R$ 59,90 - 50 alunos (sem IA)
+  'FitCoachManual100': 'SEU_CHECKOUT_ID_AQUI',  // ⚠️ R$ 129,90 - 100 alunos (sem IA)
+  'FitCoachManual200': 'SEU_CHECKOUT_ID_AQUI',  // ⚠️ R$ 229,90 - 200 alunos (sem IA)
+  'FitCoachManual300': 'SEU_CHECKOUT_ID_AQUI',  // ⚠️ R$ 329,90 - 300 alunos (sem IA)
+  'FitCoachManual400': 'SEU_CHECKOUT_ID_AQUI',  // ⚠️ R$ 429,90 - 400 alunos (sem IA)
+  'FitCoachManual500': 'SEU_CHECKOUT_ID_AQUI',  // ⚠️ R$ 529,90 - 500 alunos (sem IA)
+  'FitCoachManual600': 'SEU_CHECKOUT_ID_AQUI',  // ⚠️ R$ 629,90 - 600 alunos (sem IA)
+  
+  // Planos B2C Manual (sem IA) - ⚠️ SUBSTITUIR pelo ID real da Cakto
+  'manual_monthly': 'SEU_CHECKOUT_ID_AQUI',    // ⚠️ Plano manual individual (sem IA)
 };
 
 /**
