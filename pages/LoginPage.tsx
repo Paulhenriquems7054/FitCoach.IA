@@ -1648,9 +1648,16 @@ const LoginPage: React.FC = () => {
                                 <Button
                                     type="button"
                                     onClick={() => {
-                                        setShowSignup(true);
+                                        // Resetar estados antes de abrir
                                         setSignupStep(2); // Ir direto para o formulário de cadastro
                                         setTesteComIA(null); // Resetar escolha de teste
+                                        setSignupCouponCode(''); // Limpar código
+                                        setCouponValidated(false); // Resetar validação
+                                        setValidatedCouponPlan(null);
+                                        setSignupError(null);
+                                        setSignupSuccess(null);
+                                        // Abrir modal após definir estados
+                                        setShowSignup(true);
                                     }}
                                     variant="primary"
                                     className="w-full"
