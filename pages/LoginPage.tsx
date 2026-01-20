@@ -751,30 +751,45 @@ const LoginPage: React.FC = () => {
                                     return { data, error: null };
                                 }
                                 
-                                // Log detalhado do erro
-                                logger.error(`❌ Erro na tentativa ${attempt + 1} da função RPC:`, 'LoginPage', {
-                                    code: error.code,
-                                    message: error.message,
-                                    details: error.details,
-                                    hint: error.hint,
-                                    status: (error as any).status,
-                                    error: error
-                                });
-                                // Log direto no console para garantir visibilidade
-                                console.error(`[LoginPage] ❌ Erro na tentativa ${attempt + 1} da função RPC:`, {
-                                    code: error.code,
-                                    message: error.message,
-                                    details: error.details,
-                                    hint: error.hint,
-                                    status: (error as any).status,
-                                    error: error
-                                });
+                                // Log detalhado do erro (apenas na primeira tentativa para evitar spam)
+                                if (attempt === 0) {
+                                    logger.error(`❌ Erro na tentativa ${attempt + 1} da função RPC:`, 'LoginPage', {
+                                        code: error.code,
+                                        message: error.message,
+                                        details: error.details,
+                                        hint: error.hint,
+                                        status: (error as any).status,
+                                        error: error
+                                    });
+                                    // Log direto no console para garantir visibilidade (apenas primeira tentativa)
+                                    console.error(`[LoginPage] ❌ Erro na tentativa ${attempt + 1} da função RPC:`, {
+                                        code: error.code,
+                                        message: error.message,
+                                        details: error.details,
+                                        hint: error.hint,
+                                        status: (error as any).status,
+                                        error: error
+                                    });
+                                } else {
+                                    // Nas tentativas subsequentes, apenas logar mensagem simples
+                                    console.warn(`[LoginPage] ⚠️ Tentativa ${attempt + 1} falhou: ${error.message}`);
+                                }
                                 
-                                // Se for erro 400, pode ser problema de permissões ou parâmetros
-                                if ((error as any).status === 400 || error.code === '42883' || error.message?.includes('function') || error.message?.includes('does not exist')) {
-                                    logger.error('⚠️ ERRO 400 ou função não encontrada - verifique se GRANT EXECUTE foi executado e se a assinatura da função está correta', 'LoginPage');
+                                // Se for erro 400 ou função não existe, parar imediatamente
+                                const isFunctionNotFound = (error as any).status === 400 || 
+                                                          error.code === '42883' || 
+                                                          error.message?.includes('function') || 
+                                                          error.message?.includes('does not exist') ||
+                                                          error.message?.includes('não existe') ||
+                                                          error.message?.toLowerCase().includes('not found');
+                                
+                                if (isFunctionNotFound) {
+                                    const errorMsg = `⚠️ Função RPC não encontrada ou sem permissões. Execute a migration: supabase/migration_criar_funcao_insert_user_profile.sql`;
+                                    logger.error(errorMsg, 'LoginPage');
+                                    console.error('[LoginPage]', errorMsg);
+                                    console.error('[LoginPage] Erro completo:', error);
                                     // Não fazer retry para esse tipo de erro (é problema de configuração)
-                                    return { data, error };
+                                    return { data, error: new Error(errorMsg) };
                                 }
                                 
                                 // Se for erro de foreign key (usuário não existe em auth.users), aguardar e tentar novamente
@@ -789,11 +804,17 @@ const LoginPage: React.FC = () => {
                                 // Para outros erros, retornar imediatamente (não fazer retry)
                                 return { data, error };
                             } catch (err: any) {
-                                logger.error(`Exceção na tentativa ${attempt + 1} da função RPC:`, 'LoginPage', err);
+                                // Logar exceção apenas na primeira tentativa
+                                if (attempt === 0) {
+                                    logger.error(`Exceção na tentativa ${attempt + 1} da função RPC:`, 'LoginPage', err);
+                                    console.error('[LoginPage] Exceção ao chamar RPC:', err);
+                                }
                                 if (attempt === maxRetries - 1) {
                                     return { data: null, error: err };
                                 }
-                                logger.warn(`Aguardando ${delay}ms antes de tentar novamente...`, 'LoginPage');
+                                if (attempt === 0) {
+                                    logger.warn(`Aguardando ${delay}ms antes de tentar novamente...`, 'LoginPage');
+                                }
                                 await new Promise(resolve => setTimeout(resolve, delay));
                             }
                         }
@@ -808,32 +829,31 @@ const LoginPage: React.FC = () => {
                     const { data: rpcData, error: rpcError } = await retryRpcCall(rpcParams);
 
                     if (rpcError) {
-                        logger.error('❌ ERRO CRÍTICO: Falha ao criar usuário via função RPC após todas as tentativas', 'LoginPage', rpcError);
-                        logger.error('📋 Detalhes completos do erro RPC:', 'LoginPage', {
-                            message: rpcError.message,
-                            code: rpcError.code,
-                            details: rpcError.details,
-                            hint: rpcError.hint,
-                            status: (rpcError as any).status,
-                            error_object: rpcError
-                        });
-                        // Log direto no console para garantir visibilidade
-                        console.error('[LoginPage] ❌ ERRO CRÍTICO: Falha ao criar usuário via função RPC após todas as tentativas', rpcError);
-                        console.error('[LoginPage] 📋 Detalhes completos do erro RPC:', {
-                            message: rpcError.message,
-                            code: rpcError.code,
-                            details: rpcError.details,
-                            hint: rpcError.hint,
-                            status: (rpcError as any).status,
-                            error_object: rpcError
-                        });
+                        // Verificar se é erro de função não encontrada
+                        const isFunctionNotFound = rpcError.message?.includes('Função RPC não encontrada') ||
+                                                   (rpcError as any).status === 400 ||
+                                                   rpcError.code === '42883' ||
+                                                   rpcError.message?.includes('function') ||
+                                                   rpcError.message?.includes('does not exist') ||
+                                                   rpcError.message?.includes('não existe');
                         
-                        // Se for erro 400, adicionar mensagem específica sobre permissões
-                        if ((rpcError as any).status === 400 || rpcError.code === '42883') {
-                            logger.error('🔧 AÇÃO NECESSÁRIA: Execute o script supabase/verificar_e_corrigir_permissoes.sql no SQL Editor do Supabase para verificar/corrigir permissões GRANT EXECUTE', 'LoginPage');
+                        if (isFunctionNotFound) {
+                            const errorMsg = 'Função RPC não encontrada no Supabase. Execute a migration: supabase/migration_criar_funcao_insert_user_profile.sql';
+                            logger.error('❌ ERRO CRÍTICO: ' + errorMsg, 'LoginPage', rpcError);
+                            console.error('[LoginPage] ❌ ERRO CRÍTICO:', errorMsg);
+                            console.error('[LoginPage] Detalhes:', rpcError);
+                            userError = new Error(errorMsg);
+                        } else {
+                            logger.error('❌ ERRO CRÍTICO: Falha ao criar usuário via função RPC após todas as tentativas', 'LoginPage', rpcError);
+                            // Log direto no console (apenas uma vez)
+                            console.error('[LoginPage] ❌ ERRO CRÍTICO: Falha ao criar usuário via função RPC', {
+                                message: rpcError.message,
+                                code: rpcError.code,
+                                details: rpcError.details,
+                                hint: rpcError.hint
+                            });
+                            userError = rpcError;
                         }
-                        
-                        userError = rpcError;
                     } else {
                         userCreatedInDB = true;
                         logger.info('✅ Usuário criado com sucesso na tabela users via função RPC', 'LoginPage', { rpcData });
@@ -888,12 +908,20 @@ const LoginPage: React.FC = () => {
                 }
             }
 
-            // Se ainda não foi criado, mostrar erro detalhado mas não bloquear completamente
+            // Se ainda não foi criado, lançar erro para exibir ao usuário
             if (!userCreatedInDB) {
-                const errorMsg = userError instanceof Error ? userError.message : JSON.stringify(userError);
+                const errorMsg = userError instanceof Error ? userError.message : (typeof userError === 'string' ? userError : JSON.stringify(userError));
+                
+                // Verificar se é erro de função RPC não encontrada
+                if (errorMsg.includes('Função RPC não encontrada') || errorMsg.includes('migration_criar_funcao')) {
+                    const detailedError = 'Erro de configuração: A função RPC não foi encontrada no Supabase. Execute a migration: supabase/migration_criar_funcao_insert_user_profile.sql no SQL Editor do Supabase.';
+                    logger.error(`CRÍTICO: ${detailedError}`, 'LoginPage', userError);
+                    throw new Error('Erro ao criar conta. Por favor, entre em contato com o suporte.');
+                }
+                
                 logger.error(`CRÍTICO: Falha ao criar usuário na tabela users. Erro: ${errorMsg}`, 'LoginPage', userError);
-                // Mostrar aviso ao usuário mas permitir que continue (pode criar manualmente depois)
-                showError('Conta criada no sistema, mas houve um problema ao salvar seu perfil. Entre em contato com o suporte se o problema persistir.');
+                // Lançar erro para exibir ao usuário
+                throw new Error(errorMsg || 'Erro ao criar conta. Tente novamente ou entre em contato com o suporte.');
             }
 
             // Aplicar cupom ou vincular via código mestre (apenas se fornecido)

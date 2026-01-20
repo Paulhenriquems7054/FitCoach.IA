@@ -15,6 +15,7 @@ interface ErrorContext {
 class ErrorTrackingService {
   private isInitialized = false;
   private sentryDsn: string | null = null;
+  private isCapturing = false; // Flag para evitar loops recursivos
 
   /**
    * Inicializa o serviço de error tracking
@@ -96,11 +97,20 @@ class ErrorTrackingService {
    * Captura um erro
    */
   captureError(error: Error | unknown, context?: ErrorContext): void {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
+    // Proteção contra loops recursivos
+    if (this.isCapturing) {
+      console.warn('[errorTracking] Evitando loop recursivo - erro já está sendo capturado');
+      return;
+    }
+    
+    this.isCapturing = true;
+    
+    try {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
 
-    // Log local
-    logger.error(errorMessage, 'errorTracking', error);
+      // NÃO chamar logger.error aqui para evitar loop - apenas console.error
+      console.error('[errorTracking]', errorMessage, error);
 
     // Preparar dados para envio
     const errorData = {
@@ -112,14 +122,17 @@ class ErrorTrackingService {
       url: window.location.href,
     };
 
-    // Enviar para serviço de tracking (quando implementado)
-    if (this.sentryDsn) {
-      this.sendToSentry(errorData);
-    } else {
-      // Em desenvolvimento, logar no console
-      if (import.meta.env.DEV) {
-        console.error('Error Tracking:', errorData);
+      // Enviar para serviço de tracking (quando implementado)
+      if (this.sentryDsn) {
+        this.sendToSentry(errorData);
+      } else {
+        // Em desenvolvimento, logar no console
+        if (import.meta.env.DEV) {
+          console.error('Error Tracking:', errorData);
+        }
       }
+    } finally {
+      this.isCapturing = false;
     }
   }
 
