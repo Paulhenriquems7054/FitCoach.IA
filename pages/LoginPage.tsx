@@ -298,11 +298,14 @@ const LoginPage: React.FC = () => {
         
         if (masterCodeValidation.isValid && masterCodeValidation.company) {
             // Código mestre válido
+            setSignupError(null); // Limpar erros anteriores
             setCouponValidated(true);
             setValidatedCouponPlan(masterCodeValidation.company.planType);
             showSuccess(`Código mestre válido! Você será vinculado à academia: ${masterCodeValidation.company.name}`);
-            // Avançar para a etapa 2 (criação de conta)
-            setSignupStep(2);
+            // Avançar para a etapa 2 (criação de conta) apenas se estiver na etapa 1
+            if (signupStep === 1) {
+                setSignupStep(2);
+            }
             return;
         }
         
@@ -310,11 +313,14 @@ const LoginPage: React.FC = () => {
         const validation = await validateCoupon(signupCouponCode.trim());
         
         if (validation.isValid && validation.coupon) {
+            setSignupError(null); // Limpar erros anteriores
             setCouponValidated(true);
             setValidatedCouponPlan(validation.coupon.planLinked);
             showSuccess(`Código válido! Você receberá o plano: ${validation.coupon.planLinked}`);
-            // Avançar para a etapa 2 (criação de conta) somente após cupom válido
-            setSignupStep(2);
+            // Avançar para a etapa 2 (criação de conta) apenas se estiver na etapa 1
+            if (signupStep === 1) {
+                setSignupStep(2);
+            }
         } else {
             setCouponValidated(false);
             setValidatedCouponPlan(null);
@@ -1643,7 +1649,8 @@ const LoginPage: React.FC = () => {
                                     type="button"
                                     onClick={() => {
                                         setShowSignup(true);
-                                        setSignupStep(1);
+                                        setSignupStep(2); // Ir direto para o formulário de cadastro
+                                        setTesteComIA(null); // Resetar escolha de teste
                                     }}
                                     variant="primary"
                                     className="w-full"
@@ -1914,17 +1921,22 @@ const LoginPage: React.FC = () => {
             <Card className="w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-y-auto animate-fade-in-up">
             <div className="p-3 sm:p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
                             <h2 className="text-base sm:text-lg font-bold flex items-center gap-2 truncate pr-2">
-                                ✨ Criar Conta {signupStep === 1 && '(Código opcional)'}
+                                ✨ Criar Conta {signupStep === 1 ? '(Código opcional)' : ''}
                             </h2>
                             <button
                             type="button"
                             onClick={() => {
                             setShowSignup(false);
+                            setSignupStep(1);
                             setSignupName('');
                             setSignupEmail('');
                             setSignupPassword('');
                             setSignupConfirmPassword('');
                             setSignupCouponCode('');
+                            setTesteComIA(null);
+                            setCouponValidated(false);
+                            setValidatedCouponPlan(null);
+                            setSignupError(null);
                             setSignupError(null);
                             setSignupSuccess(null);
                             setCouponValidated(false);
@@ -2033,16 +2045,56 @@ const LoginPage: React.FC = () => {
                             {/* Etapa 2: Criar Conta (E-mail e Senha) */}
                             {signupStep === 2 && (
                                 <form onSubmit={handleSignup} className="space-y-4">
-                                    <div className="mb-2">
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                                            Código de convite validado: <span className="font-medium">{signupCouponCode}</span>
-                                        </p>
-                                        {validatedCouponPlan && (
-                                            <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                                                Plano liberado: {validatedCouponPlan}
+                                    {/* Mensagem de código validado (se houver) */}
+                                    {signupCouponCode.trim() && couponValidated && (
+                                        <div className="mb-2 p-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                                            <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                                                ✓ Código de convite validado: <span className="font-medium">{signupCouponCode}</span>
                                             </p>
+                                            {validatedCouponPlan && (
+                                                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                                                    Plano liberado: {validatedCouponPlan}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Campo opcional de código (se não foi validado ainda) */}
+                                    {!couponValidated && (
+                                        <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+                                            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">
+                                                Tem um código de convite? (Opcional)
+                                            </label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={signupCouponCode}
+                                                    onChange={(e) => setSignupCouponCode(e.target.value)}
+                                                    className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                    placeholder="Ex: ACADEMIA-VIP"
+                                                />
+                                            {signupCouponCode.trim() && (
+                                                <Button
+                                                    type="button"
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        handleValidateCoupon();
+                                                    }}
+                                                >
+                                                    Validar
+                                                </Button>
+                                            )}
+                                        </div>
+                                        {signupError && signupCouponCode.trim() && (
+                                            <p className="text-xs text-red-600 dark:text-red-400 mt-1">{signupError}</p>
                                         )}
-                                    </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                                                Se não tiver código, pode continuar e criar uma conta gratuita para testar.
+                                            </p>
+                                        </div>
+                                    )}
 
                                     {/* Nome */}
                                     <div>
@@ -2204,11 +2256,15 @@ const LoginPage: React.FC = () => {
                                             className="flex-1"
                                             onClick={() => {
                                                 setShowSignup(false);
+                                                setSignupStep(1);
                                                 setSignupName('');
                                                 setSignupEmail('');
                                                 setSignupPassword('');
                                                 setSignupConfirmPassword('');
                                                 setSignupCouponCode('');
+                                                setTesteComIA(null);
+                                                setCouponValidated(false);
+                                                setValidatedCouponPlan(null);
                                                 setSignupError(null);
                                                 setSignupSuccess(null);
                                                 setCouponValidated(false);
