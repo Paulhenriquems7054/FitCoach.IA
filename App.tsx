@@ -685,8 +685,13 @@ const App: React.FC = () => {
     }
 
     // Verificar se é admin (apenas se estiver logado)
+    // IMPORTANTE: Apenas considerar admin se gymRole for explicitamente 'admin' OU username for Administrador/Desenvolvedor
+    // Não considerar admin se gymRole for null, undefined, ou qualquer outro valor
     const isDefaultAdmin = isLoggedIn && user && (user.username === 'Administrador' || user.username === 'Desenvolvedor');
-    const isAdmin = isLoggedIn && user && (user.gymRole === 'admin' || isDefaultAdmin);
+    const isAdmin = isLoggedIn && user && (
+        (user.gymRole === 'admin' && user.gymRole !== null && user.gymRole !== undefined) || 
+        isDefaultAdmin
+    );
     const isDeveloper = isLoggedIn && user && (user.username === 'Desenvolvedor' || user.username === 'dev123');
 
     // Se for desenvolvedor, permitir acesso a rotas administrativas e billing
@@ -909,10 +914,24 @@ const App: React.FC = () => {
                 if (isDeveloper) {
                     return <AdminDashboardPage />;
                 }
-                // Se for admin, mostrar dashboard administrativo; caso contrário, mostrar home do aluno
-                if (isAdmin) {
+                // Se for admin (gymRole === 'admin' explicitamente OU username é Administrador), mostrar dashboard administrativo
+                // IMPORTANTE: Não redirecionar usuários novos (sem gymRole ou com gymRole null/undefined) para admin-dashboard
+                if (isAdmin && user && (user.gymRole === 'admin' || user.username === 'Administrador')) {
                     return <AdminDashboardPage />;
                 }
+                // Verificar se é cliente B2C com assinatura ativa (após compra)
+                if (user && isLoggedIn) {
+                    const accountType = getAccountType(user);
+                    const hasActiveSubscription = user.subscriptionStatus === 'active' && 
+                                                   user.planType && 
+                                                   user.planType !== 'free';
+                    
+                    // Cliente B2C com assinatura ativa → dashboard administrativo
+                    if (accountType === 'USER_B2C' && hasActiveSubscription) {
+                        return <AdminDashboardPage />;
+                    }
+                }
+                // Para todos os outros usuários (incluindo novos usuários B2C sem assinatura), mostrar home normal
                 return <HomePage />;
         }
     };

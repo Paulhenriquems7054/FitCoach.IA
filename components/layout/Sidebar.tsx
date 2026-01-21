@@ -167,7 +167,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
       { name: 'Treinos em Grupo', href: '#/group-workouts', icon: UserGroupIcon },
       { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
       { name: 'Minha Assinatura', href: '#/billing', icon: ChartBarIcon },
-      { name: 'Planos', href: '#/plans', icon: StarIcon },
+      { name: 'Planos', href: 'https://pagina-de-vendas-fit-coach-ai.vercel.app/', icon: StarIcon, external: true },
     ];
 
     return items.filter(item => {
@@ -301,20 +301,32 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
               >
                 <div style={{ padding: '1rem 0.75rem 1.5rem' }}>
                   <nav className="space-y-3 mb-4" aria-label="Navegação principal">
-                    {mainNavigation.map((item) => (
+                    {mainNavigation.map((item) => {
+                      const isExternal = (item as any).external === true;
+                      return (
                       <a
                         key={item.name}
                         href={item.href}
+                        target={isExternal ? '_blank' : undefined}
+                        rel={isExternal ? 'noopener noreferrer' : undefined}
                         onClick={(e) => {
                           e.preventDefault();
                           setOpen(false);
-                          window.location.hash = item.href;
+                          if (isExternal) {
+                            window.open(item.href, '_blank');
+                          } else {
+                            window.location.hash = item.href;
+                          }
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
                             setOpen(false);
-                            window.location.hash = item.href;
+                            if (isExternal) {
+                              window.open(item.href, '_blank');
+                            } else {
+                              window.location.hash = item.href;
+                            }
                           }
                         }}
                         className={classNames(
@@ -338,7 +350,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
                         />
                         <span className="flex-1 text-left leading-snug">{item.name}</span>
                       </a>
-                    ))}
+                      );
+                    })}
                   </nav>
                   <nav className="space-y-3" aria-label="Navegação do usuário">
                     {userNavigation.map((item) => (
