@@ -443,6 +443,12 @@ const LoginPage: React.FC = () => {
 
             const userId = authData.user.id;
             logger.info(`Usuário criado no Supabase Auth com ID: ${userId}`, 'LoginPage');
+            
+            // Verificar se email precisa ser confirmado
+            const needsEmailConfirmation = authData.user.email_confirmed_at === null;
+            if (needsEmailConfirmation) {
+                logger.info('Email precisa ser confirmado antes de fazer login', 'LoginPage');
+            }
 
             // IMPORTANTE: Aguardar um pouco para garantir que o usuário foi commitado em auth.users
             // Isso previne erro de foreign key constraint
@@ -607,321 +613,74 @@ const LoginPage: React.FC = () => {
                 }
             }
 
-            // Criar usuário no Supabase usando função RPC segura
-            // Se sessão não estiver ativa (email confirmation), ir direto para função RPC
-            let userError = null;
-            let userCreatedInDB = false;
+            // ✅ NOVO FLUXO: O trigger automático cria o perfil, apenas precisamos aguardar e buscar
+            // O trigger handle_new_user() cria o perfil automaticamente após signup
+            logger.info('Aguardando trigger criar perfil automaticamente...', 'LoginPage');
             
-            // Verificar se a sessão está ativa antes de tentar inserir diretamente
-            let shouldTryDirectInsert = false;
-            try {
-                const { data: { user: currentUser } } = await supabase.auth.getUser();
-                if (currentUser && currentUser.id === userId) {
-                    shouldTryDirectInsert = true;
-                    logger.info(`Sessão ativa confirmada para usuário: ${currentUser.id}`, 'LoginPage');
-                } else {
-                    logger.info('Sessão não está ativa (esperado se email confirmation estiver habilitado), usando função RPC diretamente', 'LoginPage');
-                }
-            } catch (sessionError) {
-                logger.info('Não foi possível verificar sessão, usando função RPC diretamente', 'LoginPage');
-            }
+            // Aguardar um pouco para o trigger processar
+            await new Promise(resolve => setTimeout(resolve, 1500));
             
-            // Tentar inserção direta apenas se sessão estiver ativa
-            if (shouldTryDirectInsert) {
+            // Buscar o perfil criado pelo trigger (com retry para lidar com timing)
+            let userProfile = null;
+            const maxRetries = 5;
+            const retryDelay = 500;
+            
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
-                    const { data: insertData, error: directInsertError } = await supabase
+                    logger.info(`Buscando perfil do usuário (tentativa ${attempt + 1}/${maxRetries})...`, 'LoginPage');
+                    
+                    const { data: profileData, error: profileError } = await supabase
                         .from('users')
-                        .insert({
-                        id: userId,
-                        nome: userData.nome,
-                        username: usernameToUse,
-                        email: sanitizedEmail,
-                        idade: userData.idade,
-                        genero: userData.genero,
-                        peso: userData.peso,
-                        altura: userData.altura,
-                        objetivo: userData.objetivo,
-                        points: userData.points,
-                        discipline_score: userData.disciplineScore,
-                        completed_challenge_ids: userData.completedChallengeIds && userData.completedChallengeIds.length > 0 
-                            ? userData.completedChallengeIds 
-                            : null,
-                        is_anonymized: userData.isAnonymized,
-                        role: userData.role,
-                        plan_type: userData.planType,
-                        subscription_status: (userData.subscriptionStatus === 'trial' ? 'active' : (userData.subscriptionStatus || 'active')),
-                        expiry_date: userData.expiryDate || null,
-                        voice_daily_limit_seconds: userData.voiceDailyLimitSeconds || (subscriptionStatus === 'trial' && !hasCouponOrInvite ? 300 : 900),
-                        voice_used_today_seconds: 0,
-                        voice_balance_upsell: 0,
-                        text_msg_count_today: 0,
-                    })
-                    .select(); // Selecionar para verificar se foi criado
-
-                    if (directInsertError) {
-                        userError = directInsertError;
-                        logger.warn('Inserção direta falhou, tentando função RPC', 'LoginPage', directInsertError);
-                    } else if (insertData && insertData.length > 0) {
-                        userCreatedInDB = true;
-                        logger.info('Usuário criado com sucesso na tabela users (inserção direta)', 'LoginPage');
-                    }
-                } catch (directError) {
-                    // Se inserção direta falhar (RLS ou outro erro), usar função RPC
-                    logger.warn('Exceção ao inserir diretamente, tentando função RPC', 'LoginPage', directError);
-                    userError = directError as any;
-                }
-            }
-
-            // Se inserção direta falhou ou não foi tentada, tentar função RPC com retry logic
-            if (!userCreatedInDB) {
-                try {
-                    // Preparar dados do usuário em JSONB conforme a função espera
-                    const userDataJsonb = {
-                        idade: userData.idade,
-                        genero: userData.genero,
-                        peso: userData.peso,
-                        altura: userData.altura,
-                        objetivo: userData.objetivo,
-                        points: userData.points,
-                        disciplineScore: userData.disciplineScore,
-                        completedChallengeIds: userData.completedChallengeIds && userData.completedChallengeIds.length > 0 
-                            ? userData.completedChallengeIds 
-                            : [],
-                        isAnonymized: userData.isAnonymized,
-                        role: userData.role,
-                    };
-
-                    // Preparar parâmetros para a função RPC
-                    // Nota: Não passar null explicitamente, deixar undefined para valores opcionais
-                    // IMPORTANTE: subscription_status só aceita 'active', 'inactive', 'expired' - converter 'trial' para 'active'
-                    const rpcParams: any = {
-                        p_user_id: userId,
-                        p_nome: userData.nome,
-                        p_username: usernameToUse,
-                        p_plan_type: userData.planType || 'free',
-                        p_subscription_status: (userData.subscriptionStatus === 'trial' ? 'active' : (userData.subscriptionStatus || 'active')),
-                        p_user_data: userDataJsonb,
-                    };
+                        .select('*')
+                        .eq('id', userId)
+                        .maybeSingle(); // maybeSingle retorna null se não encontrar (não lança erro)
                     
-                    // Adicionar parâmetros opcionais apenas se tiverem valores
-                    if (sanitizedEmail) {
-                        rpcParams.p_email = sanitizedEmail;
-                    }
-                    
-                    rpcParams.p_voice_daily_limit_seconds = userData.voiceDailyLimitSeconds || (subscriptionStatus === 'trial' && !hasCouponOrInvite ? 300 : 900);
-                    
-                    if (userData.expiryDate) {
-                        rpcParams.p_expiry_date = userData.expiryDate;
-                    }
-
-                    // Função de retry para lidar com timing issues (foreign key constraint)
-                    const retryRpcCall = async (params: any, maxRetries = 3, delay = 1000): Promise<{ data: any; error: any }> => {
-                        for (let attempt = 0; attempt < maxRetries; attempt++) {
-                            try {
-                                logger.info(`Tentativa ${attempt + 1}/${maxRetries} de chamar função RPC insert_user_profile_after_signup`, 'LoginPage');
-                                logger.debug(`Parâmetros RPC (tentativa ${attempt + 1}):`, 'LoginPage', {
-                                    p_user_id: params.p_user_id,
-                                    p_nome: params.p_nome,
-                                    p_username: params.p_username,
-                                    p_plan_type: params.p_plan_type,
-                                    p_subscription_status: params.p_subscription_status,
-                                    p_email: params.p_email,
-                                    p_voice_daily_limit_seconds: params.p_voice_daily_limit_seconds,
-                                    p_expiry_date: params.p_expiry_date,
-                                    p_user_data_keys: params.p_user_data ? Object.keys(params.p_user_data) : []
-                                });
-                                // Log direto no console para garantir visibilidade
-                                console.log(`[LoginPage] Tentativa ${attempt + 1}/${maxRetries} de chamar função RPC insert_user_profile_after_signup`);
-                                console.log(`[LoginPage] Parâmetros RPC (tentativa ${attempt + 1}):`, {
-                                    p_user_id: params.p_user_id,
-                                    p_nome: params.p_nome,
-                                    p_username: params.p_username,
-                                    p_plan_type: params.p_plan_type,
-                                    p_subscription_status: params.p_subscription_status,
-                                    p_email: params.p_email,
-                                    p_voice_daily_limit_seconds: params.p_voice_daily_limit_seconds,
-                                    p_expiry_date: params.p_expiry_date,
-                                    p_user_data_keys: params.p_user_data ? Object.keys(params.p_user_data) : []
-                                });
-                                
-                                const { data, error } = await supabase.rpc('insert_user_profile_after_signup', params);
-                                
-                                if (!error) {
-                                    logger.info(`✅ Função RPC executada com sucesso na tentativa ${attempt + 1}`, 'LoginPage', { data });
-                                    return { data, error: null };
-                                }
-                                
-                                // Log detalhado do erro (apenas na primeira tentativa para evitar spam)
-                                if (attempt === 0) {
-                                    logger.error(`❌ Erro na tentativa ${attempt + 1} da função RPC:`, 'LoginPage', {
-                                        code: error.code,
-                                        message: error.message,
-                                        details: error.details,
-                                        hint: error.hint,
-                                        status: (error as any).status,
-                                        error: error
-                                    });
-                                    // Log direto no console para garantir visibilidade (apenas primeira tentativa)
-                                    console.error(`[LoginPage] ❌ Erro na tentativa ${attempt + 1} da função RPC:`, {
-                                        code: error.code,
-                                        message: error.message,
-                                        details: error.details,
-                                        hint: error.hint,
-                                        status: (error as any).status,
-                                        error: error
-                                    });
-                                } else {
-                                    // Nas tentativas subsequentes, apenas logar mensagem simples
-                                    console.warn(`[LoginPage] ⚠️ Tentativa ${attempt + 1} falhou: ${error.message}`);
-                                }
-                                
-                                // Se for erro 400 ou função não existe, parar imediatamente
-                                const isFunctionNotFound = (error as any).status === 400 || 
-                                                          error.code === '42883' || 
-                                                          error.message?.includes('function') || 
-                                                          error.message?.includes('does not exist') ||
-                                                          error.message?.includes('não existe') ||
-                                                          error.message?.toLowerCase().includes('not found');
-                                
-                                if (isFunctionNotFound) {
-                                    const errorMsg = `⚠️ Função RPC não encontrada ou sem permissões. Execute a migration: supabase/migration_criar_funcao_insert_user_profile.sql`;
-                                    logger.error(errorMsg, 'LoginPage');
-                                    console.error('[LoginPage]', errorMsg);
-                                    console.error('[LoginPage] Erro completo:', error);
-                                    // Não fazer retry para esse tipo de erro (é problema de configuração)
-                                    return { data, error: new Error(errorMsg) };
-                                }
-                                
-                                // Se for erro de foreign key (usuário não existe em auth.users), aguardar e tentar novamente
-                                if (error.code === '23503' || error.code === 'P0001' || error.message?.includes('foreign key constraint') || error.message?.includes('não existe em auth.users')) {
-                                    if (attempt < maxRetries - 1) {
-                                        logger.warn(`Tentativa ${attempt + 1} falhou (usuário ainda não disponível em auth.users), aguardando ${delay}ms antes de tentar novamente...`, 'LoginPage');
-                                        await new Promise(resolve => setTimeout(resolve, delay));
-                                        continue;
-                                    }
-                                }
-                                
-                                // Para outros erros, retornar imediatamente (não fazer retry)
-                                return { data, error };
-                            } catch (err: any) {
-                                // Logar exceção apenas na primeira tentativa
-                                if (attempt === 0) {
-                                    logger.error(`Exceção na tentativa ${attempt + 1} da função RPC:`, 'LoginPage', err);
-                                    console.error('[LoginPage] Exceção ao chamar RPC:', err);
-                                }
-                                if (attempt === maxRetries - 1) {
-                                    return { data: null, error: err };
-                                }
-                                if (attempt === 0) {
-                                    logger.warn(`Aguardando ${delay}ms antes de tentar novamente...`, 'LoginPage');
-                                }
-                                await new Promise(resolve => setTimeout(resolve, delay));
+                    if (profileError) {
+                        // Se for erro 406 (Not Acceptable) ou 403 (Forbidden), pode ser que o perfil ainda não existe
+                        // ou RLS está bloqueando. Aguardar e tentar novamente.
+                        if (profileError.code === 'PGRST116' || (profileError as any).status === 406 || (profileError as any).status === 403) {
+                            if (attempt < maxRetries - 1) {
+                                logger.info(`Perfil ainda não encontrado (tentativa ${attempt + 1}), aguardando ${retryDelay}ms...`, 'LoginPage');
+                                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                                continue;
+                            }
+                        } else {
+                            // Outro tipo de erro, logar e continuar tentando
+                            logger.warn(`Erro ao buscar perfil (tentativa ${attempt + 1}):`, 'LoginPage', profileError);
+                            if (attempt < maxRetries - 1) {
+                                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                                continue;
                             }
                         }
-                        return { data: null, error: new Error('Máximo de tentativas atingido') };
-                    };
-
-                    logger.info('📞 Chamando função RPC insert_user_profile_after_signup com retry logic', 'LoginPage');
-                    logger.debug('Parâmetros completos que serão enviados para a função RPC:', 'LoginPage', rpcParams);
-                    // Log direto no console para garantir visibilidade
-                    console.log('[LoginPage] 📞 Chamando função RPC insert_user_profile_after_signup com retry logic');
-                    console.log('[LoginPage] Parâmetros completos que serão enviados para a função RPC:', rpcParams);
-                    const { data: rpcData, error: rpcError } = await retryRpcCall(rpcParams);
-
-                    if (rpcError) {
-                        // Verificar se é erro de função não encontrada
-                        const isFunctionNotFound = rpcError.message?.includes('Função RPC não encontrada') ||
-                                                   (rpcError as any).status === 400 ||
-                                                   rpcError.code === '42883' ||
-                                                   rpcError.message?.includes('function') ||
-                                                   rpcError.message?.includes('does not exist') ||
-                                                   rpcError.message?.includes('não existe');
-                        
-                        if (isFunctionNotFound) {
-                            const errorMsg = 'Função RPC não encontrada no Supabase. Execute a migration: supabase/migration_criar_funcao_insert_user_profile.sql';
-                            logger.error('❌ ERRO CRÍTICO: ' + errorMsg, 'LoginPage', rpcError);
-                            console.error('[LoginPage] ❌ ERRO CRÍTICO:', errorMsg);
-                            console.error('[LoginPage] Detalhes:', rpcError);
-                            userError = new Error(errorMsg);
-                        } else {
-                            logger.error('❌ ERRO CRÍTICO: Falha ao criar usuário via função RPC após todas as tentativas', 'LoginPage', rpcError);
-                            // Log direto no console (apenas uma vez)
-                            console.error('[LoginPage] ❌ ERRO CRÍTICO: Falha ao criar usuário via função RPC', {
-                                message: rpcError.message,
-                                code: rpcError.code,
-                                details: rpcError.details,
-                                hint: rpcError.hint
-                            });
-                            userError = rpcError;
-                        }
+                    } else if (profileData) {
+                        // Perfil encontrado!
+                        userProfile = profileData;
+                        logger.info('✅ Perfil encontrado!', 'LoginPage', { userId: profileData.id, username: profileData.username });
+                        break;
                     } else {
-                        userCreatedInDB = true;
-                        logger.info('✅ Usuário criado com sucesso na tabela users via função RPC', 'LoginPage', { rpcData });
+                        // Perfil não encontrado ainda, aguardar e tentar novamente
+                        if (attempt < maxRetries - 1) {
+                            logger.info(`Perfil ainda não criado (tentativa ${attempt + 1}), aguardando ${retryDelay}ms...`, 'LoginPage');
+                            await new Promise(resolve => setTimeout(resolve, retryDelay));
+                            continue;
+                        }
                     }
-                } catch (rpcError) {
-                    logger.error('Exceção ao criar usuário via função RPC', 'LoginPage', rpcError);
-                    userError = rpcError as any;
+                } catch (err) {
+                    logger.warn(`Exceção ao buscar perfil (tentativa ${attempt + 1}):`, 'LoginPage', err);
+                    if (attempt < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        continue;
+                    }
                 }
             }
-
-            // Se ainda não foi criado, tentar inserir diretamente novamente com campos mínimos
-            if (!userCreatedInDB) {
-                try {
-                    logger.warn('Tentando inserção alternativa com campos mínimos', 'LoginPage');
-                    const { data: altInsertData, error: altInsertError } = await supabase
-                        .from('users')
-                        .insert({
-                            id: userId,
-                            nome: userData.nome,
-                            username: usernameToUse,
-                            email: sanitizedEmail,
-                            idade: userData.idade || 0,
-                            genero: userData.genero || 'Masculino',
-                            peso: 0,
-                            altura: 0,
-                            objetivo: userData.objetivo || 'perder peso',
-                            points: 0,
-                            discipline_score: 0,
-                            completed_challenge_ids: null,
-                            is_anonymized: false,
-                            role: userData.role || 'user',
-                            plan_type: userData.planType || 'free',
-                            subscription_status: ((userData.subscriptionStatus === 'trial' ? 'active' : (userData.subscriptionStatus || 'active'))),
-                            expiry_date: userData.expiryDate || null,
-                            voice_daily_limit_seconds: userData.voiceDailyLimitSeconds || 300,
-                            voice_used_today_seconds: 0,
-                            voice_balance_upsell: 0,
-                            text_msg_count_today: 0,
-                        })
-                        .select();
-
-                    if (altInsertError) {
-                        logger.error('Erro na inserção alternativa', 'LoginPage', altInsertError);
-                        userError = altInsertError;
-                    } else if (altInsertData && altInsertData.length > 0) {
-                        userCreatedInDB = true;
-                        logger.info('Usuário criado com sucesso na tabela users (inserção alternativa)', 'LoginPage');
-                    }
-                } catch (altError) {
-                    logger.error('Exceção na inserção alternativa', 'LoginPage', altError);
-                    userError = altError as any;
-                }
-            }
-
-            // Se ainda não foi criado, lançar erro para exibir ao usuário
-            if (!userCreatedInDB) {
-                const errorMsg = userError instanceof Error ? userError.message : (typeof userError === 'string' ? userError : JSON.stringify(userError));
-                
-                // Verificar se é erro de função RPC não encontrada
-                if (errorMsg.includes('Função RPC não encontrada') || errorMsg.includes('migration_criar_funcao')) {
-                    const detailedError = 'Erro de configuração: A função RPC não foi encontrada no Supabase. Execute a migration: supabase/migration_criar_funcao_insert_user_profile.sql no SQL Editor do Supabase.';
-                    logger.error(`CRÍTICO: ${detailedError}`, 'LoginPage', userError);
-                    throw new Error('Erro ao criar conta. Por favor, entre em contato com o suporte.');
-                }
-                
-                logger.error(`CRÍTICO: Falha ao criar usuário na tabela users. Erro: ${errorMsg}`, 'LoginPage', userError);
-                // Lançar erro para exibir ao usuário
-                throw new Error(errorMsg || 'Erro ao criar conta. Tente novamente ou entre em contato com o suporte.');
+            
+            // Se o perfil não foi encontrado após todas as tentativas
+            if (!userProfile) {
+                logger.warn('Perfil não foi encontrado após todas as tentativas. O trigger pode não ter executado ainda.', 'LoginPage');
+                // Não lançar erro - o perfil pode ser criado posteriormente pelo trigger
+                // O usuário pode fazer login depois quando o perfil estiver disponível
+            } else {
+                logger.info('Perfil do usuário criado com sucesso pelo trigger!', 'LoginPage');
             }
 
             // Aplicar cupom ou vincular via código mestre (apenas se fornecido)
@@ -1015,8 +774,20 @@ const LoginPage: React.FC = () => {
                 }
             }
 
-            setSignupSuccess('Conta criada com sucesso! Você já pode fazer login.');
-            showSuccess('Conta criada com sucesso!');
+            // Mensagem de sucesso com instruções claras
+            let successMessage = `Conta criada com sucesso!`;
+            if (needsEmailConfirmation) {
+                successMessage += `\n\n📧 Verifique sua caixa de entrada e confirme o email antes de fazer login.`;
+                successMessage += `\n\nApós confirmar, use o email "${sanitizedEmail}" para fazer login.`;
+            } else {
+                successMessage += `\n\nUse o email "${sanitizedEmail}" para fazer login.`;
+            }
+            
+            setSignupSuccess(successMessage);
+            showSuccess(needsEmailConfirmation 
+                ? 'Conta criada! Verifique seu email para confirmar antes de fazer login.'
+                : `Conta criada com sucesso! Use o email "${sanitizedEmail}" para fazer login.`
+            );
 
             // Limpar formulário
             setSignupName('');
@@ -1151,6 +922,8 @@ const LoginPage: React.FC = () => {
 
             // Tentar login no Supabase primeiro (usuários criados com cupom)
             let emailFromDB: string | null = null; // Declarar fora do try para uso posterior
+            let emailAttempts: string[] = []; // Declarar fora do try para uso no erro
+            let lastSupabaseError: { message: string; code?: string; details?: string } | null = null; // Armazenar último erro do Supabase
             try {
                 const supabase = getSupabaseClient();
                 
@@ -1190,7 +963,7 @@ const LoginPage: React.FC = () => {
                 }
                 
                 // Tentar múltiplas variações de email
-                const emailAttempts = [
+                emailAttempts = [
                     // PRIORIDADE 1: Email da tabela users (se encontrado) ou input se parece email
                     emailFromDB || (sanitizedUsername.includes('@') ? sanitizedUsername : null),
                     // PRIORIDADE 2: Se username parece email, usar diretamente (já incluído acima se emailFromDB não existe)
@@ -1201,8 +974,11 @@ const LoginPage: React.FC = () => {
                     !sanitizedUsername.includes('@') ? sanitizedUsername : null,
                 ].filter(Boolean) as string[];
 
+                logger.info(`Tentando login com ${emailAttempts.length} variações de email:`, 'LoginPage', emailAttempts);
+
                 for (const email of emailAttempts) {
                     try {
+                        logger.info(`Tentando login com email: ${email}`, 'LoginPage');
                         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
                             email: email,
                             password: sanitizedPassword,
@@ -1211,151 +987,228 @@ const LoginPage: React.FC = () => {
                         if (authData?.user && !authError) {
                             // Login no Supabase bem-sucedido
                             loginMethod = 'supabase';
+                            logger.info(`✅ Login bem-sucedido para usuário ${authData.user.id} (${email})`, 'LoginPage');
                             
                             // Buscar perfil do usuário usando getUserFromSupabase (evita erro 406)
-                            let userProfile = await getUserFromSupabase(authData.user.id);
+                            let userProfile = null;
+                            try {
+                                userProfile = await getUserFromSupabase(authData.user.id);
+                            } catch (profileError) {
+                                logger.warn('Erro ao buscar perfil com getUserFromSupabase:', 'LoginPage', profileError);
+                                // Continuar tentando outras formas
+                            }
                             
                             // Se não encontrou perfil, tentar buscar usando authService como fallback
                             if (!userProfile) {
-                                const { authService } = await import('../services/supabaseService');
-                                userProfile = await authService.getCurrentUserProfile();
+                                try {
+                                    const { authService } = await import('../services/supabaseService');
+                                    userProfile = await authService.getCurrentUserProfile();
+                                } catch (serviceError) {
+                                    logger.warn('Erro ao buscar perfil com authService:', 'LoginPage', serviceError);
+                                }
                             }
                             
-                            // Se ainda não encontrou perfil, criar automaticamente
+                            // Se ainda não encontrou perfil, aguardar um pouco e tentar novamente
+                            // O trigger deve criar o perfil automaticamente após signup
                             if (!userProfile) {
-                                logger.warn(`Perfil não encontrado para usuário ${authData.user.id}, criando perfil automaticamente`, 'LoginPage');
+                                logger.info(`Perfil não encontrado para usuário ${authData.user.id}, aguardando trigger criar...`, 'LoginPage');
                                 
-                                try {
-                                    // Obter metadata do usuário do auth (pode ter nome e username)
-                                    const authUserMetadata = authData.user.user_metadata || {};
-                                    const nomeFromMetadata = authUserMetadata.nome || sanitizedUsername || 'Usuário';
-                                    const usernameFromMetadata = authUserMetadata.username || sanitizedUsername;
-                                    
-                                    // Criar perfil básico na tabela users
-                                    const { data: newUserData, error: createError } = await supabase
-                                        .from('users')
-                                        .insert({
-                                            id: authData.user.id,
-                                            nome: nomeFromMetadata,
-                                            username: usernameFromMetadata,
-                                            email: email,
-                                            idade: 0,
-                                            genero: 'Masculino',
-                                            peso: 0,
-                                            altura: 0,
-                                            objetivo: 'perder peso',
-                                            points: 0,
-                                            discipline_score: 0,
-                                            completed_challenge_ids: null,
-                                            is_anonymized: false,
-                                            role: 'user',
-                                            plan_type: 'free',
-                                            subscription_status: 'active', // Status inicial (modo demo será ativado depois)
-                                            voice_daily_limit_seconds: 0, // Será definido pelo modo demo
-                                            voice_used_today_seconds: 0,
-                                            voice_balance_upsell: 0,
-                                            text_msg_count_today: 0,
-                                            // NOVO MODELO: Trial removido - modo demo será ativado via deveAtivarModoDemo
-                                            expiry_date: null, // Não usar mais expiry_date para trial
-                                        })
-                                        .select()
-                                        .single();
-                                    
-                                    if (createError) {
-                                        logger.error('Erro ao criar perfil automaticamente', 'LoginPage', createError);
-                                        // Continuar - não bloquear login
-                                    } else if (newUserData) {
-                                        logger.info('Perfil criado automaticamente com sucesso', 'LoginPage');
-                                        // Converter para formato User
-                                        userProfile = {
-                                            id: newUserData.id,
-                                            nome: newUserData.nome || nomeFromMetadata,
-                                            username: newUserData.username || usernameFromMetadata,
-                                            email: newUserData.email || email,
-                                            idade: newUserData.idade || 0,
-                                            genero: newUserData.genero || 'Masculino',
-                                            peso: newUserData.peso || 0,
-                                            altura: newUserData.altura || 0,
-                                            objetivo: (newUserData.objetivo || 'perder peso') as any,
-                                            points: newUserData.points || 0,
-                                            disciplineScore: newUserData.discipline_score || 0,
-                                            completedChallengeIds: newUserData.completed_challenge_ids || [],
-                                            isAnonymized: newUserData.is_anonymized || false,
-                                            weightHistory: [],
-                                            role: newUserData.role || 'user',
-                                            subscription: 'free',
-                                            planType: (newUserData.plan_type as any) || 'free',
-                                            subscriptionStatus: (newUserData.subscription_status as any) || 'trial',
-                                        };
+                                // Aguardar um pouco para o trigger processar
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                
+                                // Tentar buscar novamente (com retry)
+                                for (let retryAttempt = 0; retryAttempt < 5; retryAttempt++) {
+                                    try {
+                                        const { data: retryProfile, error: retryError } = await supabase
+                                            .from('users')
+                                            .select('*')
+                                            .eq('id', authData.user.id)
+                                            .maybeSingle();
+                                        
+                                        if (retryProfile) {
+                                            userProfile = retryProfile;
+                                            logger.info(`✅ Perfil encontrado após retry (tentativa ${retryAttempt + 1})!`, 'LoginPage');
+                                            break;
+                                        } else if (retryError) {
+                                            // Logar erros que não sejam "não encontrado"
+                                            if (retryError.code !== 'PGRST116' && retryError.code !== 'PGRST301') {
+                                                logger.warn(`Erro ao buscar perfil (tentativa ${retryAttempt + 1}):`, 'LoginPage', {
+                                                    code: retryError.code,
+                                                    message: retryError.message,
+                                                    status: (retryError as any).status
+                                                });
+                                            }
+                                        }
+                                    } catch (retryErr) {
+                                        logger.warn(`Exceção ao buscar perfil (tentativa ${retryAttempt + 1}):`, 'LoginPage', retryErr);
                                     }
-                                } catch (createProfileError) {
-                                    logger.error('Exceção ao criar perfil automaticamente', 'LoginPage', createProfileError);
-                                    // Continuar - não bloquear login
+                                    
+                                    if (retryAttempt < 4) {
+                                        await new Promise(resolve => setTimeout(resolve, 1000));
+                                    }
+                                }
+                                
+                                if (!userProfile) {
+                                    logger.error(`❌ Perfil não encontrado após todas as tentativas para usuário ${authData.user.id}`, 'LoginPage');
+                                    
+                                    // Informar ao usuário sobre o problema - lançar erro específico
+                                    const profileError = new Error(`Login bem-sucedido, mas perfil não encontrado.\n\nO seu email e senha estão corretos, mas o perfil não foi criado na tabela 'users'.\n\nEmail: ${email}\nID do usuário: ${authData.user.id}\n\nPossíveis causas:\n• O trigger não executou após o cadastro\n• O perfil foi criado com outro ID\n• Problema com Row Level Security (RLS)\n\nSolução:\n• Verifique no Supabase Dashboard:\n  - Authentication → Users (procure pelo email)\n  - Table Editor → users (procure pelo ID acima)\n• Execute a migration 008_trigger_perfil_simples.sql se ainda não foi executada\n• Entre em contato com o suporte se o problema persistir`);
+                                    
+                                    // Armazenar erro para exibir na mensagem final
+                                    lastSupabaseError = {
+                                        message: profileError.message,
+                                        code: 'PROFILE_NOT_FOUND',
+                                        details: `Usuário autenticado com sucesso (ID: ${authData.user.id}), mas perfil não encontrado na tabela users`
+                                    };
+                                    
+                                    throw profileError;
                                 }
                             }
                             
                             if (userProfile) {
                                 user = userProfile;
+                                logger.info(`✅ Perfil carregado com sucesso para ${email}`, 'LoginPage');
                                 break;
                             }
                         } else if (authError) {
                             // Verificar tipo de erro específico
                             const errorMsg = authError.message || '';
+                            const errorCode = (authError as any).code || (authError as any).statusCode || '';
+                            const errorDetails = (authError as any).error_description || (authError as any).msg || '';
                             
-                            // Log detalhado para debugging (apenas em modo debug)
-                            logger.debug(`Supabase login attempt failed for ${email}: ${errorMsg}`, 'LoginPage');
+                            // Armazenar erro para exibir na mensagem final
+                            lastSupabaseError = {
+                                message: errorMsg,
+                                code: errorCode,
+                                details: errorDetails
+                            };
                             
-                            // Erros 400 (Bad Request) são esperados quando usuário não existe no Supabase ou credenciais inválidas
-                            // Silenciar esses erros e continuar para login local
-                            if (authError.status === 400 || 
-                                errorMsg.includes('Invalid login credentials') || 
-                                errorMsg.includes('invalid login') ||
-                                errorMsg.includes('Invalid credentials')) {
-                                // Credenciais inválidas ou usuário não existe no Supabase
-                                // Continuar para próxima tentativa de email ou fallback local
-                                continue;
-                            } else if (errorMsg.includes('Email not confirmed') || 
-                                      errorMsg.includes('email not confirmed') ||
-                                      errorMsg.includes('email_not_confirmed') ||
-                                      errorMsg.includes('Email address not confirmed')) {
-                                // Email não confirmado - mas permitir login local como fallback
-                                // Não bloquear o login, permitir que tente outras variações ou login local
-                                logger.debug(`Email not confirmed for ${email}, allowing fallback to local login`, 'LoginPage');
-                                continue; // Continue para tentar outras variações ou fallback local
-                            } else if (errorMsg.includes('rate limit') || 
-                                      errorMsg.includes('For security purposes') ||
-                                      errorMsg.includes('Too Many Requests')) {
+                            // Log detalhado para debugging
+                            logger.warn(`❌ Login falhou para email "${email}":`, 'LoginPage', {
+                                error: errorMsg,
+                                status: authError.status,
+                                code: errorCode,
+                                details: errorDetails,
+                                fullError: authError
+                            });
+                            
+                            // Log também no console para o usuário ver
+                            console.error('[LoginPage] Erro do Supabase:', {
+                                email,
+                                message: errorMsg,
+                                code: errorCode,
+                                details: errorDetails,
+                                status: authError.status
+                            });
+                            
+                            // Verificar se é email não confirmado (pode aparecer em diferentes formatos)
+                            const isEmailNotConfirmed = 
+                                errorMsg.toLowerCase().includes('email not confirmed') ||
+                                errorMsg.toLowerCase().includes('email_not_confirmed') ||
+                                errorMsg.toLowerCase().includes('email address not confirmed') ||
+                                errorMsg.toLowerCase().includes('email not verified') ||
+                                errorMsg.toLowerCase().includes('verification') ||
+                                errorCode === 'email_not_confirmed' ||
+                                errorDetails.toLowerCase().includes('email not confirmed');
+                            
+                            if (isEmailNotConfirmed) {
+                                // Email não confirmado - mostrar mensagem específica
+                                logger.error(`Email "${email}" não foi confirmado`, 'LoginPage');
+                                throw new Error(`Email não confirmado. Por favor, verifique sua caixa de entrada e clique no link de confirmação antes de fazer login.\n\nEmail tentado: ${email}`);
+                            }
+                            
+                            // Verificar rate limit
+                            if (errorMsg.includes('rate limit') || 
+                                errorMsg.includes('For security purposes') ||
+                                errorMsg.includes('Too Many Requests') ||
+                                authError.status === 429) {
                                 // Rate limit - propagar erro com mensagem amigável
                                 const match = errorMsg.match(/(\d+)\s*seconds?/i);
                                 const seconds = match ? match[1] : 'alguns';
                                 throw new Error(`Muitas tentativas de login. Por segurança, aguarde ${seconds} segundos antes de tentar novamente.`);
-                            } else {
-                                // Outros erros - tentar próxima variação ou fallback local
-                                continue;
                             }
+                            
+                            // Erros 400 (Bad Request) - credenciais inválidas ou usuário não existe
+                            if (authError.status === 400) {
+                                // Verificar se é a última tentativa de email
+                                const isLastEmail = email === emailAttempts[emailAttempts.length - 1];
+                                
+                                if (isLastEmail) {
+                                    // Se é a última tentativa, lançar erro com detalhes
+                                    const specificError = errorMsg || errorDetails || 'Credenciais inválidas';
+                                    logger.error(`Todas as tentativas de login falharam. Último erro: ${specificError}`, 'LoginPage');
+                                    
+                                    // Criar mensagem de erro detalhada
+                                    let detailedError = `Erro ao fazer login: ${specificError}`;
+                                    
+                                    // Verificar se o erro indica que o usuário não existe
+                                    const userNotFound = 
+                                        errorMsg.toLowerCase().includes('user not found') ||
+                                        errorMsg.toLowerCase().includes('no user found') ||
+                                        errorMsg.toLowerCase().includes('invalid login') ||
+                                        errorMsg.toLowerCase().includes('invalid credentials');
+                                    
+                                    if (userNotFound) {
+                                        detailedError = `Usuário não encontrado ou credenciais inválidas.\n\nErro do Supabase: ${specificError}\n\nVerifique:\n• Se o email "${email}" está correto\n• Se você completou o cadastro\n• Se a senha está correta\n• Se o email foi confirmado (verifique sua caixa de entrada)`;
+                                    }
+                                    
+                                    throw new Error(detailedError);
+                                } else {
+                                    // Não é a última tentativa, continuar
+                                    logger.debug(`Credenciais inválidas para email "${email}", tentando próxima variação...`, 'LoginPage');
+                                    continue;
+                                }
+                            }
+                            
+                            // Outros erros - logar e tentar próxima variação
+                            logger.warn(`Erro desconhecido ao tentar login com "${email}": ${errorMsg}`, 'LoginPage');
+                            continue;
                         }
                     } catch (supabaseError) {
-                        // Continuar para próxima tentativa ou fallback
-                        // Erros 400 são esperados quando usuário não existe - silenciar
-                        if (supabaseError instanceof Error && 
-                            (supabaseError.message.includes('rate limit') || 
-                             supabaseError.message.includes('For security purposes'))) {
-                            throw supabaseError;
+                        // Capturar erro lançado ou erro de rede
+                        if (supabaseError instanceof Error) {
+                            // Se for um erro que lançamos intencionalmente (email não confirmado, etc), propagar
+                            if (supabaseError.message.includes('Email não confirmado') ||
+                                supabaseError.message.includes('Muitas tentativas') ||
+                                supabaseError.message.includes('Usuário não encontrado') ||
+                                supabaseError.message.includes('Erro ao fazer login')) {
+                                throw supabaseError;
+                            }
+                            
+                            // Se for rate limit, propagar
+                            if (supabaseError.message.includes('rate limit') || 
+                                supabaseError.message.includes('For security purposes')) {
+                                throw supabaseError;
+                            }
                         }
-                        // Silenciar outros erros do Supabase e continuar para login local
+                        
+                        // Silenciar outros erros do Supabase e continuar para próxima tentativa ou login local
+                        logger.debug(`Erro capturado no catch, tentando próxima variação ou login local`, 'LoginPage', supabaseError);
                         continue;
                     }
                 }
             } catch (supabaseError) {
-                // Se for rate limit ou outro erro crítico, propagar
-                if (supabaseError instanceof Error && 
-                    (supabaseError.message.includes('rate limit') || 
-                     supabaseError.message.includes('For security purposes'))) {
-                    const match = supabaseError.message.match(/(\d+)\s*seconds?/i);
-                    const seconds = match ? match[1] : 'alguns';
-                    throw new Error(`Muitas tentativas de login. Por segurança, aguarde ${seconds} segundos antes de tentar novamente.`);
+                // Se for um erro que lançamos intencionalmente, propagar diretamente
+                if (supabaseError instanceof Error) {
+                    // Erros que devem ser mostrados ao usuário
+                    if (supabaseError.message.includes('Email não confirmado') ||
+                        supabaseError.message.includes('Usuário não encontrado') ||
+                        supabaseError.message.includes('Erro ao fazer login') ||
+                        supabaseError.message.includes('Login bem-sucedido, mas perfil não encontrado')) {
+                        throw supabaseError;
+                    }
+                    
+                    // Rate limit - propagar com mensagem amigável
+                    if (supabaseError.message.includes('rate limit') || 
+                        supabaseError.message.includes('For security purposes')) {
+                        const match = supabaseError.message.match(/(\d+)\s*seconds?/i);
+                        const seconds = match ? match[1] : 'alguns';
+                        throw new Error(`Muitas tentativas de login. Por segurança, aguarde ${seconds} segundos antes de tentar novamente.`);
+                    }
                 }
+                
                 // Se não for erro crítico, continuar para login local
+                logger.debug('Erro do Supabase capturado, tentando login local', 'LoginPage', supabaseError);
             }
 
             // Se não conseguiu login no Supabase, tentar login local (IndexedDB)
@@ -1572,27 +1425,92 @@ const LoginPage: React.FC = () => {
                     window.location.hash = redirectPath;
                 }, 1000);
             } else {
-                // Mensagem de erro mais clara
-                let errorMsg = 'Nome de usuário ou senha incorretos.';
+                // Mensagem de erro mais clara e específica
+                let errorMsg = '❌ Login falhou.';
                 
-                // Adicionar dicas baseadas no que foi tentado
-                if (sanitizedUsername.includes('@')) {
-                    errorMsg += '\n\n💡 Dica: Verifique se você está usando o email correto que foi usado no cadastro.';
-                } else {
-                    errorMsg += '\n\n💡 Dicas:';
-                    errorMsg += '\n• Se você criou a conta com código de convite, use o EMAIL (não o username)';
-                    errorMsg += '\n• Se não forneceu email no cadastro, tente: seuusuario@fitcoach.ia';
-                    errorMsg += '\n• Verifique se a senha está correta';
-                    errorMsg += '\n• Se você criou a conta localmente (sem código), use o username';
+                // Adicionar informações sobre o que foi tentado
+                const attemptedEmails = emailAttempts || [];
+                if (attemptedEmails.length > 0) {
+                    errorMsg += `\n\n📧 Emails tentados: ${attemptedEmails.join(', ')}`;
                 }
                 
+                // Adicionar erro específico do Supabase se disponível
+                if (lastSupabaseError) {
+                    const supabaseMsg = lastSupabaseError.message || lastSupabaseError.details || '';
+                    if (supabaseMsg) {
+                        errorMsg += `\n\n🔍 Erro do Supabase: ${supabaseMsg}`;
+                        
+                        // Traduzir erros comuns do Supabase
+                        if (supabaseMsg.toLowerCase().includes('invalid login credentials') ||
+                            supabaseMsg.toLowerCase().includes('invalid credentials') ||
+                            supabaseMsg.toLowerCase().includes('invalid password')) {
+                            errorMsg += '\n\n💡 Tradução: Email ou senha incorretos.';
+                        } else if (supabaseMsg.toLowerCase().includes('email not confirmed') ||
+                                  supabaseMsg.toLowerCase().includes('email_not_confirmed')) {
+                            errorMsg += '\n\n💡 Tradução: Email não confirmado. Verifique sua caixa de entrada.';
+                        } else if (supabaseMsg.toLowerCase().includes('user not found')) {
+                            errorMsg += '\n\n💡 Tradução: Usuário não encontrado. Verifique se o cadastro foi completado.';
+                        }
+                    }
+                }
+                
+                // Mensagem específica baseada no input
+                if (sanitizedUsername.includes('@')) {
+                    errorMsg += `\n\n🔍 Você tentou fazer login com: "${sanitizedUsername}"`;
+                    errorMsg += '\n\n💡 Possíveis causas:';
+                    errorMsg += '\n1. ❌ Email não confirmado - Verifique sua caixa de entrada e clique no link de confirmação';
+                    errorMsg += '\n2. ❌ Senha incorreta - Use a senha EXATA que você digitou no cadastro';
+                    errorMsg += '\n3. ❌ Email incorreto - Use o email EXATO que apareceu na mensagem de sucesso do cadastro';
+                    errorMsg += '\n4. ❌ Usuário não existe - O cadastro pode não ter sido completado';
+                    errorMsg += '\n\n📋 Checklist rápido:';
+                    errorMsg += '\n• Abra o console (F12 → Console) e veja os logs detalhados acima';
+                    errorMsg += '\n• Verifique se você recebeu um email de confirmação do Supabase';
+                    errorMsg += '\n• Verifique se você completou o cadastro com sucesso';
+                    errorMsg += '\n• No Supabase Dashboard: Authentication → Users → Procure pelo seu email';
+                    errorMsg += '\n• Tente fazer um novo cadastro se necessário';
+                } else {
+                    errorMsg += `\n\n⚠️ Você tentou fazer login com: "${sanitizedUsername}"`;
+                    errorMsg += '\n\n❌ ERRO: O login deve ser feito com EMAIL, não com nome ou username!';
+                    errorMsg += '\n\n✅ Solução:';
+                    errorMsg += '\n• Use o EMAIL completo que você digitou no cadastro';
+                    errorMsg += '\n• Exemplo: se você cadastrou com "usuario@email.com", use "usuario@email.com" no login';
+                    errorMsg += '\n\n💡 Onde encontrar o email correto:';
+                    errorMsg += '\n• A mensagem de sucesso do cadastro mostra o email que você deve usar';
+                    errorMsg += '\n• Exemplo: "Use o email "seuemail@exemplo.com" para fazer login"';
+                    if (attemptedEmails.length > 0) {
+                        errorMsg += `\n\n📧 O sistema tentou automaticamente: ${attemptedEmails.join(', ')}`;
+                        errorMsg += '\n• Mas nenhum funcionou. Verifique o email exato do cadastro.';
+                    }
+                }
+                
+                logger.error('Login falhou após todas as tentativas', 'LoginPage', {
+                    input: sanitizedUsername,
+                    attemptedEmails: emailAttempts,
+                    emailFromDB: emailFromDB,
+                    lastError: lastSupabaseError,
+                    error: 'Todos os emails tentados retornaram 400 Bad Request'
+                });
+                
                 setError(errorMsg);
-                showError('Credenciais inválidas. Verifique seu email/username e senha.');
+                showError('Login falhou. Abra o console (F12) para ver detalhes do erro do Supabase.');
             }
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Erro ao fazer login. Tente novamente.';
-            setError(errorMessage);
-            showError(errorMessage);
+            
+            // Se o erro já contém informações detalhadas, usar diretamente
+            if (err instanceof Error && (errorMessage.includes('Email não confirmado') ||
+                errorMessage.includes('Usuário não encontrado') ||
+                errorMessage.includes('Erro ao fazer login') ||
+                errorMessage.includes('Login bem-sucedido, mas perfil não encontrado'))) {
+                setError(errorMessage);
+                showError(errorMessage.split('\n')[0]); // Mostrar primeira linha no toast
+            } else {
+                // Erro genérico
+                setError(errorMessage);
+                showError(errorMessage);
+            }
+            
+            logger.error('Erro no handleLogin:', 'LoginPage', err);
         } finally {
             setIsLoading(false);
         }

@@ -24,6 +24,7 @@ import { logger } from '../utils/logger';
 import type { WellnessPlan, WorkoutDay } from '../types';
 import { Goal } from '../types';
 import { useToast } from '../components/ui/Toast';
+import { useRouter } from '../hooks/useRouter';
 
 const WellnessPlanSkeleton = () => (
     <div className="space-y-8">
@@ -64,6 +65,7 @@ const WellnessPlanSkeleton = () => (
 const WellnessPlanPage: React.FC = () => {
     const { user, setUser } = useUser();
     const { showSuccess, showError, showWarning } = useToast();
+    const { navigate } = useRouter();
     const [plan, setPlan] = useState<WellnessPlan | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -467,6 +469,14 @@ const WellnessPlanPage: React.FC = () => {
                                     >
                                         <SparklesIcon className="w-4 h-4 mr-2" />
                                             {isLoading ? 'Gerando...' : 'Gerar Novo Plano'}
+                                    </Button>
+                                    <Button
+                                        onClick={() => navigate('/treinos-pre-configurados')}
+                                        variant="secondary"
+                                        size="sm"
+                                        className="w-full sm:w-auto text-xs sm:text-sm"
+                                    >
+                                        📚 Ver Treinos Pré-Configurados
                                     </Button>
                                     </div>
                                 </div>

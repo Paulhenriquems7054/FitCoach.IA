@@ -86,6 +86,7 @@ export function useSpendingTracker() {
     const fetchUserData = async () => {
       try {
         setLoading(true);
+        setError(null); // Limpar erro anterior
         
         // Verificar se usuário está disponível no contexto
         if (!user || !user.id) {

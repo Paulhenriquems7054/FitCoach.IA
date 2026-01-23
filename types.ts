@@ -385,3 +385,64 @@ export interface UserCouponLink {
     createdAt?: string;
     updatedAt?: string;
 }
+
+/**
+ * Categorias de treinos pré-configurados
+ */
+export type WorkoutCategory = 
+    | 'corpo-inteiro'
+    | 'hipertrofia'
+    | 'emagrecimento'
+    | 'definicao'
+    | 'forca'
+    | 'resistencia'
+    | 'funcional'
+    | 'cardio';
+
+/**
+ * Representa um treino pré-configurado extraído dos documentos
+ */
+export interface PreconfiguredWorkout {
+    id: string;                    // ID único (ex: "corpo-inteiro-1")
+    nome: string;                   // Nome do treino (ex: "Corpo Inteiro")
+    categoria: WorkoutCategory;    // Categoria do treino
+    objetivo: Goal[];              // Objetivos que o treino atende
+    genero?: 'masculino' | 'feminino' | 'unisex';
+    nivel: 'iniciante' | 'intermediario' | 'avancado';
+    duracao_semanas?: number;       // Duração do programa (se aplicável)
+    mes?: number;                   // Mês do programa (se aplicável)
+    arquivo_origem: string;         // Nome do arquivo original
+    data_importacao: string;        // Data de importação
+    versao: number;                 // Versão do treino
+    plano: WellnessPlan;            // Plano completo estruturado
+    metadata?: {
+        descricao?: string;
+        observacoes?: string;
+        tags?: string[];
+        criado_por?: string;
+    };
+}
+
+/**
+ * Catálogo de treinos pré-configurados
+ */
+export interface WorkoutCatalog {
+    treinos: PreconfiguredWorkout[];
+    categorias: WorkoutCategory[];
+    filtros: {
+        por_objetivo: Record<Goal, PreconfiguredWorkout[]>;
+        por_genero: Record<string, PreconfiguredWorkout[]>;
+        por_nivel: Record<string, PreconfiguredWorkout[]>;
+    };
+}
+
+/**
+ * Filtros para busca de treinos
+ */
+export interface WorkoutFilters {
+    categoria?: WorkoutCategory;
+    objetivo?: Goal;
+    genero?: 'masculino' | 'feminino' | 'unisex';
+    nivel?: 'iniciante' | 'intermediario' | 'avancado';
+    busca?: string;
+}

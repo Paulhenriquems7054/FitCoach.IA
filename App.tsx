@@ -66,6 +66,7 @@ const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const GroupWorkoutsPage = lazy(() => import('./pages/GroupWorkoutsPage'));
 const BillingPage = lazy(() => import('./pages/BillingPage'));
 const PlansPage = lazy(() => import('./pages/PlansPage'));
+const PreconfiguredWorkoutsPage = lazy(() => import('./pages/PreconfiguredWorkoutsPage'));
 const Onboarding = lazy(() => import('./components/Onboarding'));
 
 // Componente de loading
@@ -908,6 +909,7 @@ const App: React.FC = () => {
             case '/group-workouts': return <GroupWorkoutsPage />;
             case '/billing': return <BillingPage />;
             case '/plans': return <PlansPage />;
+            case '/treinos-pre-configurados': return <PreconfiguredWorkoutsPage />;
             case '/':
             default:
                 // Se for desenvolvedor, sempre mostrar admin-dashboard

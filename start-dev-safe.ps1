@@ -12,6 +12,6 @@ Start-Sleep -Seconds 1
 Write-Host "Iniciando servidor de desenvolvimento..." -ForegroundColor Green
 Write-Host ""
 
-# Iniciar Vite
-npm run dev:start
+# Iniciar Vite usando npx para garantir que funcione
+npx vite --host 0.0.0.0 --port 3000
 

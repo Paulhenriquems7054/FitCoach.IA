@@ -58,9 +58,8 @@ const PlansPage: React.FC = () => {
       return;
     }
 
-    // TODO: Implementar checkout/upgrade
-    // Por enquanto, redirecionar para página de billing com modal de upgrade
-    window.location.hash = `#/billing?upgrade=${selectedPlan.id}`;
+    // Redirecionar para página de vendas externa
+    window.open('https://pagina-de-vendas-fit-coach-ai.vercel.app/', '_blank');
   };
 
   const formatPrice = (price: number) => {

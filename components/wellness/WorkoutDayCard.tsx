@@ -12,6 +12,7 @@ interface WorkoutDayCardProps {
     onComplete?: (dayIndex: number) => void;
     isCompleted?: boolean;
     onEdit?: (dayIndex: number) => void;
+    showGifs?: boolean; // Prop para controlar exibição de GIFs
 }
 
 /**
@@ -24,6 +25,7 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
     onComplete,
     isCompleted = false,
     onEdit,
+    showGifs = true, // Por padrão mostra GIFs para manter compatibilidade
 }) => {
     const [expandedExercises, setExpandedExercises] = useState<Set<number>>(new Set());
     
@@ -155,7 +157,7 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                             // Renderizar exercícios detalhados (Exercise[])
                             exercises.map((ex: any, idx: number) => {
                                 const exercise = normalizeExercise(ex);
-                                const gifPath = getExerciseGif(exercise.name);
+                                const gifPath = showGifs ? getExerciseGif(exercise.name) : null;
                                 const isGifExpanded = expandedExercises.has(idx);
                                 
                                 return (
@@ -163,13 +165,13 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                                         key={idx}
                                         className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700"
                                     >
-                                        <div className={`flex items-stretch gap-3 sm:gap-4 ${isGifExpanded && gifPath ? 'flex-col sm:flex-row sm:flex-nowrap' : 'flex-col'}`}>
-                                            <div className={`${isGifExpanded && gifPath ? 'flex-1 min-w-0 sm:min-w-[200px] flex flex-col justify-center' : 'w-full'}`}>
+                                        <div className={`flex items-stretch gap-3 sm:gap-4 ${showGifs && isGifExpanded && gifPath ? 'flex-col sm:flex-row sm:flex-nowrap' : 'flex-col'}`}>
+                                            <div className={`${showGifs && isGifExpanded && gifPath ? 'flex-1 min-w-0 sm:min-w-[200px] flex flex-col justify-center' : 'w-full'}`}>
                                                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                                                     <h4 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white break-words flex-1 min-w-0">
                                                         {exercise.name}
                                                     </h4>
-                                                    {gifPath && (
+                                                    {showGifs && gifPath && (
                                                         <button
                                                             onClick={() => toggleExerciseGif(idx)}
                                                             className="text-xs px-2 py-1 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/50 transition font-medium whitespace-nowrap flex-shrink-0"
@@ -209,7 +211,7 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                                                 )}
                                             </div>
                                             
-                                            {gifPath && isGifExpanded && (
+                                            {showGifs && gifPath && isGifExpanded && (
                                                 <div 
                                                     className="flex-shrink-0 w-full sm:w-[280px] md:w-[320px] lg:w-[360px] rounded-lg overflow-hidden border-2 border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-900 shadow-lg flex items-center justify-center min-h-[150px] sm:min-h-[180px] md:min-h-[220px] lg:min-h-[250px] max-w-full mx-auto sm:mx-0"
                                                     style={{
@@ -240,7 +242,6 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                             exercises.map((exercise: string | any, idx: number) => {
                                 // Se for string, renderizar diretamente
                                 if (typeof exercise === 'string') {
-                                    const gifPath = getExerciseGif(exercise);
                                     return (
                                         <div
                                             key={idx}
@@ -253,7 +254,6 @@ export const WorkoutDayCard: React.FC<WorkoutDayCardProps> = ({
                                 
                                 // Se for objeto mas não detectado antes, normalizar e renderizar
                                 const normalized = normalizeExercise(exercise);
-                                const gifPath = getExerciseGif(normalized.name);
                                 return (
                                     <div
                                         key={idx}

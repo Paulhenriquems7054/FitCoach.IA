@@ -161,6 +161,30 @@ export interface Database {
           updated_at: string;
         };
       };
+      preconfigured_workouts: {
+        Row: {
+          id: string;
+          user_id: string;
+          gym_id: string | null;
+          nome: string;
+          categoria: string;
+          nivel: string;
+          objetivo: string[];
+          genero: string | null;
+          duracao_semanas: number | null;
+          mes: number | null;
+          workout_data: any;
+          arquivo_origem: string;
+          data_importacao: string;
+          versao: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['preconfigured_workouts']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+        };
+        Update: Partial<Database['public']['Tables']['preconfigured_workouts']['Insert']>;
+      };
     };
   };
 }
@@ -951,99 +975,75 @@ export const authFlowService = {
       logger.warn('Isso pode funcionar se a política RLS permitir inserção baseada apenas no ID', 'authFlowService');
     }
     
-    // Tentar inserir diretamente primeiro
-    let { data: userRecord, error: userError } = await supabase
-      .from('users')
-      .insert(userSupabaseInsert)
-      .select()
-      .single();
-
-    // Se falhar por falta de autenticação, tentar usar função SQL como fallback
-    if (userError && (userError.code === '42501' || userError.message?.includes('row-level security'))) {
-      logger.warn('Inserção direta falhou por RLS, tentando função SQL...', 'authFlowService');
-      
-      // Tentar usar função SQL que bypassa RLS
+    // ✅ NOVO FLUXO: O trigger automático cria o perfil, apenas precisamos aguardar e buscar
+    // O trigger handle_new_user() cria o perfil automaticamente após signup
+    logger.info('Aguardando trigger criar perfil automaticamente...', 'authFlowService');
+    
+    // Aguardar um pouco para o trigger processar
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Buscar o perfil criado pelo trigger (com retry para lidar com timing)
+    let userRecord = null;
+    let userError = null;
+    const maxRetries = 5;
+    const retryDelay = 500;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        // Preparar parâmetros para a função RPC
-        // Nota: Não passar null explicitamente, deixar undefined para valores opcionais
-        const rpcParams: any = {
-          p_user_id: userId,
-          p_nome: userData.nome || username,
-          p_username: username,
-          p_plan_type: (isCoupon ? (couponValidation.planLinked as any) : 'free') || 'free',
-          p_subscription_status: subscriptionStatus,
-          p_user_data: {
-            idade: userData.idade || 0,
-            genero: userData.genero || 'Masculino',
-            peso: userData.peso || 0,
-            altura: userData.altura || 0,
-            objetivo: userData.objetivo || 'perder peso',
-            points: userData.points || 0,
-            disciplineScore: userData.disciplineScore || 0,
-            // Não enviar array vazio, deixar a função SQL lidar com isso
-            completedChallengeIds: (userData.completedChallengeIds && userData.completedChallengeIds.length > 0) 
-              ? userData.completedChallengeIds 
-              : null,
-            isAnonymized: userData.isAnonymized || false,
-            role: userData.role || 'user',
-          },
-          p_voice_daily_limit_seconds: 900, // Default 15 minutos
-        };
+        logger.info(`Buscando perfil do usuário (tentativa ${attempt + 1}/${maxRetries})...`, 'authFlowService');
         
-        // Adicionar parâmetros opcionais apenas se tiverem valores
-        if (userEmail) {
-          rpcParams.p_email = userEmail;
-        }
+        const { data: profileData, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle(); // maybeSingle retorna null se não encontrar (não lança erro)
         
-        if (subscriptionStatus === 'trial' && trialEndDate) {
-          rpcParams.p_expiry_date = trialEndDate.toISOString();
-        }
-        
-        const { data: rpcData, error: rpcError } = await supabase.rpc('insert_user_profile_after_signup', rpcParams);
-
-        if (rpcError) {
-          logger.error('Erro ao criar registro via função SQL', 'authFlowService', rpcError);
-          // Continuar para tentar buscar o registro (pode ter sido criado mesmo com erro)
-        }
-
-        // A função SQL retorna uma tabela, então rpcData será um array
-        // Se a função executou sem erro, o registro foi criado
-        if (!rpcError && rpcData && Array.isArray(rpcData) && rpcData.length > 0) {
-          // Buscar o registro completo criado
-          const { data: createdUser, error: fetchError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', userId)
-            .maybeSingle();  // Usar maybeSingle ao invés de single para evitar erro se não encontrar
-
-          if (createdUser) {
-            userRecord = createdUser;
-            userError = null;
-            logger.info('Perfil criado via função SQL com sucesso', 'authFlowService');
+        if (profileError) {
+          // Se for erro 406 (Not Acceptable) ou 403 (Forbidden), pode ser que o perfil ainda não existe
+          // ou RLS está bloqueando. Aguardar e tentar novamente.
+          if (profileError.code === 'PGRST116' || (profileError as any).status === 406 || (profileError as any).status === 403) {
+            if (attempt < maxRetries - 1) {
+              logger.info(`Perfil ainda não encontrado (tentativa ${attempt + 1}), aguardando ${retryDelay}ms...`, 'authFlowService');
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+              continue;
+            }
           } else {
-            // Se não encontrou, pode ser que RLS esteja bloqueando a leitura
-            // Mas o registro foi criado, então vamos continuar
-            logger.warn('Registro criado via função SQL mas não foi possível recuperá-lo (pode ser RLS)', 'authFlowService');
-            // Criar um objeto mínimo para continuar o fluxo
-            userRecord = {
-              id: userId,
-              nome: userData.nome || username,
-              username: username,
-            } as any;
-            userError = null;
+            // Outro tipo de erro, logar e continuar tentando
+            logger.warn(`Erro ao buscar perfil (tentativa ${attempt + 1}):`, 'authFlowService', profileError);
+            if (attempt < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+              continue;
+            }
           }
-        } else if (rpcError) {
-          // Se houve erro na função SQL, verificar se foi erro de tipo ou outro
-          logger.error('Erro na função SQL', 'authFlowService', rpcError);
-          throw new Error(`Erro ao criar perfil: ${rpcError.message}. Verifique se a função SQL foi criada corretamente.`);
+        } else if (profileData) {
+          // Perfil encontrado!
+          userRecord = profileData;
+          logger.info('✅ Perfil encontrado!', 'authFlowService', { userId: profileData.id, username: profileData.username });
+          break;
         } else {
-          throw new Error('Função SQL executou mas não retornou dados. Verifique se o registro foi criado.');
+          // Perfil não encontrado ainda, aguardar e tentar novamente
+          if (attempt < maxRetries - 1) {
+            logger.info(`Perfil ainda não criado (tentativa ${attempt + 1}), aguardando ${retryDelay}ms...`, 'authFlowService');
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            continue;
+          }
         }
-      } catch (rpcException: any) {
-        logger.error('Exceção ao usar função SQL', 'authFlowService', rpcException);
-        throw new Error(rpcException?.message || 'Erro ao criar perfil. Verifique se a função SQL foi criada no Supabase.');
+      } catch (err) {
+        logger.warn(`Exceção ao buscar perfil (tentativa ${attempt + 1}):`, 'authFlowService', err);
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
       }
-    } else if (userError || !userRecord) {
+    }
+    
+    // Se o perfil não foi encontrado após todas as tentativas
+    if (!userRecord) {
+      logger.warn('Perfil não foi encontrado após todas as tentativas. O trigger pode não ter executado ainda.', 'authFlowService');
+      userError = new Error('Perfil não foi criado automaticamente. Tente fazer login novamente.');
+    }
+    
+    if (userError || !userRecord) {
       logger.error('Erro ao criar registro de usuário', 'authFlowService', userError);
       
       // Log detalhado para debug

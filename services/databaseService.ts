@@ -19,7 +19,7 @@ import { Goal } from '../types';
 import { logger } from '../utils/logger';
 
 const DB_NAME = 'NutriIA_DB';
-const DB_VERSION = 3; // Incrementado para adicionar índices de gymId e gymRole
+const DB_VERSION = 4; // Incrementado para adicionar stores de treinos (cache, favoritos, histórico)
 
 // Interfaces para os objetos do banco
 interface DBUser extends User {
@@ -229,6 +229,26 @@ export async function initDatabase(): Promise<IDBDatabase> {
             if (!db.objectStoreNames.contains('appSettings')) {
                 const settingsStore = db.createObjectStore('appSettings', { keyPath: 'key' });
                 settingsStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+            }
+
+            // Object Store: Workout Catalog Cache
+            if (!db.objectStoreNames.contains('workoutCatalogCache')) {
+                const catalogStore = db.createObjectStore('workoutCatalogCache', { keyPath: 'id', autoIncrement: true });
+                catalogStore.createIndex('filename', 'filename', { unique: true });
+                catalogStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+            }
+
+            // Object Store: Favorite Workouts
+            if (!db.objectStoreNames.contains('favoriteWorkouts')) {
+                const favoriteStore = db.createObjectStore('favoriteWorkouts', { keyPath: 'workoutId', autoIncrement: false });
+                favoriteStore.createIndex('addedAt', 'addedAt', { unique: false });
+            }
+
+            // Object Store: Workout History
+            if (!db.objectStoreNames.contains('workoutHistory')) {
+                const historyStore = db.createObjectStore('workoutHistory', { keyPath: 'id', autoIncrement: true });
+                historyStore.createIndex('workoutId', 'workoutId', { unique: false });
+                historyStore.createIndex('appliedAt', 'appliedAt', { unique: false });
             }
 
             logger.info('Estrutura do banco de dados criada', 'databaseService');
@@ -1727,5 +1747,240 @@ export async function clearAllData(): Promise<void> {
     }
 
     logger.info('Todos os dados foram limpos', 'databaseService');
+}
+
+// ==================== WORKOUT CATALOG CACHE ====================
+
+interface DBWorkoutCatalogCache {
+    id?: number;
+    filename: string;
+    workout: unknown; // PreconfiguredWorkout serializado
+    updatedAt: string;
+}
+
+/**
+ * Salva treino processado no cache
+ */
+export async function saveWorkoutToCache(filename: string, workout: unknown): Promise<void> {
+    const db = await getDB();
+    const transaction = db.transaction(['workoutCatalogCache'], 'readwrite');
+    const store = transaction.objectStore('workoutCatalogCache');
+
+    const cacheEntry: DBWorkoutCatalogCache = {
+        filename,
+        workout,
+        updatedAt: new Date().toISOString(),
+    };
+
+    // Verificar se já existe
+    const existing = await new Promise<IDBRequest>((resolve) => {
+        const index = store.index('filename');
+        const request = index.get(filename);
+        resolve(request);
+    }).then((request): Promise<DBWorkoutCatalogCache | null> => {
+        return new Promise((resolve) => {
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => resolve(null);
+        });
+    });
+
+    if (existing) {
+        // Atualizar existente
+        cacheEntry.id = existing.id;
+        await new Promise<void>((resolve, reject) => {
+            const request = store.put(cacheEntry);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    } else {
+        // Criar novo
+        await new Promise<void>((resolve, reject) => {
+            const request = store.add(cacheEntry);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+}
+
+/**
+ * Obtém treino do cache
+ */
+export async function getWorkoutFromCache(filename: string): Promise<unknown | null> {
+    const db = await getDB();
+    const transaction = db.transaction(['workoutCatalogCache'], 'readonly');
+    const store = transaction.objectStore('workoutCatalogCache');
+    const index = store.index('filename');
+
+    return new Promise((resolve) => {
+        const request = index.get(filename);
+        request.onsuccess = () => {
+            resolve(request.result?.workout || null);
+        };
+        request.onerror = () => resolve(null);
+    });
+}
+
+/**
+ * Limpa cache de treinos
+ */
+export async function clearWorkoutCache(): Promise<void> {
+    const db = await getDB();
+    const transaction = db.transaction(['workoutCatalogCache'], 'readwrite');
+    const store = transaction.objectStore('workoutCatalogCache');
+
+    await new Promise<void>((resolve, reject) => {
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// ==================== FAVORITE WORKOUTS ====================
+
+interface DBFavoriteWorkout {
+    workoutId: string;
+    workout: unknown; // PreconfiguredWorkout serializado
+    addedAt: string;
+}
+
+/**
+ * Adiciona treino aos favoritos
+ */
+export async function addFavoriteWorkout(workoutId: string, workout: unknown): Promise<void> {
+    const db = await getDB();
+    const transaction = db.transaction(['favoriteWorkouts'], 'readwrite');
+    const store = transaction.objectStore('favoriteWorkouts');
+
+    const favorite: DBFavoriteWorkout = {
+        workoutId,
+        workout,
+        addedAt: new Date().toISOString(),
+    };
+
+    await new Promise<void>((resolve, reject) => {
+        const request = store.put(favorite);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+/**
+ * Remove treino dos favoritos
+ */
+export async function removeFavoriteWorkout(workoutId: string): Promise<void> {
+    const db = await getDB();
+    const transaction = db.transaction(['favoriteWorkouts'], 'readwrite');
+    const store = transaction.objectStore('favoriteWorkouts');
+
+    await new Promise<void>((resolve, reject) => {
+        const request = store.delete(workoutId);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+/**
+ * Verifica se treino está nos favoritos
+ */
+export async function isFavoriteWorkout(workoutId: string): Promise<boolean> {
+    const db = await getDB();
+    const transaction = db.transaction(['favoriteWorkouts'], 'readonly');
+    const store = transaction.objectStore('favoriteWorkouts');
+
+    return new Promise((resolve) => {
+        const request = store.get(workoutId);
+        request.onsuccess = () => resolve(!!request.result);
+        request.onerror = () => resolve(false);
+    });
+}
+
+/**
+ * Obtém todos os treinos favoritos
+ */
+export async function getFavoriteWorkouts(): Promise<unknown[]> {
+    const db = await getDB();
+    const transaction = db.transaction(['favoriteWorkouts'], 'readonly');
+    const store = transaction.objectStore('favoriteWorkouts');
+
+    return new Promise((resolve) => {
+        const request = store.getAll();
+        request.onsuccess = () => {
+            const favorites = request.result || [];
+            resolve(favorites.map((f: DBFavoriteWorkout) => f.workout));
+        };
+        request.onerror = () => resolve([]);
+    });
+}
+
+// ==================== WORKOUT HISTORY ====================
+
+interface DBWorkoutHistory {
+    id?: number;
+    workoutId: string;
+    workoutName: string;
+    workout: unknown; // PreconfiguredWorkout serializado
+    appliedAt: string;
+}
+
+/**
+ * Adiciona treino ao histórico
+ */
+export async function addWorkoutToHistory(workoutId: string, workoutName: string, workout: unknown): Promise<void> {
+    const db = await getDB();
+    const transaction = db.transaction(['workoutHistory'], 'readwrite');
+    const store = transaction.objectStore('workoutHistory');
+
+    const historyEntry: DBWorkoutHistory = {
+        workoutId,
+        workoutName,
+        workout,
+        appliedAt: new Date().toISOString(),
+    };
+
+    await new Promise<void>((resolve, reject) => {
+        const request = store.add(historyEntry);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+/**
+ * Obtém histórico de treinos aplicados
+ */
+export async function getWorkoutHistory(limit?: number): Promise<DBWorkoutHistory[]> {
+    const db = await getDB();
+    const transaction = db.transaction(['workoutHistory'], 'readonly');
+    const store = transaction.objectStore('workoutHistory');
+    const index = store.index('appliedAt');
+
+    return new Promise((resolve) => {
+        const request = index.getAll();
+        request.onsuccess = () => {
+            let results = (request.result || []) as DBWorkoutHistory[];
+            // Ordenar por data (mais recente primeiro)
+            results.sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime());
+            // Limitar resultados se especificado
+            if (limit) {
+                results = results.slice(0, limit);
+            }
+            resolve(results);
+        };
+        request.onerror = () => resolve([]);
+    });
+}
+
+/**
+ * Limpa histórico de treinos
+ */
+export async function clearWorkoutHistory(): Promise<void> {
+    const db = await getDB();
+    const transaction = db.transaction(['workoutHistory'], 'readwrite');
+    const store = transaction.objectStore('workoutHistory');
+
+    await new Promise<void>((resolve, reject) => {
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
 }
 

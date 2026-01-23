@@ -58,80 +58,134 @@ DECLARE
     inserted_nome TEXT;
     inserted_username TEXT;
     auth_user_exists BOOLEAN;
+    retry_count INTEGER := 0;
+    max_retries INTEGER := 5;
+    retry_delay INTEGER := 200; -- 200ms entre tentativas
 BEGIN
-    -- Verificar se o usuário existe em auth.users antes de inserir
-    -- Isso previne erro de foreign key constraint se o signup ainda não foi commitado
-    SELECT EXISTS(SELECT 1 FROM auth.users WHERE id = p_user_id) INTO auth_user_exists;
-    
-    IF NOT auth_user_exists THEN
-        RAISE EXCEPTION 'Usuário com ID % não existe em auth.users. Aguarde a conclusão do cadastro antes de criar o perfil.', p_user_id;
-    END IF;
-    
-    -- Inserir perfil do usuário
-    -- Esta função usa SECURITY DEFINER para bypass RLS
-    INSERT INTO public.users (
-        id,
-        nome,
-        username,
-        email,
-        plan_type,
-        subscription_status,
-        expiry_date,
-        idade,
-        genero,
-        peso,
-        altura,
-        objetivo,
-        points,
-        discipline_score,
-        completed_challenge_ids,
-        is_anonymized,
-        role,
-        voice_daily_limit_seconds,
-        voice_used_today_seconds,
-        voice_balance_upsell,
-        text_msg_count_today,
-        created_at,
-        updated_at
-    ) VALUES (
-        p_user_id,
-        p_nome,
-        p_username,
-        p_email,
-        p_plan_type::TEXT,  -- plan_type é TEXT com CHECK constraint
-        p_subscription_status::TEXT,  -- subscription_status é TEXT com CHECK constraint
-        p_expiry_date,
-        COALESCE((p_user_data->>'idade')::INTEGER, 0),
-        COALESCE((p_user_data->>'genero')::TEXT, 'Masculino'),
-        COALESCE((p_user_data->>'peso')::NUMERIC, 0),
-        COALESCE((p_user_data->>'altura')::NUMERIC, 0),
-        COALESCE((p_user_data->>'objetivo')::TEXT, 'perder peso'),
-        COALESCE((p_user_data->>'points')::INTEGER, 0),
-        COALESCE((p_user_data->>'disciplineScore')::INTEGER, 0),
-        CASE 
-            WHEN p_user_data->>'completedChallengeIds' IS NULL OR p_user_data->>'completedChallengeIds' = '[]' OR p_user_data->>'completedChallengeIds' = '' THEN ARRAY[]::TEXT[]
-            WHEN jsonb_typeof(p_user_data->'completedChallengeIds') = 'array' THEN 
-                ARRAY(SELECT jsonb_array_elements_text(p_user_data->'completedChallengeIds'))
-            ELSE ARRAY[]::TEXT[]
-        END,
-        COALESCE((p_user_data->>'isAnonymized')::BOOLEAN, false),
-        COALESCE((p_user_data->>'role')::TEXT, 'user'),
-        p_voice_daily_limit_seconds,
-        0,  -- voice_used_today_seconds
-        0,  -- voice_balance_upsell
-        0,  -- text_msg_count_today
-        NOW(),
-        NOW()
-    )
-    ON CONFLICT (id) DO NOTHING
-    RETURNING 
-        public.users.id,
-        public.users.nome,
-        public.users.username
-    INTO inserted_id, inserted_nome, inserted_username;
-    
-    -- Retornar os valores
-    RETURN QUERY SELECT inserted_id, inserted_nome, inserted_username;
+    -- Tentar inserir com retry para lidar com timing issues
+    -- O usuário pode não estar disponível imediatamente em auth.users após signup
+    LOOP
+        -- Verificar se o usuário existe em auth.users
+        SELECT EXISTS(SELECT 1 FROM auth.users WHERE id = p_user_id) INTO auth_user_exists;
+        
+        -- Se o usuário existe, tentar inserir
+        IF auth_user_exists THEN
+            BEGIN
+                -- Inserir perfil do usuário
+                -- Esta função usa SECURITY DEFINER para bypass RLS
+                -- IMPORTANTE: SECURITY DEFINER faz a função executar com os privilégios do criador,
+                -- permitindo que ela ignore as políticas RLS
+                INSERT INTO public.users (
+                    id,
+                    nome,
+                    username,
+                    email,
+                    plan_type,
+                    subscription_status,
+                    expiry_date,
+                    idade,
+                    genero,
+                    peso,
+                    altura,
+                    objetivo,
+                    points,
+                    discipline_score,
+                    completed_challenge_ids,
+                    is_anonymized,
+                    role,
+                    voice_daily_limit_seconds,
+                    voice_used_today_seconds,
+                    voice_balance_upsell,
+                    text_msg_count_today,
+                    created_at,
+                    updated_at
+                ) VALUES (
+                    p_user_id,
+                    p_nome,
+                    p_username,
+                    p_email,
+                    p_plan_type::TEXT,  -- plan_type é TEXT com CHECK constraint
+                    p_subscription_status::TEXT,  -- subscription_status é TEXT com CHECK constraint
+                    p_expiry_date,
+                    COALESCE((p_user_data->>'idade')::INTEGER, 0),
+                    COALESCE((p_user_data->>'genero')::TEXT, 'Masculino'),
+                    COALESCE((p_user_data->>'peso')::NUMERIC, 0),
+                    COALESCE((p_user_data->>'altura')::NUMERIC, 0),
+                    COALESCE((p_user_data->>'objetivo')::TEXT, 'perder peso'),
+                    COALESCE((p_user_data->>'points')::INTEGER, 0),
+                    COALESCE((p_user_data->>'disciplineScore')::INTEGER, 0),
+                    CASE 
+                        WHEN p_user_data->>'completedChallengeIds' IS NULL OR p_user_data->>'completedChallengeIds' = '[]' OR p_user_data->>'completedChallengeIds' = '' THEN ARRAY[]::TEXT[]
+                        WHEN jsonb_typeof(p_user_data->'completedChallengeIds') = 'array' THEN 
+                            ARRAY(SELECT jsonb_array_elements_text(p_user_data->'completedChallengeIds'))
+                        ELSE ARRAY[]::TEXT[]
+                    END,
+                    COALESCE((p_user_data->>'isAnonymized')::BOOLEAN, false),
+                    COALESCE((p_user_data->>'role')::TEXT, 'user'),
+                    p_voice_daily_limit_seconds,
+                    0,  -- voice_used_today_seconds
+                    0,  -- voice_balance_upsell
+                    0,  -- text_msg_count_today
+                    NOW(),
+                    NOW()
+                )
+                ON CONFLICT (id) DO NOTHING
+                RETURNING 
+                    public.users.id,
+                    public.users.nome,
+                    public.users.username
+                INTO inserted_id, inserted_nome, inserted_username;
+                
+                -- Se inserted_id é NULL, significa que o registro já existe (ON CONFLICT DO NOTHING)
+                -- Nesse caso, buscar o registro existente
+                IF inserted_id IS NULL THEN
+                    SELECT id, nome, username 
+                    INTO inserted_id, inserted_nome, inserted_username
+                    FROM public.users
+                    WHERE id = p_user_id;
+                END IF;
+                
+                -- Se chegou aqui, a inserção foi bem-sucedida ou o registro já existe
+                -- Retornar os valores
+                IF inserted_id IS NOT NULL THEN
+                    RETURN QUERY SELECT inserted_id, inserted_nome, inserted_username;
+                    EXIT; -- Sair do loop
+                ELSE
+                    -- Se ainda não temos o ID, pode ser problema de RLS ou timing
+                    -- Tentar novamente
+                    IF retry_count < max_retries THEN
+                        retry_count := retry_count + 1;
+                        PERFORM pg_sleep(retry_delay / 1000.0);
+                        CONTINUE;
+                    ELSE
+                        RAISE EXCEPTION 'Não foi possível criar ou recuperar o perfil do usuário após % tentativas.', max_retries;
+                    END IF;
+                END IF;
+            EXCEPTION
+                WHEN foreign_key_violation THEN
+                    -- Se for erro de foreign key, aguardar e tentar novamente
+                    IF retry_count < max_retries THEN
+                        retry_count := retry_count + 1;
+                        PERFORM pg_sleep(retry_delay / 1000.0); -- Converter ms para segundos
+                        CONTINUE; -- Tentar novamente
+                    ELSE
+                        RAISE EXCEPTION 'Usuário com ID % não existe em auth.users após % tentativas. Aguarde a conclusão do cadastro antes de criar o perfil.', p_user_id, max_retries;
+                    END IF;
+                WHEN OTHERS THEN
+                    -- Para outros erros, relançar
+                    RAISE;
+            END;
+        ELSE
+            -- Usuário ainda não existe em auth.users
+            IF retry_count < max_retries THEN
+                retry_count := retry_count + 1;
+                PERFORM pg_sleep(retry_delay / 1000.0); -- Converter ms para segundos
+                CONTINUE; -- Tentar novamente
+            ELSE
+                RAISE EXCEPTION 'Usuário com ID % não existe em auth.users após % tentativas. Aguarde a conclusão do cadastro antes de criar o perfil.', p_user_id, max_retries;
+            END IF;
+        END IF;
+    END LOOP;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

@@ -55,6 +55,15 @@ export const useRouter = () => {
     };
   }, []);
   
+  // Função para navegar para uma rota
+  const navigate = (newPath: string) => {
+    if (typeof window !== 'undefined') {
+      // Garantir que o path comece com /
+      const normalizedPath = newPath.startsWith('/') ? newPath : `/${newPath}`;
+      window.location.hash = `#${normalizedPath}`;
+    }
+  };
+  
   // Retornar path vazio se não houver hash, para o App decidir
-  return { path: path || '' };
+  return { path: path || '', navigate };
 };

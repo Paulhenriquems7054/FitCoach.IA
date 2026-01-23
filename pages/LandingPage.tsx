@@ -287,7 +287,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onAnalyze, onDe
                   Treinos e Nutrição Consciente
                 </h1>
                 <p className="text-lg sm:text-xl md:text-2xl text-slate-700 dark:text-slate-300 max-w-2xl mx-auto">
-                  Planos alimentares personalizados e chefs IA para sua melhor versão
+                  Treinos personalizados e Planos alimentares para sua melhor versão
                 </p>
                 <div className="flex items-center justify-center gap-3 mt-6">
                   <span className="px-4 py-2 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 rounded-full text-sm font-semibold">
