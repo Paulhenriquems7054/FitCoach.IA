@@ -920,14 +920,14 @@ const LoginPage: React.FC = () => {
             let user: any = null;
             let loginMethod = '';
 
-            // Tentar login no Supabase primeiro (usuários criados com cupom)
+            // Tentar login no Supabase primeiro (usuários criados com email/Supabase)
             let emailFromDB: string | null = null; // Declarar fora do try para uso posterior
             let emailAttempts: string[] = []; // Declarar fora do try para uso no erro
             let lastSupabaseError: { message: string; code?: string; details?: string } | null = null; // Armazenar último erro do Supabase
             try {
                 const supabase = getSupabaseClient();
                 
-                // Primeiro, tentar buscar o usuário na tabela users pelo username OU email para obter o email
+                // Primeiro, tentar buscar o usuário na tabela users pelo username, email OU nome para obter o email
                 let userIdFromDB: string | null = null;
                 try {
                     // Se o input parece email, buscar por email primeiro
@@ -943,7 +943,7 @@ const LoginPage: React.FC = () => {
                             emailFromDB = userDataByEmail.email || sanitizedUsername;
                         }
                     }
-                    
+
                     // Se não encontrou por email, buscar por username
                     if (!emailFromDB) {
                         const { data: userData } = await supabase
@@ -955,6 +955,36 @@ const LoginPage: React.FC = () => {
                         if (userData) {
                             userIdFromDB = userData.id;
                             emailFromDB = userData.email || null; // Email salvo na tabela users
+                        }
+                    }
+
+                    // Se ainda não encontrou e o input NÃO parece email, tentar pelo nome (nome completo ou primeiro nome)
+                    if (!emailFromDB && !sanitizedUsername.includes('@')) {
+                        // 1) Tentar match exato de nome (case insensitive)
+                        const { data: userByFullName } = await supabase
+                            .from('users')
+                            .select('id, username, email, nome')
+                            .ilike('nome', sanitizedUsername)
+                            .maybeSingle();
+
+                        if (userByFullName) {
+                            userIdFromDB = userByFullName.id;
+                            emailFromDB = userByFullName.email || null;
+                        } else {
+                            // 2) Tentar pelo primeiro nome (primeira palavra)
+                            const firstName = sanitizedUsername.split(' ')[0];
+                            if (firstName) {
+                                const { data: userByFirstName } = await supabase
+                                    .from('users')
+                                    .select('id, username, email, nome')
+                                    .ilike('nome', `${firstName}%`)
+                                    .maybeSingle();
+
+                                if (userByFirstName) {
+                                    userIdFromDB = userByFirstName.id;
+                                    emailFromDB = userByFirstName.email || null;
+                                }
+                            }
                         }
                     }
                 } catch (e) {

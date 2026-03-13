@@ -19,6 +19,7 @@ import { TrialCounter } from '../components/TrialCounter';
 import { TrialExpiredBanner } from '../components/TrialExpiredBanner';
 import { TesteSemIAExpiradoBanner } from '../components/TesteSemIAExpiradoBanner';
 import { UsageIndicator } from '../hooks/useSpendingTracker';
+import { redirectToSalesPage } from '../constants/salesPage';
 
 const QuickActionCard: React.FC<{ href: string; title: string; description: string; icon: React.ElementType }> = ({ href, title, description, icon: Icon }) => (
     <a href={href} className="block group">
@@ -194,7 +195,26 @@ const HomePage: React.FC = () => {
             <div className="space-y-6">
                 {/* Indicador de Uso do Plano */}
                 <UsageIndicator />
-                
+
+                {/* CTA para contratar planos após conhecer o app */}
+                <Card>
+                    <div className="p-6 space-y-3">
+                        <h3 className="font-bold text-slate-900 dark:text-white">
+                            👋 Gostou do app?
+                        </h3>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                            Se você é dono(a) de academia ou personal e quer usar o FitCoach.IA com seus alunos,
+                            escolha um dos planos na nossa página oficial de vendas.
+                        </p>
+                        <Button
+                            className="w-full sm:w-auto"
+                            onClick={() => redirectToSalesPage('B2B')}
+                        >
+                            Quero contratar para minha academia
+                        </Button>
+                    </div>
+                </Card>
+
                 <Card>
                     <div className="p-6">
                         <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
