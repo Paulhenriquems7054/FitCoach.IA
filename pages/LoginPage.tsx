@@ -2160,14 +2160,22 @@ const LoginPage: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => setTesteComIA(true)}
+                                                    aria-pressed={testeComIA === true}
                                                     className={`p-4 rounded-lg border-2 transition-all ${
                                                         testeComIA === true
-                                                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-md'
+                                                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-md ring-2 ring-primary-400 dark:ring-primary-500 scale-[1.02]'
                                                             : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-primary-300 dark:hover:border-primary-600'
                                                     }`}
                                                 >
                                                     <div className="text-center">
-                                                        <div className="text-2xl mb-2">🤖</div>
+                                                        <div className="flex items-center justify-center gap-2 mb-2">
+                                                            <span className="text-2xl">🤖</span>
+                                                            {testeComIA === true && (
+                                                                <span className="inline-flex items-center rounded-full bg-primary-500 text-white text-[10px] font-semibold px-2 py-0.5">
+                                                                    Selecionado
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <div className="font-semibold text-sm text-slate-900 dark:text-white mb-1">
                                                             COM IA
                                                         </div>
@@ -2179,14 +2187,22 @@ const LoginPage: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => setTesteComIA(false)}
+                                                    aria-pressed={testeComIA === false}
                                                     className={`p-4 rounded-lg border-2 transition-all ${
                                                         testeComIA === false
-                                                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-md'
+                                                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-md ring-2 ring-primary-400 dark:ring-primary-500 scale-[1.02]'
                                                             : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-primary-300 dark:hover:border-primary-600'
                                                     }`}
                                                 >
                                                     <div className="text-center">
-                                                        <div className="text-2xl mb-2">📝</div>
+                                                        <div className="flex items-center justify-center gap-2 mb-2">
+                                                            <span className="text-2xl">📝</span>
+                                                            {testeComIA === false && (
+                                                                <span className="inline-flex items-center rounded-full bg-primary-500 text-white text-[10px] font-semibold px-2 py-0.5">
+                                                                    Selecionado
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <div className="font-semibold text-sm text-slate-900 dark:text-white mb-1">
                                                             SEM IA
                                                         </div>
