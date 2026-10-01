@@ -21,8 +21,6 @@ import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
 import { UsersIcon } from '../icons/UsersIcon';
 import { KeyIcon } from '../icons/KeyIcon';
 import { CalendarIcon } from '../icons/CalendarIcon';
-import { ChatBubbleIcon } from '../icons/ChatBubbleIcon';
-import { UserGroupIcon } from '../icons/UserGroupIcon';
 import { StarIcon } from '../icons/StarIcon';
 
 interface SidebarProps {
@@ -85,8 +83,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     '/smart-meal',
     '/analyzer',
     '/calendar',
-    '/community',
-    '/group-workouts',
     '/perfil',
     '/billing',
   ];
@@ -117,8 +113,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
         { name: t('sidebar.smartMeal'), href: '#/smart-meal', icon: WandIcon },
         { name: t('sidebar.plateAnalyzer'), href: '#/analyzer', icon: CameraIcon },
         { name: 'Calendário', href: '#/calendar', icon: CalendarIcon },
-        { name: 'Comunidade', href: '#/community', icon: ChatBubbleIcon },
-        { name: 'Treinos em Grupo', href: '#/group-workouts', icon: UserGroupIcon },
         { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon },
         { name: 'Minha Assinatura', href: '#/billing', icon: ChartBarIcon },
         { name: 'Controle de Academias e Assinaturas', href: '#/admin-dashboard', icon: ChartBarIcon },
@@ -134,8 +128,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
         { name: 'Criar Planos de Treino', href: '#/trainer-workout', icon: HeartIcon, show: permissions.canViewStudents },
         { name: 'Biblioteca de Exercícios', href: '#/biblioteca', icon: BookOpenIcon },
         { name: 'Calendário', href: '#/calendar', icon: CalendarIcon },
-        { name: 'Comunidade', href: '#/community', icon: ChatBubbleIcon },
-        { name: 'Treinos em Grupo', href: '#/group-workouts', icon: UserGroupIcon },
       ].filter(item => item.show !== false);
     }
     
@@ -146,8 +138,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
         { name: 'Criar Planos de Treino', href: '#/trainer-workout', icon: HeartIcon, show: permissions.canViewStudents },
         { name: 'Biblioteca de Exercícios', href: '#/biblioteca', icon: BookOpenIcon },
         { name: 'Calendário', href: '#/calendar', icon: CalendarIcon },
-        { name: 'Comunidade', href: '#/community', icon: ChatBubbleIcon },
-        { name: 'Treinos em Grupo', href: '#/group-workouts', icon: UserGroupIcon },
       ].filter(item => item.show !== false);
     }
 
@@ -163,8 +153,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
       { name: t('sidebar.smartMeal'), href: '#/smart-meal', icon: WandIcon },
       { name: t('sidebar.plateAnalyzer'), href: '#/analyzer', icon: CameraIcon },
       { name: 'Calendário', href: '#/calendar', icon: CalendarIcon },
-      { name: 'Comunidade', href: '#/community', icon: ChatBubbleIcon },
-      { name: 'Treinos em Grupo', href: '#/group-workouts', icon: UserGroupIcon },
       { name: 'Gerenciar Alunos', href: '#/student-management', icon: UsersIcon, show: permissions.canViewStudents },
       { name: 'Minha Assinatura', href: '#/billing', icon: ChartBarIcon },
       { name: 'Planos', href: 'https://pagina-de-vendas-fit-coach-ai.vercel.app/', icon: StarIcon, external: true },
@@ -348,7 +336,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
                           )}
                           aria-hidden="true"
                         />
-                        <span className="flex-1 text-left leading-snug">{item.name}</span>
+                        <span className="flex-1 text-left leading-snug break-words min-w-0">{item.name}</span>
                       </a>
                       );
                     })}
@@ -384,7 +372,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
                           className="mr-3 flex-shrink-0 h-6 w-6 text-slate-400 group-hover:text-slate-500 dark:text-slate-500 dark:group-hover:text-slate-400 transition-colors duration-200"
                           aria-hidden="true"
                         />
-                        <span className="flex-1 text-left leading-snug">{item.name}</span>
+                        <span className="flex-1 text-left leading-snug break-words min-w-0">{item.name}</span>
                       </a>
                     ))}
                   </nav>

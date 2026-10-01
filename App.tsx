@@ -62,8 +62,6 @@ const ChangePlanPage = lazy(() => import('./pages/ChangePlanPage'));
 const CreateDefaultUsersPage = lazy(() => import('./pages/CreateDefaultUsersPage'));
 const StudentAiPlansPage = lazy(() => import('./pages/StudentAiPlansPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
-const CommunityPage = lazy(() => import('./pages/CommunityPage'));
-const GroupWorkoutsPage = lazy(() => import('./pages/GroupWorkoutsPage'));
 const BillingPage = lazy(() => import('./pages/BillingPage'));
 const PlansPage = lazy(() => import('./pages/PlansPage'));
 const PreconfiguredWorkoutsPage = lazy(() => import('./pages/PreconfiguredWorkoutsPage'));
@@ -905,8 +903,6 @@ const App: React.FC = () => {
             case '/change-plan': return <ChangePlanPage />;
             case '/create-default-users': return <CreateDefaultUsersPage />;
             case '/calendar': return <CalendarPage />;
-            case '/community': return <CommunityPage />;
-            case '/group-workouts': return <GroupWorkoutsPage />;
             case '/billing': return <BillingPage />;
             case '/plans': return <PlansPage />;
             case '/treinos-pre-configurados': return <PreconfiguredWorkoutsPage />;
